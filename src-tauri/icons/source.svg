@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="180" fill="#0f172a"/>
+  <!-- Root node -->
+  <circle cx="512" cy="230" r="70" fill="#fbbf24" stroke="#fff" stroke-width="8"/>
+  <!-- Second generation -->
+  <circle cx="300" cy="500" r="60" fill="#60a5fa" stroke="#fff" stroke-width="8"/>
+  <circle cx="724" cy="500" r="60" fill="#f472b6" stroke="#fff" stroke-width="8"/>
+  <!-- Third generation -->
+  <circle cx="180" cy="770" r="50" fill="#34d399" stroke="#fff" stroke-width="8"/>
+  <circle cx="420" cy="770" r="50" fill="#34d399" stroke="#fff" stroke-width="8"/>
+  <circle cx="604" cy="770" r="50" fill="#a78bfa" stroke="#fff" stroke-width="8"/>
+  <circle cx="844" cy="770" r="50" fill="#a78bfa" stroke="#fff" stroke-width="8"/>
+  <!-- Connectors -->
+  <g stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round">
+    <path d="M512 300 L512 380 L300 380 L300 440"/>
+    <path d="M512 380 L724 380 L724 440"/>
+    <path d="M300 560 L300 640 L180 640 L180 720"/>
+    <path d="M300 640 L420 640 L420 720"/>
+    <path d="M724 560 L724 640 L604 640 L604 720"/>
+    <path d="M724 640 L844 640 L844 720"/>
+  </g>
+</svg>
