@@ -18,6 +18,9 @@ dist-ssr
 src-tauri/target
 src-tauri/gen
 
+# workbuddy
+.workbuddy
+
 # logs
 npm-debug.log*
 yarn-debug.log*
