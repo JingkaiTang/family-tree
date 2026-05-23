@@ -6,7 +6,7 @@ import type { Member } from '@/core/schema'
 export type EdgeKind = 'parent' | 'child' | 'spouse' | 'sibling'
 
 /** 关系子类型，用于区分血亲/继/养/半亲等 */
-export type RelType = 'blood' | 'adopted' | 'half' | 'married' | 'divorced'
+export type RelType = 'blood' | 'adopted' | 'step' | 'half' | 'married' | 'divorced'
 
 export interface PathStep {
   kind: EdgeKind

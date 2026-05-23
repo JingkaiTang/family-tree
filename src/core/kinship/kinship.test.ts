@@ -832,11 +832,11 @@ describe('getKinship — P2: 继父/继母（adopted parent）', () => {
     m.self.parents.push({ id: 'bio_mom', type: 'blood' })
     m.bio_mom.children.push({ id: 'self', type: 'blood' })
 
-    // 继父继母（adopted 类型）
-    m.self.parents.push({ id: 'step_dad', type: 'adopted' })
-    m.step_dad.children.push({ id: 'self', type: 'adopted' })
-    m.self.parents.push({ id: 'step_mom', type: 'adopted' })
-    m.step_mom.children.push({ id: 'self', type: 'adopted' })
+    // 继父继母（step 类型）
+    m.self.parents.push({ id: 'step_dad', type: 'step' })
+    m.step_dad.children.push({ id: 'self', type: 'step' })
+    m.self.parents.push({ id: 'step_mom', type: 'step' })
+    m.step_mom.children.push({ id: 'self', type: 'step' })
 
     return m
   }
@@ -1009,4 +1009,419 @@ describe('getKinship — P2: 妯娌/连襟', () => {
     const m = buildSistersInLawFixture()
     expect(getKinship('wife', 'sis_husb', m)).toBe('连襟')
   })
+})
+
+// ========================= 新增测试：外孙/外孙女 =========================
+
+describe('getKinship — 外孙/外孙女（通过女儿的后代）', () => {
+  function buildGrandchildFixture(): Record<string, Member> {
+    const mk = (id: string, gender: 'male' | 'female'): Member => ({
+      id, firstName: id, lastName: '', gender,
+      parents: [], children: [], siblings: [], spouses: [],
+      godparents: [], godchildren: [],
+    })
+    const m: Record<string, Member> = {
+      self: mk('self', 'male'),
+      son: mk('son', 'male'),
+      daughter: mk('daughter', 'female'),
+      gson: mk('gson', 'male'),           // 儿子的儿子
+      gdau: mk('gdau', 'female'),         // 儿子的女儿
+      gson_d: mk('gson_d', 'male'),       // 女儿的儿子
+      gdau_d: mk('gdau_d', 'female'),     // 女儿的女儿
+      gson_gson: mk('gson_gson', 'male'), // 儿子的儿子的儿子
+      gson_d_gson: mk('gson_d_gson', 'male'), // 女儿的儿子的儿子
+    }
+    const addParent = (child: Member, parent: Member) => {
+      child.parents.push({ id: parent.id, type: 'blood' })
+      parent.children.push({ id: child.id, type: 'blood' })
+    }
+    addParent(m.son, m.self)
+    addParent(m.daughter, m.self)
+    addParent(m.gson, m.son)
+    addParent(m.gdau, m.son)
+    addParent(m.gson_d, m.daughter)
+    addParent(m.gdau_d, m.daughter)
+    addParent(m.gson_gson, m.gson)
+    addParent(m.gson_d_gson, m.gson_d)
+    return m
+  }
+
+  const m = buildGrandchildFixture()
+  const cases: Array<[string, string, string]> = [
+    ['self', 'gson', '孙子'],
+    ['self', 'gdau', '孙女'],
+    ['self', 'gson_d', '外孙'],
+    ['self', 'gdau_d', '外孙女'],
+    ['self', 'gson_gson', '曾孙'],
+    ['self', 'gson_d_gson', '外曾孙'],
+  ]
+  for (const [from, to, expected] of cases) {
+    it(`${from} → ${to} = ${expected}`, () => {
+      expect(getKinship(from, to, m)).toBe(expected)
+    })
+  }
+})
+
+// ========================= 新增测试：堂/表兄弟姐妹年龄区分 =========================
+
+describe('getKinship — 堂/表兄弟姐妹年龄区分', () => {
+  function buildCousinAgeFixture(): Record<string, Member> {
+    const mk = (id: string, gender: 'male' | 'female', birthDate?: string): Member => ({
+      id, firstName: id, lastName: '', gender, birthDate,
+      parents: [], children: [], siblings: [], spouses: [],
+      godparents: [], godchildren: [],
+    })
+    const m: Record<string, Member> = {
+      self: mk('self', 'male', '1990-01-01'),
+      dad: mk('dad', 'male', '1960-01-01'),
+      mom: mk('mom', 'female', '1962-01-01'),
+      gpa: mk('gpa', 'male'),
+      gma: mk('gma', 'female'),
+      uncle_p: mk('uncle_p', 'male'),
+      aunt_p: mk('aunt_p', 'female'),
+      mgp: mk('mgp', 'male'),
+      mgm: mk('mgm', 'female'),
+      aunt_m: mk('aunt_m', 'female'),
+      // 堂兄弟（比自己年长）
+      cousin_p_m_older: mk('cousin_p_m_older', 'male', '1985-01-01'),
+      // 堂兄弟（比自己年幼）
+      cousin_p_m_younger: mk('cousin_p_m_younger', 'male', '1995-01-01'),
+      // 表姐妹（比自己年长）
+      cousin_m_f_older: mk('cousin_m_f_older', 'female', '1987-01-01'),
+      // 表姐妹（比自己年幼）
+      cousin_m_f_younger: mk('cousin_m_f_younger', 'female', '1993-01-01'),
+    }
+    const addParent = (child: Member, parent: Member) => {
+      child.parents.push({ id: parent.id, type: 'blood' })
+      parent.children.push({ id: child.id, type: 'blood' })
+    }
+    const addSpouse = (a: Member, b: Member) => {
+      a.spouses.push({ id: b.id, type: 'married' })
+      b.spouses.push({ id: a.id, type: 'married' })
+    }
+    const addSibling = (a: Member, b: Member) => {
+      a.siblings.push({ id: b.id, type: 'blood' })
+      b.siblings.push({ id: a.id, type: 'blood' })
+    }
+    addParent(m.self, m.dad)
+    addParent(m.self, m.mom)
+    addSpouse(m.dad, m.mom)
+    addParent(m.dad, m.gpa)
+    addParent(m.dad, m.gma)
+    addSpouse(m.gpa, m.gma)
+    addParent(m.mom, m.mgp)
+    addParent(m.mom, m.mgm)
+    addSpouse(m.mgp, m.mgm)
+    addParent(m.uncle_p, m.gpa)
+    addParent(m.uncle_p, m.gma)
+    addSibling(m.uncle_p, m.dad)
+    addParent(m.aunt_p, m.gpa)
+    addParent(m.aunt_p, m.gma)
+    addSibling(m.aunt_p, m.dad)
+    addParent(m.aunt_m, m.mgp)
+    addParent(m.aunt_m, m.mgm)
+    addSibling(m.aunt_m, m.mom)
+    addParent(m.cousin_p_m_older, m.uncle_p)
+    addParent(m.cousin_p_m_younger, m.uncle_p)
+    addParent(m.cousin_m_f_older, m.aunt_m)
+    addParent(m.cousin_m_f_younger, m.aunt_m)
+    return m
+  }
+
+  const m = buildCousinAgeFixture()
+  const cases: Array<[string, string, string]> = [
+    ['self', 'cousin_p_m_older', '堂兄'],
+    ['self', 'cousin_p_m_younger', '堂弟'],
+    ['self', 'cousin_m_f_older', '表姐'],
+    ['self', 'cousin_m_f_younger', '表妹'],
+  ]
+  for (const [from, to, expected] of cases) {
+    it(`${from} → ${to} = ${expected}`, () => {
+      expect(getKinship(from, to, m)).toBe(expected)
+    })
+  }
+})
+
+// ========================= 新增测试：堂/表侄辈配偶 =========================
+
+describe('getKinship — 堂/表侄辈配偶', () => {
+  function buildCousinNephewSpouseFixture(): Record<string, Member> {
+    const mk = (id: string, gender: 'male' | 'female'): Member => ({
+      id, firstName: id, lastName: '', gender,
+      parents: [], children: [], siblings: [], spouses: [],
+      godparents: [], godchildren: [],
+    })
+    const m: Record<string, Member> = {
+      self: mk('self', 'male'),
+      dad: mk('dad', 'male'),
+      mom: mk('mom', 'female'),
+      gpa: mk('gpa', 'male'),
+      gma: mk('gma', 'female'),
+      uncle_p: mk('uncle_p', 'male'),
+      aunt_m: mk('aunt_m', 'female'),
+      mgp: mk('mgp', 'male'),
+      mgm: mk('mgm', 'female'),
+      cousin_p_m: mk('cousin_p_m', 'male'),       // 堂兄弟
+      cousin_p_m_son: mk('cousin_p_m_son', 'male'),     // 堂侄
+      cousin_p_m_son_wife: mk('cousin_p_m_son_wife', 'female'), // 堂侄媳
+      cousin_p_m_dau: mk('cousin_p_m_dau', 'female'),   // 堂侄女
+      cousin_p_m_dau_husb: mk('cousin_p_m_dau_husb', 'male'), // 堂侄女婿
+      cousin_m_f: mk('cousin_m_f', 'female'),       // 表姐妹
+      cousin_m_f_son: mk('cousin_m_f_son', 'male'),     // 表外甥
+      cousin_m_f_son_wife: mk('cousin_m_f_son_wife', 'female'), // 表甥媳
+    }
+    const addParent = (child: Member, parent: Member) => {
+      child.parents.push({ id: parent.id, type: 'blood' })
+      parent.children.push({ id: child.id, type: 'blood' })
+    }
+    const addSpouse = (a: Member, b: Member) => {
+      a.spouses.push({ id: b.id, type: 'married' })
+      b.spouses.push({ id: a.id, type: 'married' })
+    }
+    const addSibling = (a: Member, b: Member) => {
+      a.siblings.push({ id: b.id, type: 'blood' })
+      b.siblings.push({ id: a.id, type: 'blood' })
+    }
+    addParent(m.self, m.dad)
+    addParent(m.self, m.mom)
+    addParent(m.dad, m.gpa)
+    addParent(m.dad, m.gma)
+    addParent(m.mom, m.mgp)
+    addParent(m.mom, m.mgm)
+    addParent(m.uncle_p, m.gpa)
+    addParent(m.uncle_p, m.gma)
+    addSibling(m.uncle_p, m.dad)
+    addParent(m.aunt_m, m.mgp)
+    addParent(m.aunt_m, m.mgm)
+    addSibling(m.aunt_m, m.mom)
+    addParent(m.cousin_p_m, m.uncle_p)
+    addParent(m.cousin_p_m_son, m.cousin_p_m)
+    addSpouse(m.cousin_p_m_son, m.cousin_p_m_son_wife)
+    addParent(m.cousin_p_m_dau, m.cousin_p_m)
+    addSpouse(m.cousin_p_m_dau, m.cousin_p_m_dau_husb)
+    addParent(m.cousin_m_f, m.aunt_m)
+    addParent(m.cousin_m_f_son, m.cousin_m_f)
+    addSpouse(m.cousin_m_f_son, m.cousin_m_f_son_wife)
+    return m
+  }
+
+  const m = buildCousinNephewSpouseFixture()
+  const cases: Array<[string, string, string]> = [
+    ['self', 'cousin_p_m_son', '堂侄'],
+    ['self', 'cousin_p_m_son_wife', '堂侄媳'],
+    ['self', 'cousin_p_m_dau', '堂侄女'],
+    ['self', 'cousin_p_m_dau_husb', '堂侄女婿'],
+    ['self', 'cousin_m_f_son', '表外甥'],
+    ['self', 'cousin_m_f_son_wife', '表甥媳'],
+  ]
+  for (const [from, to, expected] of cases) {
+    it(`${from} → ${to} = ${expected}`, () => {
+      expect(getKinship(from, to, m)).toBe(expected)
+    })
+  }
+})
+
+// ========================= 新增测试：养父/养母 =========================
+
+describe('getKinship — 养父/养母（adopted parent）', () => {
+  function buildAdoptedParentFixture(): Record<string, Member> {
+    const mk = (id: string, gender: 'male' | 'female'): Member => ({
+      id, firstName: id, lastName: '', gender,
+      parents: [], children: [], siblings: [], spouses: [],
+      godparents: [], godchildren: [],
+    })
+    const m: Record<string, Member> = {
+      self: mk('self', 'male'),
+      adopt_dad: mk('adopt_dad', 'male'),
+      adopt_mom: mk('adopt_mom', 'female'),
+      bio_dad: mk('bio_dad', 'male'),
+      bio_mom: mk('bio_mom', 'female'),
+    }
+    m.self.parents.push({ id: 'bio_dad', type: 'blood' })
+    m.bio_dad.children.push({ id: 'self', type: 'blood' })
+    m.self.parents.push({ id: 'bio_mom', type: 'blood' })
+    m.bio_mom.children.push({ id: 'self', type: 'blood' })
+    m.self.parents.push({ id: 'adopt_dad', type: 'adopted' })
+    m.adopt_dad.children.push({ id: 'self', type: 'adopted' })
+    m.self.parents.push({ id: 'adopt_mom', type: 'adopted' })
+    m.adopt_mom.children.push({ id: 'self', type: 'adopted' })
+    return m
+  }
+  const m = buildAdoptedParentFixture()
+  it('adopted parent 男 → 养父', () => {
+    expect(getKinship('self', 'adopt_dad', m)).toBe('养父')
+  })
+  it('adopted parent 女 → 养母', () => {
+    expect(getKinship('self', 'adopt_mom', m)).toBe('养母')
+  })
+  it('blood parent 男 → 父亲', () => {
+    expect(getKinship('self', 'bio_dad', m)).toBe('父亲')
+  })
+  it('blood parent 女 → 母亲', () => {
+    expect(getKinship('self', 'bio_mom', m)).toBe('母亲')
+  })
+})
+
+// ========================= 新增测试：堂兄弟配偶年龄区分 =========================
+
+describe('getKinship — 堂兄弟配偶年龄区分', () => {
+  function buildCousinSpouseAgeFixture(): Record<string, Member> {
+    const mk = (id: string, gender: 'male' | 'female', birthDate?: string): Member => ({
+      id, firstName: id, lastName: '', gender, birthDate,
+      parents: [], children: [], siblings: [], spouses: [],
+      godparents: [], godchildren: [],
+    })
+    const m: Record<string, Member> = {
+      self: mk('self', 'male', '1990-01-01'),
+      dad: mk('dad', 'male'),
+      gpa: mk('gpa', 'male'),
+      gma: mk('gma', 'female'),
+      uncle_p: mk('uncle_p', 'male'),
+      cousin_p_m_older: mk('cousin_p_m_older', 'male', '1985-01-01'),
+      cousin_p_m_older_wife: mk('cousin_p_m_older_wife', 'female'),
+      cousin_p_m_younger: mk('cousin_p_m_younger', 'male', '1995-01-01'),
+      cousin_p_m_younger_wife: mk('cousin_p_m_younger_wife', 'female'),
+    }
+    const addParent = (child: Member, parent: Member) => {
+      child.parents.push({ id: parent.id, type: 'blood' })
+      parent.children.push({ id: child.id, type: 'blood' })
+    }
+    const addSpouse = (a: Member, b: Member) => {
+      a.spouses.push({ id: b.id, type: 'married' })
+      b.spouses.push({ id: a.id, type: 'married' })
+    }
+    const addSibling = (a: Member, b: Member) => {
+      a.siblings.push({ id: b.id, type: 'blood' })
+      b.siblings.push({ id: a.id, type: 'blood' })
+    }
+    addParent(m.self, m.dad)
+    addParent(m.dad, m.gpa)
+    addParent(m.dad, m.gma)
+    addSpouse(m.gpa, m.gma)
+    addParent(m.uncle_p, m.gpa)
+    addParent(m.uncle_p, m.gma)
+    addSibling(m.uncle_p, m.dad)
+    addParent(m.cousin_p_m_older, m.uncle_p)
+    addSpouse(m.cousin_p_m_older, m.cousin_p_m_older_wife)
+    addParent(m.cousin_p_m_younger, m.uncle_p)
+    addSpouse(m.cousin_p_m_younger, m.cousin_p_m_younger_wife)
+    return m
+  }
+
+  const m = buildCousinSpouseAgeFixture()
+  const cases: Array<[string, string, string]> = [
+    ['self', 'cousin_p_m_older', '堂兄'],
+    ['self', 'cousin_p_m_older_wife', '堂嫂'],
+    ['self', 'cousin_p_m_younger', '堂弟'],
+    ['self', 'cousin_p_m_younger_wife', '堂弟媳'],
+  ]
+  for (const [from, to, expected] of cases) {
+    it(`${from} → ${to} = ${expected}`, () => {
+      expect(getKinship(from, to, m)).toBe(expected)
+    })
+  }
+})
+
+// ========================= 新增测试：祖辈旁系亲属的配偶 =========================
+
+describe('getKinship — 祖辈旁系亲属的配偶', () => {
+  function buildGrandUncleSpouseFixture(): Record<string, Member> {
+    const mk = (id: string, gender: 'male' | 'female'): Member => ({
+      id, firstName: id, lastName: '', gender,
+      parents: [], children: [], siblings: [], spouses: [],
+      godparents: [], godchildren: [],
+    })
+    const m: Record<string, Member> = {
+      self: mk('self', 'male'),
+      dad: mk('dad', 'male'),
+      mom: mk('mom', 'female'),
+      gpa: mk('gpa', 'male'),
+      gma: mk('gma', 'female'),
+      great_gpa: mk('great_gpa', 'male'),
+      great_gma: mk('great_gma', 'female'),
+      // 爷爷的兄弟 = 叔公
+      granduncle: mk('granduncle', 'male'),
+      granduncle_wife: mk('granduncle_wife', 'female'),
+      // 爷爷的姐妹 = 姑奶奶
+      grandaunt: mk('grandaunt', 'female'),
+      grandaunt_husb: mk('grandaunt_husb', 'male'),
+      // 外公的兄弟 = 舅姥爷
+      granduncle_m: mk('granduncle_m', 'male'),
+      granduncle_m_wife: mk('granduncle_m_wife', 'female'),
+      // 外公的姐妹 = 姨姥
+      grandaunt_m: mk('grandaunt_m', 'female'),
+      grandaunt_m_husb: mk('grandaunt_m_husb', 'male'),
+      mgp: mk('mgp', 'male'),
+      mgm: mk('mgm', 'female'),
+      mgp_father: mk('mgp_father', 'male'),
+      mgp_mother: mk('mgp_mother', 'female'),
+    }
+    const addParent = (child: Member, parent: Member) => {
+      child.parents.push({ id: parent.id, type: 'blood' })
+      parent.children.push({ id: child.id, type: 'blood' })
+    }
+    const addSpouse = (a: Member, b: Member) => {
+      a.spouses.push({ id: b.id, type: 'married' })
+      b.spouses.push({ id: a.id, type: 'married' })
+    }
+    const addSibling = (a: Member, b: Member) => {
+      a.siblings.push({ id: b.id, type: 'blood' })
+      b.siblings.push({ id: a.id, type: 'blood' })
+    }
+    // 父系
+    addParent(m.self, m.dad)
+    addParent(m.self, m.mom)
+    addSpouse(m.dad, m.mom)
+    addParent(m.dad, m.gpa)
+    addParent(m.dad, m.gma)
+    addSpouse(m.gpa, m.gma)
+    addParent(m.gpa, m.great_gpa)
+    addParent(m.gpa, m.great_gma)
+    addSpouse(m.great_gpa, m.great_gma)
+    // 叔公（爷爷的兄弟）
+    addParent(m.granduncle, m.great_gpa)
+    addParent(m.granduncle, m.great_gma)
+    addSibling(m.granduncle, m.gpa)
+    addSpouse(m.granduncle, m.granduncle_wife)
+    // 姑奶奶（爷爷的姐妹）
+    addParent(m.grandaunt, m.great_gpa)
+    addParent(m.grandaunt, m.great_gma)
+    addSibling(m.grandaunt, m.gpa)
+    addSpouse(m.grandaunt, m.grandaunt_husb)
+    // 母系
+    addParent(m.mom, m.mgp)
+    addParent(m.mom, m.mgm)
+    addSpouse(m.mgp, m.mgm)
+    addParent(m.mgp, m.mgp_father)
+    addParent(m.mgp, m.mgp_mother)
+    addSpouse(m.mgp_father, m.mgp_mother)
+    // 舅姥爷（外公的兄弟）
+    addParent(m.granduncle_m, m.mgp_father)
+    addParent(m.granduncle_m, m.mgp_mother)
+    addSibling(m.granduncle_m, m.mgp)
+    addSpouse(m.granduncle_m, m.granduncle_m_wife)
+    // 姨姥（外公的姐妹）
+    addParent(m.grandaunt_m, m.mgp_father)
+    addParent(m.grandaunt_m, m.mgp_mother)
+    addSibling(m.grandaunt_m, m.mgp)
+    addSpouse(m.grandaunt_m, m.grandaunt_m_husb)
+    return m
+  }
+
+  const m = buildGrandUncleSpouseFixture()
+  const cases: Array<[string, string, string]> = [
+    ['self', 'granduncle', '叔公'],
+    ['self', 'granduncle_wife', '叔婆'],
+    ['self', 'grandaunt', '姑奶奶'],
+    ['self', 'grandaunt_husb', '姑爷爷'],
+    ['self', 'granduncle_m', '舅姥爷'],
+    ['self', 'granduncle_m_wife', '舅姥姥'],
+    ['self', 'grandaunt_m', '姨姥'],
+    ['self', 'grandaunt_m_husb', '姨姥爷'],
+  ]
+  for (const [from, to, expected] of cases) {
+    it(`${from} → ${to} = ${expected}`, () => {
+      expect(getKinship(from, to, m)).toBe(expected)
+    })
+  }
 })

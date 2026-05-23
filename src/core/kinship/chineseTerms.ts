@@ -122,8 +122,11 @@ function ancestorLabel(path: PathStep[], targetGender: TargetGender, members: Re
   const paternalFirst = path[0].toGender === 'male'
 
   if (n === 1) {
-    if (path[0].relType === 'adopted') {
+    if (path[0].relType === 'step') {
       return targetGender === 'female' ? '继母' : '继父'
+    }
+    if (path[0].relType === 'adopted') {
+      return targetGender === 'female' ? '养母' : '养父'
     }
     return targetGender === 'female' ? '母亲' : '父亲'
   }
@@ -147,16 +150,41 @@ function ancestorLabel(path: PathStep[], targetGender: TargetGender, members: Re
 
 function descendantLabel(path: PathStep[], targetGender: TargetGender, members: Record<string, Member>): string {
   const n = path.length
+
+  // 检查路径中是否经过女性（除目标外），用于区分孙子/外孙
+  const goesThroughFemale = path.some((step, i) => {
+    if (i === path.length - 1) return false // 跳过目标
+    return step.toGender === 'female'
+  })
+
   if (n === 1) {
     if (path[0].relType === 'adopted') {
       return targetGender === 'female' ? '养女' : '养子'
     }
+    if (path[0].relType === 'step') {
+      return targetGender === 'female' ? '继女' : '继子'
+    }
     return targetGender === 'female' ? '女儿' : '儿子'
   }
-  if (n === 2) return targetGender === 'female' ? '孙女' : '孙子'
-  if (n === 3) return targetGender === 'female' ? '曾孙女' : '曾孙'
-  if (n === 4) return targetGender === 'female' ? '玄孙女' : '玄孙'
-  return `${n}代以下晚辈`
+  if (n === 2) {
+    if (goesThroughFemale) {
+      return targetGender === 'female' ? '外孙女' : '外孙'
+    }
+    return targetGender === 'female' ? '孙女' : '孙子'
+  }
+  if (n === 3) {
+    if (goesThroughFemale) {
+      return targetGender === 'female' ? '外曾孙女' : '外曾孙'
+    }
+    return targetGender === 'female' ? '曾孙女' : '曾孙'
+  }
+  if (n === 4) {
+    if (goesThroughFemale) {
+      return targetGender === 'female' ? '外玄孙女' : '外玄孙'
+    }
+    return targetGender === 'female' ? '玄孙女' : '玄孙'
+  }
+  return `${goesThroughFemale ? '外' : ''}${n}代以下晚辈`
 }
 
 // ==================== 旁系 ====================
@@ -205,7 +233,16 @@ function collateralLabel(
     }
     if (up === 2) {
       const prefix = branchIsMale ? '堂' : '表'
-      return targetGender === 'female' ? `${prefix}姐妹` : `${prefix}兄弟`
+      const ageOrder = compareAgeById(targetId(path), selfId, members)
+      if (targetGender === 'female') {
+        if (ageOrder === 'older') return `${prefix}姐`
+        if (ageOrder === 'younger') return `${prefix}妹`
+        return `${prefix}姐妹`
+      } else {
+        if (ageOrder === 'older') return `${prefix}兄`
+        if (ageOrder === 'younger') return `${prefix}弟`
+        return `${prefix}兄弟`
+      }
     }
     return (branchIsMale ? '远房堂' : '远房表') + (targetGender === 'female' ? '姐妹' : '兄弟')
   }
@@ -408,9 +445,13 @@ function inLawByInner(
   if (innerLabel === '女儿') return targetGender === 'female' ? '女儿' : '女婿'
   if (innerLabel === '养子') return targetGender === 'female' ? '养儿媳' : '养子'
   if (innerLabel === '养女') return targetGender === 'female' ? '养女' : '养女婿'
+  if (innerLabel === '继子') return targetGender === 'female' ? '继儿媳' : '继子'
+  if (innerLabel === '继女') return targetGender === 'female' ? '继女' : '继女婿'
   // 孙辈的配偶
   if (innerLabel === '孙子') return targetGender === 'female' ? '孙媳' : '孙子'
   if (innerLabel === '孙女') return targetGender === 'female' ? '孙女' : '孙女婿'
+  if (innerLabel === '外孙') return targetGender === 'female' ? '外孙媳' : '外孙'
+  if (innerLabel === '外孙女') return targetGender === 'female' ? '外孙女' : '外孙女婿'
   // 侄辈的配偶
   if (innerLabel === '侄子') return targetGender === 'female' ? '侄媳' : '侄子'
   if (innerLabel === '侄女') return targetGender === 'female' ? '侄女' : '侄女婿'
@@ -423,6 +464,20 @@ function inLawByInner(
   if (innerLabel === '姑姑') return targetGender === 'female' ? '姑姑' : '姑父'
   if (innerLabel === '舅舅') return targetGender === 'female' ? '舅妈' : '舅舅'
   if (innerLabel === '姨') return targetGender === 'female' ? '姨' : '姨父'
+  // 祖辈旁系亲属的配偶
+  if (innerLabel === '叔公') return targetGender === 'female' ? '叔婆' : '叔公'
+  if (innerLabel === '姑奶奶') return targetGender === 'female' ? '姑奶奶' : '姑爷爷'
+  if (innerLabel === '舅姥爷') return targetGender === 'female' ? '舅姥姥' : '舅姥爷'
+  if (innerLabel === '姨姥') return targetGender === 'female' ? '姨姥' : '姨姥爷'
+  // 堂/表祖辈旁系亲属的配偶
+  if (innerLabel === '堂叔公') return targetGender === 'female' ? '堂叔婆' : '堂叔公'
+  if (innerLabel === '堂姑奶奶') return targetGender === 'female' ? '堂姑奶奶' : '堂姑爷爷'
+  if (innerLabel === '堂舅姥爷') return targetGender === 'female' ? '堂舅姥姥' : '堂舅姥爷'
+  if (innerLabel === '堂姨姥') return targetGender === 'female' ? '堂姨姥' : '堂姨姥爷'
+  if (innerLabel === '表叔公') return targetGender === 'female' ? '表叔婆' : '表叔公'
+  if (innerLabel === '表姑奶奶') return targetGender === 'female' ? '表姑奶奶' : '表姑爷爷'
+  if (innerLabel === '表舅姥爷') return targetGender === 'female' ? '表舅姥姥' : '表舅姥爷'
+  if (innerLabel === '表姨姥') return targetGender === 'female' ? '表姨姥' : '表姨姥爷'
   // 堂/表叔伯姑舅姨的配偶
   if (innerLabel === '表伯') return targetGender === 'female' ? '表伯母' : '表伯'
   if (innerLabel === '表叔') return targetGender === 'female' ? '表婶' : '表叔'
@@ -434,9 +489,24 @@ function inLawByInner(
   if (innerLabel === '堂伯') return targetGender === 'female' ? '堂伯母' : '堂伯'
   // 堂/表兄弟姐妹的配偶
   if (innerLabel === '堂兄弟') return targetGender === 'female' ? '堂嫂' : '堂兄弟'
+  if (innerLabel === '堂兄') return targetGender === 'female' ? '堂嫂' : '堂兄'
+  if (innerLabel === '堂弟') return targetGender === 'female' ? '堂弟媳' : '堂弟'
   if (innerLabel === '堂姐妹') return targetGender === 'female' ? '堂姐妹' : '堂姐夫/妹夫'
+  if (innerLabel === '堂姐') return targetGender === 'female' ? '堂姐' : '堂姐夫'
+  if (innerLabel === '堂妹') return targetGender === 'female' ? '堂妹' : '堂妹夫'
   if (innerLabel === '表兄弟') return targetGender === 'female' ? '表嫂' : '表兄弟'
+  if (innerLabel === '表兄') return targetGender === 'female' ? '表嫂' : '表兄'
+  if (innerLabel === '表弟') return targetGender === 'female' ? '表弟媳' : '表弟'
   if (innerLabel === '表姐妹') return targetGender === 'female' ? '表姐妹' : '表姐夫/妹夫'
+  if (innerLabel === '表姐') return targetGender === 'female' ? '表姐' : '表姐夫'
+  if (innerLabel === '表妹') return targetGender === 'female' ? '表妹' : '表妹夫'
+  // 堂/表侄辈的配偶
+  if (innerLabel === '堂侄') return targetGender === 'female' ? '堂侄媳' : '堂侄'
+  if (innerLabel === '堂侄女') return targetGender === 'female' ? '堂侄女' : '堂侄女婿'
+  if (innerLabel === '表侄') return targetGender === 'female' ? '表侄媳' : '表侄'
+  if (innerLabel === '表侄女') return targetGender === 'female' ? '表侄女' : '表侄女婿'
+  if (innerLabel === '表外甥') return targetGender === 'female' ? '表甥媳' : '表外甥'
+  if (innerLabel === '表外甥女') return targetGender === 'female' ? '表外甥女' : '表甥女婿'
   // 父母的配偶
   if (innerLabel === '父亲') return targetGender === 'female' ? '母亲（或继母）' : '父亲'
   if (innerLabel === '母亲') return targetGender === 'female' ? '母亲' : '父亲（或继父）'
@@ -459,11 +529,19 @@ function viaSpouseLabel(
   if (innerLabel === '女儿') return '继女'
   if (innerLabel === '养子') return '继子'
   if (innerLabel === '养女') return '继女'
-  if (innerLabel === '哥哥' || innerLabel === '弟弟' || innerLabel === '兄弟') {
+  if (innerLabel === '继子') return '继子'
+  if (innerLabel === '继女') return '继女'
+  if (innerLabel === '哥哥' || innerLabel === '弟弟' || innerLabel === '兄弟' ||
+      innerLabel === '堂兄' || innerLabel === '堂弟' || innerLabel === '堂兄弟') {
     return selfGender === 'female' ? '大伯子/小叔子' : '大舅子/小舅子'
   }
-  if (innerLabel === '姐姐' || innerLabel === '妹妹' || innerLabel === '姐妹') {
+  if (innerLabel === '姐姐' || innerLabel === '妹妹' || innerLabel === '姐妹' ||
+      innerLabel === '堂姐' || innerLabel === '堂妹' || innerLabel === '堂姐妹') {
     return selfGender === 'female' ? '大姑子/小姑子' : '大姨子/小姨子'
+  }
+  // 表系亲属
+  if (innerLabel.startsWith('表')) {
+    return `配偶的${innerLabel}`
   }
   return `配偶的${innerLabel}`
 }

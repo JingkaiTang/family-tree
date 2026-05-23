@@ -7,8 +7,8 @@ export const SCHEMA_VERSION = 1
 export const Gender = z.enum(['male', 'female', 'other'])
 export type Gender = z.infer<typeof Gender>
 
-export const ParentType = z.enum(['blood', 'adopted'])
-export const ChildType = z.enum(['blood', 'adopted'])
+export const ParentType = z.enum(['blood', 'adopted', 'step'])
+export const ChildType = z.enum(['blood', 'adopted', 'step'])
 export const SiblingType = z.enum(['blood', 'half'])
 export const SpouseType = z.enum(['married', 'divorced'])
 /** 干亲关系 — 社会关系，不参与血缘/姻亲的称呼推算链。 */
