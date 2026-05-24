@@ -75,7 +75,7 @@ describe('groupByDistance', () => {
   })
 })
 
-describe('layoutProtagonist', () => {
+describe('布局结果', () => {
   it('返回正确的 LayoutResult 结构', async () => {
     const members: Member[] = [
       { id: '1', firstName: '我', lastName: '', gender: 'male', parents: [], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] },
