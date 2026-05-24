@@ -1,6 +1,8 @@
 import type { Member } from './schema'
 import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeLayout'
 
+const UNIT_GAP = 1.5
+
 const NODE_W = 2
 const NODE_H = 4
 const COUPLE_GAP = 0.2
@@ -18,6 +20,133 @@ export function groupByDistance(
     groups.get(distance)!.push(id)
   }
   return groups
+}
+
+interface ElkNode {
+  id: string
+  width: number
+  height: number
+  x?: number
+  y?: number
+}
+
+interface ElkEdge {
+  id: string
+  sources: string[]
+  targets: string[]
+}
+
+interface ElkGraph {
+  id: string
+  layoutOptions: Record<string, string>
+  children: ElkNode[]
+  edges: ElkEdge[]
+}
+
+export async function layoutLayerWithElk(
+  layerMembers: Member[],
+  distances: Map<string, { distance: number }>,
+): Promise<{ nodes: LaidOutNode[] }> {
+  if (layerMembers.length === 0) return { nodes: [] }
+
+  const byId = new Map(layerMembers.map(m => [m.id, m]))
+
+  const couples = buildCouplesForLayer(layerMembers, byId)
+
+  const elkNodes: ElkNode[] = couples.map(c => ({
+    id: c.id,
+    width: c.memberIds.length === 2 ? NODE_W * 2 + COUPLE_GAP : NODE_W,
+    height: NODE_H,
+  }))
+
+  const elkGraph: ElkGraph = {
+    id: 'layer',
+    layoutOptions: {
+      'elk.algorithm': 'force',
+      'elk.spacing.nodeNode': String(UNIT_GAP),
+    },
+    children: elkNodes,
+    edges: [],
+  }
+
+  const elk = await getElk()
+  const layouted = await elk.layout(elkGraph)
+
+  const nodes: LaidOutNode[] = []
+  const coupleById = new Map(couples.map(c => [c.id, c]))
+
+  for (const elkNode of layouted.children) {
+    const couple = coupleById.get(elkNode.id)
+    if (!couple) continue
+
+    const elkX = elkNode.x || 0
+    const elkY = elkNode.y || 0
+
+    couple.cx = elkX + (couple.memberIds.length === 2 ? NODE_W + COUPLE_GAP / 2 : NODE_W / 2)
+
+    couple.memberIds.forEach((id, idx) => {
+      const offset = couple.memberIds.length === 2
+        ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
+        : 0
+
+      nodes.push({
+        id,
+        cx: elkX + offset + NODE_W / 2,
+        top: elkY,
+        generation: 0,
+      })
+    })
+  }
+
+  return { nodes }
+}
+
+function buildCouplesForLayer(
+  members: Member[],
+  byId: Map<string, Member>,
+): Array<{ id: string; memberIds: string[]; cx: number }> {
+  const used = new Set<string>()
+  const couples: Array<{ id: string; memberIds: string[]; cx: number }> = []
+
+  for (const m of members) {
+    if (used.has(m.id)) continue
+    const spouse = m.spouses
+      .map(s => byId.get(s.id))
+      .find(sp => sp && !used.has(sp.id))
+
+    if (spouse) {
+      let pair = [m.id, spouse.id]
+      if (m.gender === 'female' && spouse.gender === 'male') {
+        pair = [spouse.id, m.id]
+      }
+      used.add(m.id)
+      used.add(spouse.id)
+      couples.push({
+        id: pair.join('|'),
+        memberIds: pair,
+        cx: 0,
+      })
+    } else {
+      used.add(m.id)
+      couples.push({
+        id: m.id,
+        memberIds: [m.id],
+        cx: 0,
+      })
+    }
+  }
+
+  return couples
+}
+
+let ELK: any = null
+
+async function getElk() {
+  if (!ELK) {
+    const elkModule = await import('elkjs')
+    ELK = elkModule.default
+  }
+  return new ELK()
 }
 
 export function calcRelationshipDistances(

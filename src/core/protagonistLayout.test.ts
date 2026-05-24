@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcRelationshipDistances, groupByDistance, layoutProtagonist } from './protagonistLayout'
+import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLayerWithElk } from './protagonistLayout'
 import type { Member } from './schema'
 
 describe('calcRelationshipDistances', () => {
@@ -86,5 +86,18 @@ describe('layoutProtagonist', () => {
     expect(result).toHaveProperty('canvas')
     expect(result).toHaveProperty('orphanIds')
     expect(result).toHaveProperty('offsetX')
+  })
+})
+
+describe('layoutLayerWithElk', () => {
+  it('返回节点坐标，无重叠', async () => {
+    const members: Member[] = [
+      { id: '1', firstName: 'A', lastName: '', gender: 'male', parents: [], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] },
+      { id: '2', firstName: 'B', lastName: '', gender: 'female', parents: [], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] },
+    ]
+    const result = await layoutLayerWithElk(members, new Map([['1', { distance: 1 }], ['2', { distance: 1 }]]))
+    expect(result.nodes.length).toBe(2)
+    const [n1, n2] = result.nodes
+    expect(Math.abs(n1.cx - n2.cx)).toBeGreaterThan(2)
   })
 })
