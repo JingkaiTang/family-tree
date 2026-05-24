@@ -15,7 +15,7 @@ const router = useRouter()
 const family = useFamilyStore()
 const ui = useUiStore()
 const { projectMeta, projectPath, memberCount, isDirty, membersArray, data } = storeToRefs(family)
-const { viewpointId, selectedId } = storeToRefs(ui)
+const { viewpointId, selectedId, centerLayoutId } = storeToRefs(ui)
 
 const saveStatus = computed(() => {
   if (!family.projectPath) return ''
@@ -59,6 +59,14 @@ function setViewpoint() {
 function clearViewpoint() {
   ui.setViewpoint(null)
   family.setDefaultViewpoint(undefined)
+}
+
+function setCenterLayout() {
+  ui.setCenterLayout(selectedId.value)
+}
+
+function clearCenterLayout() {
+  ui.setCenterLayout(null)
 }
 
 /**
@@ -197,6 +205,20 @@ function seedFixture() {
           清除视角
         </button>
         <button
+          v-if="selectedId && centerLayoutId !== selectedId"
+          class="rounded border border-violet-300 bg-violet-50 px-3 py-1 text-sm text-violet-700 hover:bg-violet-100"
+          @click="setCenterLayout"
+        >
+          以选中为中心布局
+        </button>
+        <button
+          v-if="centerLayoutId"
+          class="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-100"
+          @click="clearCenterLayout"
+        >
+          退出中心布局
+        </button>
+        <button
           v-if="memberCount === 0"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"
           @click="seedFixture"
@@ -230,6 +252,7 @@ function seedFixture() {
         :root-id="rootId"
         :selected-id="selectedId"
         :viewpoint-id="viewpointId"
+        :center-layout-id="centerLayoutId"
         :get-kinship="kinshipResolver"
         :manual-positions="family.data.manualPositions"
         :initial-view="ui.canvasView"

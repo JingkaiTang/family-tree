@@ -3,6 +3,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import type { LayoutResult } from '@/core/treeLayout'
 import { layoutFamilyTree } from '@/core/treeLayout'
+import { layoutProtagonist } from '@/core/protagonistLayout'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import MemberNode from './MemberNode.vue'
 import { useFamilyStore } from '@/stores/family'
@@ -12,6 +13,7 @@ const props = defineProps<{
   rootId?: string
   selectedId?: string | null
   viewpointId?: string | null
+  centerLayoutId?: string | null
   getKinship?: (fromId: string, toId: string) => string | null
   /** 手工拖动后的节点位置（cell 单位，未平移的原始坐标） */
   manualPositions?: Record<string, { cx: number; top: number }>
@@ -44,10 +46,14 @@ const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
 const layout = ref<LayoutResult>({ nodes: [], couples: [], connectors: [], canvas: { width: 0, height: 0 }, orphanIds: [], offsetX: 0 })
 
 async function updateLayout() {
-  layout.value = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
+  if (props.centerLayoutId) {
+    layout.value = await layoutProtagonist(props.members, props.centerLayoutId)
+  } else {
+    layout.value = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
+  }
 }
 
-watch(() => [props.members, props.manualPositions], updateLayout, { immediate: true, deep: true })
+watch(() => [props.members, props.centerLayoutId, props.manualPositions], updateLayout, { immediate: true, deep: true })
 
 const canvasSize = computed(() => ({
   width: Math.max(layout.value.canvas.width * CELL_PX + PADDING * 2, 600),

@@ -7,6 +7,7 @@ import { ref } from 'vue'
 export const useUiStore = defineStore('ui', () => {
   const viewpointId = ref<string | null>(null) // 当前以谁为视角查看称呼
   const selectedId = ref<string | null>(null)
+  const centerLayoutId = ref<string | null>(null) // 当前以谁为中心布局
   const searchQuery = ref('')
   /** 错误/成功 toast */
   const toast = ref<{ type: 'info' | 'error' | 'success'; text: string } | null>(null)
@@ -21,6 +22,9 @@ export const useUiStore = defineStore('ui', () => {
   }
   function setSelected(id: string | null) {
     selectedId.value = id
+  }
+  function setCenterLayout(id: string | null) {
+    centerLayoutId.value = id
   }
   function setSearch(q: string) {
     searchQuery.value = q
@@ -43,11 +47,13 @@ export const useUiStore = defineStore('ui', () => {
   return {
     viewpointId,
     selectedId,
+    centerLayoutId,
     searchQuery,
     toast,
     canvasView,
     setViewpoint,
     setSelected,
+    setCenterLayout,
     setSearch,
     setCanvasView,
     showToast,
