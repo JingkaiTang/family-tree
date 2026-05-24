@@ -12,7 +12,13 @@ export function calculateRingCoordinates(
 
   for (const [dist, layer] of layerNodes) {
     if (dist === 0) {
-      nodes.push(...layer)
+      let cxSum = 0, topSum = 0
+      for (const n of layer) { cxSum += n.cx; topSum += n.top }
+      const cxCenter = cxSum / layer.length
+      const topCenter = topSum / layer.length
+      for (const n of layer) {
+        nodes.push({ ...n, cx: n.cx - cxCenter, top: n.top - topCenter })
+      }
       continue
     }
 
@@ -224,82 +230,6 @@ function buildCouples(
   return couples
 }
 
-/**
- * 找到每个 couple 的"锚点"：距离主角最近的那个环上的祖先/亲属
- * 用于让有亲缘关系的节点聚在一起
- */
-function findAnchors(
-  couples: Couple[],
-  protagonistId: string,
-  byId: Map<string, Member>,
-  distances: Map<string, RelationshipInfo>,
-): Map<string, string | null> {
-  const anchors = new Map<string, string | null>()
-  const coupleOfMember = new Map<string, Couple>()
-  for (const c of couples) {
-    for (const mid of c.memberIds) coupleOfMember.set(mid, c)
-  }
-
-  anchors.set('protagonist', null)
-
-  for (const c of couples) {
-    if (c.memberIds.includes(protagonistId)) continue
-
-    // 找距离主角最近的父母/配偶的 couple
-    let bestAnchor: string | null = null
-    let bestDist = Infinity
-
-    for (const mid of c.memberIds) {
-      const m = byId.get(mid)
-      if (!m) continue
-
-      // 检查父母
-      for (const p of m.parents) {
-        const pc = coupleOfMember.get(p.id)
-        if (pc) {
-          const d = distances.get(p.id)?.distance ?? Infinity
-          if (d < bestDist) {
-            bestDist = d
-            bestAnchor = pc.id
-          }
-        }
-      }
-
-      // 检查配偶（如果配偶在更近的环）
-      for (const s of m.spouses) {
-        const sc = coupleOfMember.get(s.id)
-        if (sc && sc.id !== c.id) {
-          const d = distances.get(s.id)?.distance ?? Infinity
-          if (d < bestDist) {
-            bestDist = d
-            bestAnchor = sc.id
-          }
-        }
-      }
-
-      // 检查兄弟姐妹
-      for (const s of m.siblings) {
-        const sc = coupleOfMember.get(s.id)
-        if (sc && sc.id !== c.id) {
-          const d = distances.get(s.id)?.distance ?? Infinity
-          if (d < bestDist) {
-            bestDist = d
-            bestAnchor = sc.id
-          }
-        }
-      }
-    }
-
-    anchors.set(c.id, bestAnchor)
-  }
-
-  return anchors
-}
-
-/**
- * 环形放射状布局：主角在中心，按关系距离一圈圈环绕
- * 关系近的节点聚在一起
- */
 export async function layoutProtagonist(
   members: Member[],
   protagonistId: string,
@@ -316,122 +246,23 @@ export async function layoutProtagonist(
   }
 
   const byId = new Map(members.map(m => [m.id, m]))
+
   const distances = calcRelationshipDistances(protagonistId, members)
+
+  const layerGroups = groupByDistance(distances)
+
+  const layerNodes = new Map<number, LaidOutNode[]>()
+  for (const [dist, ids] of layerGroups) {
+    const layerMembers = ids.map(id => byId.get(id)).filter(Boolean) as Member[]
+    const { nodes } = await layoutLayerWithElk(layerMembers, distances)
+    layerNodes.set(dist, nodes)
+  }
+
+  const { nodes } = calculateRingCoordinates(layerNodes)
+
   const couples = buildCouples(members, byId)
-  const anchors = findAnchors(couples, protagonistId, byId, distances)
+  const connectors = buildProtagonistConnectors(nodes, couples, byId)
 
-  // 按关系距离分组
-  const rings = new Map<number, Couple[]>()
-  for (const c of couples) {
-    const dist = Math.min(...c.memberIds.map(id => distances.get(id)?.distance ?? 999))
-    if (!rings.has(dist)) rings.set(dist, [])
-    rings.get(dist)!.push(c)
-  }
-
-  const maxDist = Math.max(...rings.keys())
-  const nodes: LaidOutNode[] = []
-
-  // 环形参数 - 紧凑一些
-  const BASE_RADIUS = 5
-  const RING_GAP = 4
-
-  // 第 0 圈：主角在中心
-  const ring0 = rings.get(0) ?? []
-  for (const c of ring0) {
-    c.cx = 0
-    c.generation = 0
-    c.memberIds.forEach((id, idx) => {
-      const offset = c.memberIds.length === 2
-        ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
-        : 0
-      nodes.push({ id, cx: offset, top: 0, generation: 0 })
-    })
-  }
-
-  // 记录每个 couple 的实际位置（用于锚定下一圈）
-  const couplePositions = new Map<string, { cx: number; top: number }>()
-  for (const c of ring0) {
-    couplePositions.set(c.id, { cx: c.cx, top: 0 })
-  }
-
-  // 第 1..N 圈：按锚点聚簇
-  for (let dist = 1; dist <= maxDist; dist++) {
-    const ringCouples = rings.get(dist)
-    if (!ringCouples || ringCouples.length === 0) continue
-
-    const radius = BASE_RADIUS + (dist - 1) * RING_GAP
-
-    // 按锚点分组
-    const groups = new Map<string | null, Couple[]>()
-    for (const c of ringCouples) {
-      const anchor = anchors.get(c.id) ?? null
-      // 如果锚点在当前圈或更远，用主角作为锚点
-      const anchorDist = anchor ? (distances.get(
-        ringCouples.find(rc => rc.id === anchor)?.memberIds[0] ?? ''
-      )?.distance ?? dist) : dist
-      const effectiveAnchor = (anchor && anchorDist < dist) ? anchor : null
-
-      if (!groups.has(effectiveAnchor)) groups.set(effectiveAnchor, [])
-      groups.get(effectiveAnchor)!.push(c)
-    }
-
-    // 计算每个锚点的角度位置
-    const anchorAngles = new Map<string | null, number>()
-    for (const [anchorId] of groups) {
-      if (anchorId === null) {
-        anchorAngles.set(null, Math.PI / 2) // 默认在底部
-      } else {
-        const pos = couplePositions.get(anchorId)
-        if (pos) {
-          anchorAngles.set(anchorId, Math.atan2(pos.top, pos.cx))
-        } else {
-          anchorAngles.set(null, Math.PI / 2)
-        }
-      }
-    }
-
-    // 按锚点角度排序组
-    const sortedGroups = [...groups.entries()].sort((a, b) => {
-      const angleA = anchorAngles.get(a[0]) ?? 0
-      const angleB = anchorAngles.get(b[0]) ?? 0
-      return angleA - angleB
-    })
-
-    // 分配角度，每组内的节点紧挨着
-    const totalCouples = ringCouples.length
-    let currentAngle = -Math.PI / 2 // 从顶部开始
-
-    for (const [anchorId, groupCouples] of sortedGroups) {
-      // 每组占据的角度 = 组内节点数 * 每节点角度
-      const nodeAngle = 0.3 // 每个节点占据的弧度（紧凑）
-      const groupAngle = groupCouples.length * nodeAngle
-
-      // 组内第一个节点的角度 = 当前角度
-      for (let i = 0; i < groupCouples.length; i++) {
-        const c = groupCouples[i]
-        const angle = currentAngle + i * nodeAngle + nodeAngle / 2
-
-        const cx = radius * Math.cos(angle)
-        const top = radius * Math.sin(angle)
-
-        c.cx = cx
-        c.generation = dist
-
-        c.memberIds.forEach((id, idx) => {
-          const offset = c.memberIds.length === 2
-            ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
-            : 0
-          nodes.push({ id, cx: cx + offset, top, generation: dist })
-        })
-
-        couplePositions.set(c.id, { cx, top })
-      }
-
-      currentAngle += groupAngle + 0.2 // 组间小间隔
-    }
-  }
-
-  // 计算画布尺寸
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const n of nodes) {
     minX = Math.min(minX, n.cx - NODE_W / 2)
@@ -440,7 +271,6 @@ export async function layoutProtagonist(
     maxY = Math.max(maxY, n.top + NODE_H / 2)
   }
 
-  // 平移到正坐标，主角在画布中心
   const width = maxX - minX + NODE_W * 2
   const height = maxY - minY + NODE_H * 2
   const dx = width / 2
@@ -450,8 +280,6 @@ export async function layoutProtagonist(
     n.top += dy
   }
   for (const c of couples) c.cx += dx
-
-  const connectors = buildConnectors(nodes, couples, byId)
 
   return {
     nodes,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLayerWithElk, calculateRingCoordinates, buildProtagonistConnectors } from './protagonistLayout'
 import type { Member } from './schema'
-import type { LaidOutNode } from './elkLayout'
+import type { LaidOutNode } from './treeLayout'
 
 describe('calcRelationshipDistances', () => {
   it('主角距离自己为 0', () => {
@@ -88,6 +88,20 @@ describe('layoutProtagonist', () => {
     expect(result).toHaveProperty('orphanIds')
     expect(result).toHaveProperty('offsetX')
   })
+
+  it('完整布局流程', async () => {
+    const members: Member[] = [
+      { id: '1', firstName: '我', lastName: '', gender: 'male', parents: [{ id: '3', type: 'blood' }], children: [], siblings: [], spouses: [{ id: '2', type: 'married' }], godparents: [], godchildren: [] },
+      { id: '2', firstName: '配偶', lastName: '', gender: 'female', parents: [], children: [], siblings: [], spouses: [{ id: '1', type: 'married' }], godparents: [], godchildren: [] },
+      { id: '3', firstName: '父', lastName: '', gender: 'male', parents: [], children: [{ id: '1', type: 'blood' }], siblings: [], spouses: [], godparents: [], godchildren: [] },
+    ]
+    const result = await layoutProtagonist(members, '1')
+    expect(result.nodes.length).toBe(3)
+    expect(result.connectors.length).toBeGreaterThan(0)
+    const protagonist = result.nodes.find(n => n.id === '1')
+    expect(protagonist?.cx).toBeCloseTo(result.canvas.width / 2, 0)
+    expect(protagonist?.top).toBeCloseTo(result.canvas.height / 2, 0)
+  })
 })
 
 describe('calculateRingCoordinates', () => {
@@ -156,9 +170,9 @@ describe('buildProtagonistConnectors', () => {
     ]
     const couples = [{ id: 'p1|p2', memberIds: ['p1', 'p2'], generation: 0, cx: 2 }]
     const byId = new Map<string, Member>()
-    byId.set('p1', { id: 'p1', firstName: '', lastName: '', gender: 'male', parents: [], children: [{ id: 'c1', type: 'biological' }], siblings: [], spouses: [{ id: 'p2', type: 'married' }], godparents: [], godchildren: [] })
-    byId.set('p2', { id: 'p2', firstName: '', lastName: '', gender: 'female', parents: [], children: [{ id: 'c1', type: 'biological' }], siblings: [], spouses: [{ id: 'p1', type: 'married' }], godparents: [], godchildren: [] })
-    byId.set('c1', { id: 'c1', firstName: '', lastName: '', gender: 'male', parents: [{ id: 'p1', type: 'biological' }, { id: 'p2', type: 'biological' }], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] })
+    byId.set('p1', { id: 'p1', firstName: '', lastName: '', gender: 'male', parents: [], children: [{ id: 'c1', type: 'blood' }], siblings: [], spouses: [{ id: 'p2', type: 'married' }], godparents: [], godchildren: [] })
+    byId.set('p2', { id: 'p2', firstName: '', lastName: '', gender: 'female', parents: [], children: [{ id: 'c1', type: 'blood' }], siblings: [], spouses: [{ id: 'p1', type: 'married' }], godparents: [], godchildren: [] })
+    byId.set('c1', { id: 'c1', firstName: '', lastName: '', gender: 'male', parents: [{ id: 'p1', type: 'blood' }, { id: 'p2', type: 'blood' }], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] })
 
     const connectors = buildProtagonistConnectors(nodes, couples, byId)
     expect(connectors.length).toBe(2)
