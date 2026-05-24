@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLayerWithElk } from './protagonistLayout'
+import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLayerWithElk, calculateRingCoordinates } from './protagonistLayout'
 import type { Member } from './schema'
 
 describe('calcRelationshipDistances', () => {
@@ -86,6 +86,35 @@ describe('layoutProtagonist', () => {
     expect(result).toHaveProperty('canvas')
     expect(result).toHaveProperty('orphanIds')
     expect(result).toHaveProperty('offsetX')
+  })
+})
+
+describe('calculateRingCoordinates', () => {
+  it('主角在中心', () => {
+    const layerNodes = new Map([
+      [0, [{ id: '1', cx: 0, top: 0, generation: 0 }]],
+    ])
+    const result = calculateRingCoordinates(layerNodes)
+    expect(result.nodes[0].cx).toBe(0)
+    expect(result.nodes[0].top).toBe(0)
+  })
+
+  it('第 1 层在半径为 BASE_RADIUS 的圆上', () => {
+    const layerNodes = new Map([
+      [0, [{ id: '1', cx: 0, top: 0, generation: 0 }]],
+      [1, [
+        { id: '2', cx: 0, top: 0, generation: 0 },
+        { id: '3', cx: 2, top: 0, generation: 0 },
+      ]],
+    ])
+    const result = calculateRingCoordinates(layerNodes)
+    const BASE_RADIUS = 10
+    for (const n of result.nodes) {
+      if (n.id !== '1') {
+        const dist = Math.sqrt(n.cx * n.cx + n.top * n.top)
+        expect(dist).toBeCloseTo(BASE_RADIUS, 0)
+      }
+    }
   })
 })
 

@@ -3,6 +3,35 @@ import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeL
 import type { ElkNode, ElkEdge, ElkGraph } from './elkLayout'
 import { getElk } from './elkLayout'
 
+export function calculateRingCoordinates(
+  layerNodes: Map<number, LaidOutNode[]>,
+): { nodes: LaidOutNode[] } {
+  const BASE_RADIUS = 10
+  const RING_GAP = 8
+  const nodes: LaidOutNode[] = []
+
+  for (const [dist, layer] of layerNodes) {
+    if (dist === 0) {
+      nodes.push(...layer)
+      continue
+    }
+
+    const radius = BASE_RADIUS + (dist - 1) * RING_GAP
+    const angleStep = (2 * Math.PI) / layer.length
+
+    for (let i = 0; i < layer.length; i++) {
+      const angle = i * angleStep - Math.PI / 2
+      nodes.push({
+        ...layer[i],
+        cx: radius * Math.cos(angle),
+        top: radius * Math.sin(angle),
+      })
+    }
+  }
+
+  return { nodes }
+}
+
 const NODE_W = 2
 const NODE_H = 4
 const COUPLE_GAP = 0.2
