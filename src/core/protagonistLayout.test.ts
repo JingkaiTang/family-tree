@@ -146,6 +146,46 @@ describe('layoutLayerWithElk', () => {
   })
 })
 
+describe('集成测试', () => {
+  it('大家族布局无重叠', async () => {
+    const members: Member[] = [
+      // 祖辈
+      { id: 'gpa', firstName: '爷爷', lastName: '', gender: 'male', parents: [], children: [{ id: 'dad', type: 'blood' }], siblings: [], spouses: [{ id: 'gma', type: 'married' }], godparents: [], godchildren: [] },
+      { id: 'gma', firstName: '奶奶', lastName: '', gender: 'female', parents: [], children: [{ id: 'dad', type: 'blood' }], siblings: [], spouses: [{ id: 'gpa', type: 'married' }], godparents: [], godchildren: [] },
+      // 父辈
+      { id: 'dad', firstName: '父', lastName: '', gender: 'male', parents: [{ id: 'gpa', type: 'blood' }, { id: 'gma', type: 'blood' }], children: [{ id: 'me', type: 'blood' }], siblings: [], spouses: [{ id: 'mom', type: 'married' }], godparents: [], godchildren: [] },
+      { id: 'mom', firstName: '母', lastName: '', gender: 'female', parents: [], children: [{ id: 'me', type: 'blood' }], siblings: [], spouses: [{ id: 'dad', type: 'married' }], godparents: [], godchildren: [] },
+      // 主角
+      { id: 'me', firstName: '我', lastName: '', gender: 'male', parents: [{ id: 'dad', type: 'blood' }, { id: 'mom', type: 'blood' }], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] },
+    ]
+    const result = await layoutProtagonist(members, 'me')
+    expect(result.nodes.length).toBe(5)
+
+    const NODE_W = 2
+    const NODE_H = 4
+    // 检查无重叠
+    for (let i = 0; i < result.nodes.length; i++) {
+      for (let j = i + 1; j < result.nodes.length; j++) {
+        const a = result.nodes[i]
+        const b = result.nodes[j]
+        const dx = Math.abs(a.cx - b.cx)
+        const dy = Math.abs(a.top - b.top)
+        expect(dx > NODE_W || dy > NODE_H).toBe(true)
+      }
+    }
+  })
+
+  it('主角在画布中心', async () => {
+    const members: Member[] = [
+      { id: '1', firstName: '我', lastName: '', gender: 'male', parents: [], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] },
+    ]
+    const result = await layoutProtagonist(members, '1')
+    const protagonist = result.nodes.find(n => n.id === '1')
+    expect(protagonist?.cx).toBeCloseTo(result.canvas.width / 2, 0)
+    expect(protagonist?.top).toBeCloseTo(result.canvas.height / 2, 0)
+  })
+})
+
 describe('buildProtagonistConnectors', () => {
   it('生成配偶连线', () => {
     const nodes: LaidOutNode[] = [
