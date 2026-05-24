@@ -9,7 +9,7 @@ interface RelationshipInfo {
   distance: number
 }
 
-function calcRelationshipDistances(
+export function calcRelationshipDistances(
   protagonistId: string,
   members: Member[],
 ): Map<string, RelationshipInfo> {
@@ -30,7 +30,6 @@ function calcRelationshipDistances(
       ...m.parents.map(r => r.id),
       ...m.children.map(r => r.id),
       ...m.spouses.map(r => r.id),
-      ...m.siblings.map(r => r.id),
       ...m.godparents.map(r => r.id),
       ...m.godchildren.map(r => r.id),
     ]
