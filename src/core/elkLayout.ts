@@ -1,5 +1,32 @@
 import type { Member } from './schema'
-import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeLayout'
+
+export interface LaidOutNode {
+  id: string
+  cx: number
+  top: number
+  generation: number
+}
+
+export interface Couple {
+  id: string
+  memberIds: string[]
+  generation: number
+  cx: number
+}
+
+export interface LayoutConnector {
+  points: Array<{ x: number; y: number }>
+  kind: 'parent-child' | 'spouse' | 'godparent'
+}
+
+export interface LayoutResult {
+  nodes: LaidOutNode[]
+  couples: Couple[]
+  connectors: LayoutConnector[]
+  canvas: { width: number; height: number }
+  orphanIds: string[]
+  offsetX: number
+}
 
 let ELK: any = null
 
@@ -65,6 +92,8 @@ export async function layoutWithElk(
 
   const result = convertElkResult(layouted, couples, coupleOfMember, gen, members)
 
+  alignOnlyChildren(result.nodes, couples, byId, opts?.manualPositions)
+
   if (opts?.manualPositions) {
     for (const n of result.nodes) {
       const m = opts.manualPositions[n.id]
@@ -75,9 +104,55 @@ export async function layoutWithElk(
     }
   }
 
+  let minX = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const n of result.nodes) {
+    minX = Math.min(minX, n.cx - NODE_W / 2)
+    maxX = Math.max(maxX, n.cx + NODE_W / 2)
+    maxY = Math.max(maxY, n.top + NODE_H)
+  }
+  const dx = -minX
+  for (const n of result.nodes) n.cx += dx
+  for (const c of result.couples) c.cx += dx
+  result.offsetX = dx
+  result.canvas = { width: maxX - minX, height: maxY }
+
   result.connectors = buildConnectors(result.nodes, couples, byId)
 
   return result
+}
+
+function alignOnlyChildren(
+  nodes: LaidOutNode[],
+  couples: Couple[],
+  byId: Map<string, Member>,
+  manualPositions?: Record<string, { cx: number; top: number }>,
+) {
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+
+  for (const c of couples) {
+    const childSet = new Set<string>()
+    for (const mid of c.memberIds) {
+      const m = byId.get(mid)
+      if (!m) continue
+      for (const ch of m.children) childSet.add(ch.id)
+    }
+    if (childSet.size !== 1) continue
+    const onlyChildId = [...childSet][0]
+    if (manualPositions?.[onlyChildId]) continue
+    const child = byId.get(onlyChildId)
+    const childNode = nodeById.get(onlyChildId)
+    if (!child || !childNode) continue
+    const parentIds = new Set(c.memberIds)
+    const allParentsMatchCouple = child.parents.every(p => parentIds.has(p.id))
+    if (!allParentsMatchCouple) continue
+    const parentNodes = c.memberIds.map(id => nodeById.get(id)).filter(Boolean) as LaidOutNode[]
+    if (parentNodes.length > 0) {
+      const parentX = parentNodes.length === 2
+        ? (parentNodes[0].cx + parentNodes[1].cx) / 2
+        : parentNodes[0].cx
+      childNode.cx = parentX
+    }
+  }
 }
 
 function assignGenerations(
@@ -296,16 +371,13 @@ function convertElkResult(
     maxY = Math.max(maxY, n.top + NODE_H)
   }
 
-  const dx = -minX
-  for (const n of nodes) n.cx += dx
-
   return {
     nodes,
     couples,
     connectors: [],
     canvas: { width: maxX - minX, height: maxY },
     orphanIds: [],
-    offsetX: dx,
+    offsetX: -minX,
   }
 }
 
@@ -406,6 +478,26 @@ function buildConnectors(
         points: [
           { x: cn.cx, y: midY },
           { x: cn.cx, y: cn.top },
+        ],
+      })
+    }
+  }
+
+  const emittedGod = new Set<string>()
+  for (const n of nodes) {
+    const m = byId.get(n.id)
+    if (!m) continue
+    for (const gc of m.godchildren) {
+      const key = `${n.id}>${gc.id}`
+      if (emittedGod.has(key)) continue
+      emittedGod.add(key)
+      const target = nodeById.get(gc.id)
+      if (!target) continue
+      lines.push({
+        kind: 'godparent',
+        points: [
+          { x: n.cx, y: n.top + NODE_H },
+          { x: target.cx, y: target.top },
         ],
       })
     }

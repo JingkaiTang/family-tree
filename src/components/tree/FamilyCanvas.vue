@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
+import type { LayoutResult } from '@/core/treeLayout'
 import { layoutFamilyTree } from '@/core/treeLayout'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import MemberNode from './MemberNode.vue'
@@ -40,9 +41,13 @@ void props.rootId
 
 const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
 
-const layout = computed(() =>
-  layoutFamilyTree(props.members, { manualPositions: props.manualPositions }),
-)
+const layout = ref<LayoutResult>({ nodes: [], couples: [], connectors: [], canvas: { width: 0, height: 0 }, orphanIds: [], offsetX: 0 })
+
+async function updateLayout() {
+  layout.value = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
+}
+
+watch(() => [props.members, props.manualPositions], updateLayout, { immediate: true, deep: true })
 
 const canvasSize = computed(() => ({
   width: Math.max(layout.value.canvas.width * CELL_PX + PADDING * 2, 600),
