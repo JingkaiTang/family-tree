@@ -1,11 +1,12 @@
 import type { Member } from './schema'
 import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeLayout'
-
-const UNIT_GAP = 1.5
+import type { ElkNode, ElkEdge, ElkGraph } from './elkLayout'
+import { getElk } from './elkLayout'
 
 const NODE_W = 2
 const NODE_H = 4
 const COUPLE_GAP = 0.2
+const UNIT_GAP = 1.5
 
 interface RelationshipInfo {
   distance: number
@@ -20,27 +21,6 @@ export function groupByDistance(
     groups.get(distance)!.push(id)
   }
   return groups
-}
-
-interface ElkNode {
-  id: string
-  width: number
-  height: number
-  x?: number
-  y?: number
-}
-
-interface ElkEdge {
-  id: string
-  sources: string[]
-  targets: string[]
-}
-
-interface ElkGraph {
-  id: string
-  layoutOptions: Record<string, string>
-  children: ElkNode[]
-  edges: ElkEdge[]
 }
 
 export async function layoutLayerWithElk(
@@ -93,7 +73,7 @@ export async function layoutLayerWithElk(
         id,
         cx: elkX + offset + NODE_W / 2,
         top: elkY,
-        generation: 0,
+        generation: distances.get(id)?.distance ?? 0,
       })
     })
   }
@@ -137,16 +117,6 @@ function buildCouplesForLayer(
   }
 
   return couples
-}
-
-let ELK: any = null
-
-async function getElk() {
-  if (!ELK) {
-    const elkModule = await import('elkjs')
-    ELK = elkModule.default
-  }
-  return new ELK()
 }
 
 export function calcRelationshipDistances(

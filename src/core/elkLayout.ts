@@ -30,7 +30,7 @@ export interface LayoutResult {
 
 let ELK: any = null
 
-async function getElk() {
+export async function getElk() {
   if (!ELK) {
     const elkModule = await import('elkjs')
     ELK = elkModule.default
@@ -45,7 +45,7 @@ const UNIT_GAP = 1.5
 const ROW_GAP = 3
 const ROW_HEIGHT = NODE_H + ROW_GAP
 
-interface ElkNode {
+export interface ElkNode {
   id: string
   width: number
   height: number
@@ -53,13 +53,13 @@ interface ElkNode {
   y?: number
 }
 
-interface ElkEdge {
+export interface ElkEdge {
   id: string
   sources: string[]
   targets: string[]
 }
 
-interface ElkGraph {
+export interface ElkGraph {
   id: string
   layoutOptions: Record<string, string>
   children: ElkNode[]
