@@ -4,11 +4,9 @@ import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeL
 const NODE_W = 2
 const NODE_H = 4
 const COUPLE_GAP = 0.2
-const ROW_HEIGHT = 7
 
 interface RelationshipInfo {
   distance: number
-  path: string[]
 }
 
 function calcRelationshipDistances(
@@ -18,13 +16,13 @@ function calcRelationshipDistances(
   const byId = new Map(members.map(m => [m.id, m]))
   const distances = new Map<string, RelationshipInfo>()
 
-  const queue: Array<{ id: string; dist: number; path: string[] }> = [
-    { id: protagonistId, dist: 0, path: [protagonistId] },
+  const queue: Array<{ id: string; dist: number }> = [
+    { id: protagonistId, dist: 0 },
   ]
-  distances.set(protagonistId, { distance: 0, path: [protagonistId] })
+  distances.set(protagonistId, { distance: 0 })
 
   while (queue.length > 0) {
-    const { id, dist, path } = queue.shift()!
+    const { id, dist } = queue.shift()!
     const m = byId.get(id)
     if (!m) continue
 
@@ -40,117 +38,130 @@ function calcRelationshipDistances(
     for (const nextId of neighbors) {
       if (!byId.has(nextId)) continue
       if (distances.has(nextId)) continue
-
-      const newPath = [...path, nextId]
-      distances.set(nextId, { distance: dist + 1, path: newPath })
-      queue.push({ id: nextId, dist: dist + 1, path: newPath })
+      distances.set(nextId, { distance: dist + 1 })
+      queue.push({ id: nextId, dist: dist + 1 })
     }
   }
 
   return distances
 }
 
-function assignGenerations(
-  members: Member[],
-  byId: Map<string, Member>,
-  protagonistId: string,
-): Map<string, number> {
-  const gen = new Map<string, number>()
-
-  const bfs = (startId: string, startGen: number) => {
-    const queue: string[] = [startId]
-    gen.set(startId, startGen)
-    while (queue.length > 0) {
-      const id = queue.shift()!
-      const g = gen.get(id)!
-      const m = byId.get(id)
-      if (!m) continue
-      const push = (otherId: string, otherGen: number) => {
-        if (!byId.has(otherId)) return
-        if (gen.has(otherId)) return
-        gen.set(otherId, otherGen)
-        queue.push(otherId)
-      }
-      // Forward edges
-      for (const p of m.parents) push(p.id, g - 1)
-      for (const c of m.children) push(c.id, g + 1)
-      for (const s of m.spouses) push(s.id, g)
-      for (const s of m.siblings) push(s.id, g)
-      for (const p of m.godparents) push(p.id, g - 1)
-      for (const c of m.godchildren) push(c.id, g + 1)
-      // Reverse edges (for incomplete data)
-      for (const other of members) {
-        if (other.id === id) continue
-        if (other.children.some(c => c.id === id)) push(other.id, g - 1)
-        if (other.parents.some(p => p.id === id)) push(other.id, g + 1)
-        if (other.spouses.some(s => s.id === id)) push(other.id, g)
-        if (other.siblings.some(s => s.id === id)) push(other.id, g)
-        if (other.godchildren.some(gc => gc.id === id)) push(other.id, g - 1)
-        if (other.godparents.some(gp => gp.id === id)) push(other.id, g + 1)
-      }
-    }
-  }
-
-  if (byId.has(protagonistId)) {
-    bfs(protagonistId, 0)
-  } else {
-    const protagonist = members.find(m => !gen.has(m.id))
-    if (protagonist) bfs(protagonist.id, 0)
-  }
-
-  return gen
-}
-
 function buildCouples(
   members: Member[],
   byId: Map<string, Member>,
-  gen: Map<string, number>,
 ): Couple[] {
   const used = new Set<string>()
   const couples: Couple[] = []
-  const gens = new Map<number, Member[]>()
 
   for (const m of members) {
-    const g = gen.get(m.id) ?? 0
-    if (!gens.has(g)) gens.set(g, [])
-    gens.get(g)!.push(m)
-  }
+    if (used.has(m.id)) continue
+    const spouse = m.spouses
+      .map(s => byId.get(s.id))
+      .find(sp => sp && !used.has(sp.id))
 
-  for (const [g, membersInGen] of gens) {
-    for (const m of membersInGen) {
-      if (used.has(m.id)) continue
-      const spouseInGen = m.spouses
-        .map(s => byId.get(s.id))
-        .find(sp => sp && !used.has(sp.id) && gen.get(sp.id) === g)
-
-      if (spouseInGen) {
-        let pair = [m.id, spouseInGen.id]
-        if (m.gender === 'female' && spouseInGen.gender === 'male') {
-          pair = [spouseInGen.id, m.id]
-        }
-        used.add(m.id)
-        used.add(spouseInGen.id)
-        couples.push({
-          id: pair.join('|'),
-          memberIds: pair,
-          generation: g,
-          cx: 0,
-        })
-      } else {
-        used.add(m.id)
-        couples.push({
-          id: m.id,
-          memberIds: [m.id],
-          generation: g,
-          cx: 0,
-        })
+    if (spouse) {
+      let pair = [m.id, spouse.id]
+      if (m.gender === 'female' && spouse.gender === 'male') {
+        pair = [spouse.id, m.id]
       }
+      used.add(m.id)
+      used.add(spouse.id)
+      couples.push({
+        id: pair.join('|'),
+        memberIds: pair,
+        generation: 0,
+        cx: 0,
+      })
+    } else {
+      used.add(m.id)
+      couples.push({
+        id: m.id,
+        memberIds: [m.id],
+        generation: 0,
+        cx: 0,
+      })
     }
   }
 
   return couples
 }
 
+/**
+ * 找到每个 couple 的"锚点"：距离主角最近的那个环上的祖先/亲属
+ * 用于让有亲缘关系的节点聚在一起
+ */
+function findAnchors(
+  couples: Couple[],
+  protagonistId: string,
+  byId: Map<string, Member>,
+  distances: Map<string, RelationshipInfo>,
+): Map<string, string | null> {
+  const anchors = new Map<string, string | null>()
+  const coupleOfMember = new Map<string, Couple>()
+  for (const c of couples) {
+    for (const mid of c.memberIds) coupleOfMember.set(mid, c)
+  }
+
+  anchors.set('protagonist', null)
+
+  for (const c of couples) {
+    if (c.memberIds.includes(protagonistId)) continue
+
+    // 找距离主角最近的父母/配偶的 couple
+    let bestAnchor: string | null = null
+    let bestDist = Infinity
+
+    for (const mid of c.memberIds) {
+      const m = byId.get(mid)
+      if (!m) continue
+
+      // 检查父母
+      for (const p of m.parents) {
+        const pc = coupleOfMember.get(p.id)
+        if (pc) {
+          const d = distances.get(p.id)?.distance ?? Infinity
+          if (d < bestDist) {
+            bestDist = d
+            bestAnchor = pc.id
+          }
+        }
+      }
+
+      // 检查配偶（如果配偶在更近的环）
+      for (const s of m.spouses) {
+        const sc = coupleOfMember.get(s.id)
+        if (sc && sc.id !== c.id) {
+          const d = distances.get(s.id)?.distance ?? Infinity
+          if (d < bestDist) {
+            bestDist = d
+            bestAnchor = sc.id
+          }
+        }
+      }
+
+      // 检查兄弟姐妹
+      for (const s of m.siblings) {
+        const sc = coupleOfMember.get(s.id)
+        if (sc && sc.id !== c.id) {
+          const d = distances.get(s.id)?.distance ?? Infinity
+          if (d < bestDist) {
+            bestDist = d
+            bestAnchor = sc.id
+          }
+        }
+      }
+    }
+
+    anchors.set(c.id, bestAnchor)
+  }
+
+  return anchors
+}
+
+/**
+ * 环形放射状布局：主角在中心，按关系距离一圈圈环绕
+ * 关系近的节点聚在一起
+ */
 export async function layoutProtagonist(
   members: Member[],
   protagonistId: string,
@@ -167,117 +178,140 @@ export async function layoutProtagonist(
   }
 
   const byId = new Map(members.map(m => [m.id, m]))
-
   const distances = calcRelationshipDistances(protagonistId, members)
+  const couples = buildCouples(members, byId)
+  const anchors = findAnchors(couples, protagonistId, byId, distances)
 
-  const gen = assignGenerations(members, byId, protagonistId)
-  const minGen = Math.min(...gen.values())
-
-  const couples = buildCouples(members, byId, gen)
-  const coupleOfMember = new Map<string, Couple>()
+  // 按关系距离分组
+  const rings = new Map<number, Couple[]>()
   for (const c of couples) {
-    for (const mid of c.memberIds) {
-      coupleOfMember.set(mid, c)
-    }
+    const dist = Math.min(...c.memberIds.map(id => distances.get(id)?.distance ?? 999))
+    if (!rings.has(dist)) rings.set(dist, [])
+    rings.get(dist)!.push(c)
   }
 
-  // Sort couples by relationship distance (closest first)
-  couples.sort((a, b) => {
-    const aIsProtagonist = a.memberIds.includes(protagonistId)
-    const bIsProtagonist = b.memberIds.includes(protagonistId)
-    if (aIsProtagonist) return -1
-    if (bIsProtagonist) return 1
-
-    const aDist = Math.min(...a.memberIds.map(id => distances.get(id)?.distance ?? Infinity))
-    const bDist = Math.min(...b.memberIds.map(id => distances.get(id)?.distance ?? Infinity))
-
-    return aDist - bDist
-  })
-
-  // Place couples alternating left and right of protagonist
+  const maxDist = Math.max(...rings.keys())
   const nodes: LaidOutNode[] = []
-  const protagonistCouple = couples.find(c => c.memberIds.includes(protagonistId))
-  const otherCouples = couples.filter(c => !c.memberIds.includes(protagonistId))
 
-  // Place protagonist at center
-  if (protagonistCouple) {
-    const w = protagonistCouple.memberIds.length === 2 ? NODE_W * 2 + COUPLE_GAP : NODE_W
-    protagonistCouple.cx = 0
+  // 环形参数 - 紧凑一些
+  const BASE_RADIUS = 5
+  const RING_GAP = 4
 
-    protagonistCouple.memberIds.forEach((id, idx) => {
-      const offset = protagonistCouple.memberIds.length === 2
-        ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
-        : 0
-
-      nodes.push({
-        id,
-        cx: protagonistCouple.cx + offset,
-        top: (protagonistCouple.generation - minGen) * ROW_HEIGHT,
-        generation: protagonistCouple.generation,
-      })
-    })
-  }
-
-  // Place other couples alternating left and right
-  let leftX = -(NODE_W + 1.5)
-  let rightX = NODE_W + 1.5
-  let useLeft = true
-
-  for (const c of otherCouples) {
-    const w = c.memberIds.length === 2 ? NODE_W * 2 + COUPLE_GAP : NODE_W
-
-    if (useLeft) {
-      c.cx = leftX - w / 2
-      leftX = c.cx - w / 2 - 1.5
-    } else {
-      c.cx = rightX + w / 2
-      rightX = c.cx + w / 2 + 1.5
-    }
-
+  // 第 0 圈：主角在中心
+  const ring0 = rings.get(0) ?? []
+  for (const c of ring0) {
+    c.cx = 0
+    c.generation = 0
     c.memberIds.forEach((id, idx) => {
       const offset = c.memberIds.length === 2
         ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
         : 0
+      nodes.push({ id, cx: offset, top: 0, generation: 0 })
+    })
+  }
 
-      nodes.push({
-        id,
-        cx: c.cx + offset,
-        top: (c.generation - minGen) * ROW_HEIGHT,
-        generation: c.generation,
-      })
+  // 记录每个 couple 的实际位置（用于锚定下一圈）
+  const couplePositions = new Map<string, { cx: number; top: number }>()
+  for (const c of ring0) {
+    couplePositions.set(c.id, { cx: c.cx, top: 0 })
+  }
+
+  // 第 1..N 圈：按锚点聚簇
+  for (let dist = 1; dist <= maxDist; dist++) {
+    const ringCouples = rings.get(dist)
+    if (!ringCouples || ringCouples.length === 0) continue
+
+    const radius = BASE_RADIUS + (dist - 1) * RING_GAP
+
+    // 按锚点分组
+    const groups = new Map<string | null, Couple[]>()
+    for (const c of ringCouples) {
+      const anchor = anchors.get(c.id) ?? null
+      // 如果锚点在当前圈或更远，用主角作为锚点
+      const anchorDist = anchor ? (distances.get(
+        ringCouples.find(rc => rc.id === anchor)?.memberIds[0] ?? ''
+      )?.distance ?? dist) : dist
+      const effectiveAnchor = (anchor && anchorDist < dist) ? anchor : null
+
+      if (!groups.has(effectiveAnchor)) groups.set(effectiveAnchor, [])
+      groups.get(effectiveAnchor)!.push(c)
+    }
+
+    // 计算每个锚点的角度位置
+    const anchorAngles = new Map<string | null, number>()
+    for (const [anchorId] of groups) {
+      if (anchorId === null) {
+        anchorAngles.set(null, Math.PI / 2) // 默认在底部
+      } else {
+        const pos = couplePositions.get(anchorId)
+        if (pos) {
+          anchorAngles.set(anchorId, Math.atan2(pos.top, pos.cx))
+        } else {
+          anchorAngles.set(null, Math.PI / 2)
+        }
+      }
+    }
+
+    // 按锚点角度排序组
+    const sortedGroups = [...groups.entries()].sort((a, b) => {
+      const angleA = anchorAngles.get(a[0]) ?? 0
+      const angleB = anchorAngles.get(b[0]) ?? 0
+      return angleA - angleB
     })
 
-    useLeft = !useLeft
+    // 分配角度，每组内的节点紧挨着
+    const totalCouples = ringCouples.length
+    let currentAngle = -Math.PI / 2 // 从顶部开始
+
+    for (const [anchorId, groupCouples] of sortedGroups) {
+      // 每组占据的角度 = 组内节点数 * 每节点角度
+      const nodeAngle = 0.3 // 每个节点占据的弧度（紧凑）
+      const groupAngle = groupCouples.length * nodeAngle
+
+      // 组内第一个节点的角度 = 当前角度
+      for (let i = 0; i < groupCouples.length; i++) {
+        const c = groupCouples[i]
+        const angle = currentAngle + i * nodeAngle + nodeAngle / 2
+
+        const cx = radius * Math.cos(angle)
+        const top = radius * Math.sin(angle)
+
+        c.cx = cx
+        c.generation = dist
+
+        c.memberIds.forEach((id, idx) => {
+          const offset = c.memberIds.length === 2
+            ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
+            : 0
+          nodes.push({ id, cx: cx + offset, top, generation: dist })
+        })
+
+        couplePositions.set(c.id, { cx, top })
+      }
+
+      currentAngle += groupAngle + 0.2 // 组间小间隔
+    }
   }
 
-  // Calculate canvas bounds and normalize
-  let minX = Infinity, maxX = -Infinity, maxY = -Infinity
+  // 计算画布尺寸
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const n of nodes) {
     minX = Math.min(minX, n.cx - NODE_W / 2)
     maxX = Math.max(maxX, n.cx + NODE_W / 2)
-    maxY = Math.max(maxY, n.top + NODE_H)
+    minY = Math.min(minY, n.top - NODE_H / 2)
+    maxY = Math.max(maxY, n.top + NODE_H / 2)
   }
 
-  const offsetX = -minX
-  for (const n of nodes) n.cx += offsetX
-  for (const c of couples) c.cx += offsetX
-
-  // Now center protagonist at canvas midpoint
-  const canvasMidX = (maxX - minX) / 2
-  const protagonistNode = nodes.find(n => n.id === protagonistId)
-  if (protagonistNode) {
-    const dx = canvasMidX - protagonistNode.cx
-    for (const n of nodes) n.cx += dx
-    for (const c of couples) c.cx += dx
-  }
-
-  // Recalculate bounds after centering
-  minX = Infinity
-  maxX = -Infinity
+  // 平移到正坐标，主角在画布中心
+  const width = maxX - minX + NODE_W * 2
+  const height = maxY - minY + NODE_H * 2
+  const dx = width / 2
+  const dy = height / 2
   for (const n of nodes) {
-    minX = Math.min(minX, n.cx - NODE_W / 2)
-    maxX = Math.max(maxX, n.cx + NODE_W / 2)
+    n.cx += dx
+    n.top += dy
   }
+  for (const c of couples) c.cx += dx
 
   const connectors = buildConnectors(nodes, couples, byId)
 
@@ -285,12 +319,15 @@ export async function layoutProtagonist(
     nodes,
     couples,
     connectors,
-    canvas: { width: maxX - minX, height: maxY },
+    canvas: { width, height },
     orphanIds: [],
-    offsetX: offsetX,
+    offsetX: dx,
   }
 }
 
+/**
+ * 简化连线：只连配偶和父母→子女
+ */
 function buildConnectors(
   nodes: LaidOutNode[],
   couples: Couple[],
@@ -299,21 +336,22 @@ function buildConnectors(
   const lines: LayoutConnector[] = []
   const nodeById = new Map(nodes.map(n => [n.id, n]))
 
+  // 配偶连线
   for (const c of couples) {
     if (c.memberIds.length === 2) {
       const a = nodeById.get(c.memberIds[0])!
       const b = nodeById.get(c.memberIds[1])!
-      const y = a.top + NODE_H / 2
       lines.push({
         kind: 'spouse',
         points: [
-          { x: a.cx, y },
-          { x: b.cx, y },
+          { x: a.cx, y: a.top },
+          { x: b.cx, y: b.top },
         ],
       })
     }
   }
 
+  // 父母→子女连线
   for (const c of couples) {
     const childIds = new Set<string>()
     for (const mid of c.memberIds) {
@@ -328,40 +366,18 @@ function buildConnectors(
 
     if (parentNodes.length === 0 || childNodes.length === 0) continue
 
-    const parentY = parentNodes[0].top + NODE_H
     const parentX = parentNodes.length === 2
       ? (parentNodes[0].cx + parentNodes[1].cx) / 2
       : parentNodes[0].cx
-    const childTop = childNodes[0].top
-    const midY = (parentY + childTop) / 2
-
-    lines.push({
-      kind: 'parent-child',
-      points: [
-        { x: parentX, y: parentY },
-        { x: parentX, y: midY },
-      ],
-    })
-
-    const childXs = childNodes.map(n => n.cx)
-    const childMin = Math.min(...childXs)
-    const childMax = Math.max(...childXs)
-
-    if (childNodes.length >= 2) {
-      lines.push({
-        kind: 'parent-child',
-        points: [
-          { x: childMin, y: midY },
-          { x: childMax, y: midY },
-        ],
-      })
-    }
+    const parentY = parentNodes.length === 2
+      ? (parentNodes[0].top + parentNodes[1].top) / 2
+      : parentNodes[0].top
 
     for (const cn of childNodes) {
       lines.push({
         kind: 'parent-child',
         points: [
-          { x: cn.cx, y: midY },
+          { x: parentX, y: parentY },
           { x: cn.cx, y: cn.top },
         ],
       })
