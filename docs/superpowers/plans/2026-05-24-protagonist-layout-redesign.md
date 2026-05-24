@@ -115,7 +115,7 @@ export function calcRelationshipDistances(
       ...m.parents.map(r => r.id),
       ...m.children.map(r => r.id),
       ...m.spouses.map(r => r.id),
-      ...m.siblings.map(r => r.id),
+      // siblings 不在邻居列表中，通过父母连接，距离 = 2
       ...m.godparents.map(r => r.id),
       ...m.godchildren.map(r => r.id),
     ]
