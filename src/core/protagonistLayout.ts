@@ -9,6 +9,17 @@ interface RelationshipInfo {
   distance: number
 }
 
+export function groupByDistance(
+  distances: Map<string, { distance: number }>,
+): Map<number, string[]> {
+  const groups = new Map<number, string[]>()
+  for (const [id, { distance }] of distances) {
+    if (!groups.has(distance)) groups.set(distance, [])
+    groups.get(distance)!.push(id)
+  }
+  return groups
+}
+
 export function calcRelationshipDistances(
   protagonistId: string,
   members: Member[],

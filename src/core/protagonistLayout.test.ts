@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcRelationshipDistances, layoutProtagonist } from './protagonistLayout'
+import { calcRelationshipDistances, groupByDistance, layoutProtagonist } from './protagonistLayout'
 import type { Member } from './schema'
 
 describe('calcRelationshipDistances', () => {
@@ -56,6 +56,21 @@ describe('calcRelationshipDistances', () => {
     ]
     const distances = calcRelationshipDistances('1', members)
     expect(distances.get('3')?.distance).toBe(2)
+  })
+})
+
+describe('groupByDistance', () => {
+  it('按距离分层', () => {
+    const distances = new Map([
+      ['1', { distance: 0 }],
+      ['2', { distance: 1 }],
+      ['3', { distance: 1 }],
+      ['4', { distance: 2 }],
+    ])
+    const groups = groupByDistance(distances)
+    expect(groups.get(0)).toEqual(['1'])
+    expect(groups.get(1)).toEqual(expect.arrayContaining(['2', '3']))
+    expect(groups.get(2)).toEqual(['4'])
   })
 })
 
