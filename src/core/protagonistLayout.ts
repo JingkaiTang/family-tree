@@ -463,6 +463,14 @@ export async function layoutProtagonist(
   }
 }
 
+export function buildProtagonistConnectors(
+  nodes: LaidOutNode[],
+  couples: Couple[],
+  byId: Map<string, Member>,
+): LayoutConnector[] {
+  return buildConnectors(nodes, couples, byId)
+}
+
 /**
  * 简化连线：只连配偶和父母→子女
  */

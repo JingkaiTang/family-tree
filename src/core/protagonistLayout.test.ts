@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLayerWithElk, calculateRingCoordinates } from './protagonistLayout'
+import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLayerWithElk, calculateRingCoordinates, buildProtagonistConnectors } from './protagonistLayout'
 import type { Member } from './schema'
+import type { LaidOutNode } from './elkLayout'
 
 describe('calcRelationshipDistances', () => {
   it('主角距离自己为 0', () => {
@@ -128,5 +129,22 @@ describe('layoutLayerWithElk', () => {
     expect(result.nodes.length).toBe(2)
     const [n1, n2] = result.nodes
     expect(Math.abs(n1.cx - n2.cx)).toBeGreaterThan(2)
+  })
+})
+
+describe('buildProtagonistConnectors', () => {
+  it('生成配偶连线', () => {
+    const nodes: LaidOutNode[] = [
+      { id: '1', cx: 0, top: 0, generation: 0 },
+      { id: '2', cx: 2, top: 0, generation: 0 },
+    ]
+    const couples = [{ id: '1|2', memberIds: ['1', '2'], generation: 0, cx: 1 }]
+    const byId = new Map<string, Member>()
+    byId.set('1', { id: '1', firstName: '', lastName: '', gender: 'male', parents: [], children: [], siblings: [], spouses: [{ id: '2', type: 'married' }], godparents: [], godchildren: [] })
+    byId.set('2', { id: '2', firstName: '', lastName: '', gender: 'female', parents: [], children: [], siblings: [], spouses: [{ id: '1', type: 'married' }], godparents: [], godchildren: [] })
+
+    const connectors = buildProtagonistConnectors(nodes, couples, byId)
+    expect(connectors.length).toBe(1)
+    expect(connectors[0].kind).toBe('spouse')
   })
 })
