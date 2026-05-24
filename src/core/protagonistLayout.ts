@@ -485,15 +485,17 @@ function buildConnectors(
   // 配偶连线
   for (const c of couples) {
     if (c.memberIds.length === 2) {
-      const a = nodeById.get(c.memberIds[0])!
-      const b = nodeById.get(c.memberIds[1])!
-      lines.push({
-        kind: 'spouse',
-        points: [
-          { x: a.cx, y: a.top },
-          { x: b.cx, y: b.top },
-        ],
-      })
+      const a = nodeById.get(c.memberIds[0])
+      const b = nodeById.get(c.memberIds[1])
+      if (a && b) {
+        lines.push({
+          kind: 'spouse',
+          points: [
+            { x: a.cx, y: a.top },
+            { x: b.cx, y: b.top },
+          ],
+        })
+      }
     }
   }
 

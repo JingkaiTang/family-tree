@@ -147,4 +147,24 @@ describe('buildProtagonistConnectors', () => {
     expect(connectors.length).toBe(1)
     expect(connectors[0].kind).toBe('spouse')
   })
+
+  it('生成父母→子女连线', () => {
+    const nodes: LaidOutNode[] = [
+      { id: 'p1', cx: 0, top: 0, generation: 0 },
+      { id: 'p2', cx: 4, top: 0, generation: 0 },
+      { id: 'c1', cx: 2, top: 10, generation: 1 },
+    ]
+    const couples = [{ id: 'p1|p2', memberIds: ['p1', 'p2'], generation: 0, cx: 2 }]
+    const byId = new Map<string, Member>()
+    byId.set('p1', { id: 'p1', firstName: '', lastName: '', gender: 'male', parents: [], children: [{ id: 'c1', type: 'biological' }], siblings: [], spouses: [{ id: 'p2', type: 'married' }], godparents: [], godchildren: [] })
+    byId.set('p2', { id: 'p2', firstName: '', lastName: '', gender: 'female', parents: [], children: [{ id: 'c1', type: 'biological' }], siblings: [], spouses: [{ id: 'p1', type: 'married' }], godparents: [], godchildren: [] })
+    byId.set('c1', { id: 'c1', firstName: '', lastName: '', gender: 'male', parents: [{ id: 'p1', type: 'biological' }, { id: 'p2', type: 'biological' }], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] })
+
+    const connectors = buildProtagonistConnectors(nodes, couples, byId)
+    expect(connectors.length).toBe(2)
+    expect(connectors[0].kind).toBe('spouse')
+    expect(connectors[1].kind).toBe('parent-child')
+    expect(connectors[1].points[0]).toEqual({ x: 2, y: 0 })
+    expect(connectors[1].points[1]).toEqual({ x: 2, y: 10 })
+  })
 })
