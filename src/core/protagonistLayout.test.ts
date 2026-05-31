@@ -130,7 +130,90 @@ describe('布局结果', () => {
     expect(result.connectors.length).toBeGreaterThan(0)
     const protagonist = result.nodes.find(n => n.id === '1')
     expect(protagonist?.cx).toBeCloseTo(result.canvas.width / 2, 0)
-    expect(protagonist?.top).toBeCloseTo(result.canvas.height / 2, 0)
+    expect(protagonist ? protagonist.top + 2 : undefined).toBeCloseTo(result.canvas.height / 2, 0)
+  })
+
+  it('returns connector points in the same translated coordinate space as nodes', async () => {
+    const members: Member[] = [
+      makeMember('me', {
+        children: [{ id: 'child', type: 'blood' }],
+        spouses: [{ id: 'spouse', type: 'married' }],
+      }),
+      makeMember('spouse', {
+        gender: 'female',
+        spouses: [{ id: 'me', type: 'married' }],
+      }),
+      makeMember('child', {
+        parents: [{ id: 'me', type: 'blood' }],
+      }),
+    ]
+
+    const result = await layoutProtagonist(members, 'me')
+    const nodeById = new Map(result.nodes.map(n => [n.id, n]))
+    const me = nodeById.get('me')!
+    const spouse = nodeById.get('spouse')!
+    const child = nodeById.get('child')!
+    const NODE_H = 4
+
+    const spouseLine = result.connectors.find(c => c.kind === 'spouse')!
+    expect(spouseLine.points[0].x).toBeCloseTo(me.cx)
+    expect(spouseLine.points[0].y).toBeCloseTo(me.top + NODE_H / 2)
+    expect(spouseLine.points[1].x).toBeCloseTo(spouse.cx)
+    expect(spouseLine.points[1].y).toBeCloseTo(spouse.top + NODE_H / 2)
+
+    const parentChildPoints = result.connectors
+      .filter(c => c.kind === 'parent-child')
+      .flatMap(c => c.points)
+    expect(parentChildPoints.some(p =>
+      Math.abs(p.x - me.cx) < 1e-9 && Math.abs(p.y - (me.top + NODE_H)) < 1e-9,
+    )).toBe(true)
+    expect(parentChildPoints.some(p =>
+      Math.abs(p.x - child.cx) < 1e-9 && Math.abs(p.y - child.top) < 1e-9,
+    )).toBe(true)
+  })
+
+  it('centers the selected card by its card center rather than its top edge', async () => {
+    const members: Member[] = [
+      makeMember('me'),
+    ]
+    const result = await layoutProtagonist(members, 'me')
+    const me = result.nodes.find(n => n.id === 'me')!
+    const NODE_H = 4
+
+    expect(me.cx).toBeCloseTo(result.canvas.width / 2)
+    expect(me.top + NODE_H / 2).toBeCloseTo(result.canvas.height / 2)
+  })
+
+  it('keeps parents above, children below, and spouses beside the center person', async () => {
+    const members: Member[] = [
+      makeMember('me', {
+        parents: [{ id: 'parent', type: 'blood' }],
+        children: [{ id: 'child', type: 'blood' }],
+        spouses: [{ id: 'spouse', type: 'married' }],
+      }),
+      makeMember('parent', {
+        children: [{ id: 'me', type: 'blood' }],
+      }),
+      makeMember('child', {
+        parents: [{ id: 'me', type: 'blood' }],
+      }),
+      makeMember('spouse', {
+        gender: 'female',
+        spouses: [{ id: 'me', type: 'married' }],
+      }),
+    ]
+
+    const result = await layoutProtagonist(members, 'me')
+    const nodeById = new Map(result.nodes.map(n => [n.id, n]))
+    const NODE_H = 4
+    const centerY = nodeById.get('me')!.top + NODE_H / 2
+    const parentY = nodeById.get('parent')!.top + NODE_H / 2
+    const childY = nodeById.get('child')!.top + NODE_H / 2
+    const spouseY = nodeById.get('spouse')!.top + NODE_H / 2
+
+    expect(parentY).toBeLessThan(centerY - 2)
+    expect(childY).toBeGreaterThan(centerY + 2)
+    expect(Math.abs(spouseY - centerY)).toBeLessThan(1)
   })
 })
 
@@ -141,7 +224,7 @@ describe('calculateRingCoordinates', () => {
     ])
     const result = calculateRingCoordinates(layerNodes)
     expect(result.nodes[0].cx).toBe(0)
-    expect(result.nodes[0].top).toBe(0)
+    expect(result.nodes[0].top).toBe(-2)
   })
 
   it('第 1 层在半径为 BASE_RADIUS 的圆上', () => {
@@ -156,7 +239,8 @@ describe('calculateRingCoordinates', () => {
     const BASE_RADIUS = 10
     for (const n of result.nodes) {
       if (n.id !== '1') {
-        const dist = Math.sqrt(n.cx * n.cx + n.top * n.top)
+        const centerY = n.top + 2
+        const dist = Math.sqrt(n.cx * n.cx + centerY * centerY)
         expect(dist).toBeCloseTo(BASE_RADIUS, 0)
       }
     }
@@ -196,6 +280,27 @@ describe('calculateRingCoordinates', () => {
     expect(result.nodes).toHaveLength(1)
     expect(Number.isFinite(result.nodes[0].cx)).toBe(true)
     expect(Number.isFinite(result.nodes[0].top)).toBe(true)
+  })
+
+  it('expands populated rings so adjacent nodes keep readable spacing', () => {
+    const denseLayer: LaidOutNode[] = Array.from({ length: 24 }, (_, i) => ({
+      id: `n${i}`,
+      cx: i,
+      top: 0,
+      generation: 1,
+    }))
+    const result = calculateRingCoordinates(new Map([[1, denseLayer]]))
+    const distances: number[] = []
+
+    for (let i = 0; i < result.nodes.length; i++) {
+      for (let j = i + 1; j < result.nodes.length; j++) {
+        const a = result.nodes[i]
+        const b = result.nodes[j]
+        distances.push(Math.hypot(a.cx - b.cx, a.top - b.top))
+      }
+    }
+
+    expect(Math.min(...distances)).toBeGreaterThanOrEqual(3.4)
   })
 })
 
@@ -248,7 +353,7 @@ describe('集成测试', () => {
     const result = await layoutProtagonist(members, '1')
     const protagonist = result.nodes.find(n => n.id === '1')
     expect(protagonist?.cx).toBeCloseTo(result.canvas.width / 2, 0)
-    expect(protagonist?.top).toBeCloseTo(result.canvas.height / 2, 0)
+    expect(protagonist ? protagonist.top + 2 : undefined).toBeCloseTo(result.canvas.height / 2, 0)
   })
 
   it('中心人物不存在时退回普通布局并保持画布有效', async () => {
@@ -307,10 +412,12 @@ describe('buildProtagonistConnectors', () => {
     byId.set('c1', { id: 'c1', firstName: '', lastName: '', gender: 'male', parents: [{ id: 'p1', type: 'blood' }, { id: 'p2', type: 'blood' }], children: [], siblings: [], spouses: [], godparents: [], godchildren: [] })
 
     const connectors = buildProtagonistConnectors(nodes, couples, byId)
-    expect(connectors.length).toBe(2)
+    expect(connectors.length).toBe(3)
     expect(connectors[0].kind).toBe('spouse')
-    expect(connectors[1].kind).toBe('parent-child')
-    expect(connectors[1].points[0]).toEqual({ x: 2, y: 0 })
-    expect(connectors[1].points[1]).toEqual({ x: 2, y: 10 })
+    const parentChildPoints = connectors
+      .filter(c => c.kind === 'parent-child')
+      .flatMap(c => c.points)
+    expect(parentChildPoints).toContainEqual({ x: 2, y: 4 })
+    expect(parentChildPoints).toContainEqual({ x: 2, y: 10 })
   })
 })

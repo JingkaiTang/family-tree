@@ -1,13 +1,70 @@
 import type { Member } from './schema'
 import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeLayout'
-import type { ElkNode, ElkEdge, ElkGraph } from './elkLayout'
+import type { ElkNode, ElkGraph } from './elkLayout'
 import { getElk, layoutWithElk } from './elkLayout'
+
+const NODE_W = 2
+const NODE_H = 4
+const COUPLE_GAP = 0.2
+const UNIT_GAP = 1.5
+const BASE_RADIUS = 10
+const RING_GAP = 8
+const MIN_RING_NODE_DISTANCE = 3.5
+
+function radiusForLayer(distance: number, nodeCount: number): number {
+  const baseRadius = BASE_RADIUS + Math.max(0, distance - 1) * RING_GAP
+  if (nodeCount <= 1) return baseRadius
+  const chordRadius = MIN_RING_NODE_DISTANCE / (2 * Math.sin(Math.PI / nodeCount))
+  return Math.max(baseRadius, chordRadius)
+}
+
+function defaultAngle(index: number, count: number, distance: number): number {
+  const angleStep = (2 * Math.PI) / count
+  const startAngle = count === 2 && distance % 2 === 1 ? 0 : -Math.PI / 2
+  return index * angleStep + startAngle
+}
+
+function anglesForLayer(
+  layer: LaidOutNode[],
+  distance: number,
+  radius: number,
+  angleHints?: Map<string, number>,
+): number[] {
+  if (!angleHints || !layer.some(n => angleHints.has(n.id))) {
+    return layer.map((_, i) => defaultAngle(i, layer.length, distance))
+  }
+
+  const minAngleGap = 2 * Math.asin(Math.min(1, MIN_RING_NODE_DISTANCE / (2 * radius)))
+  const maxSectorGap = Math.PI / 7
+  const grouped = new Map<string, Array<{ index: number; node: LaidOutNode; baseAngle: number }>>()
+  const entries = layer.map((node, index) => {
+    const baseAngle = angleHints.get(node.id) ?? defaultAngle(index, layer.length, distance)
+    return { index, node, baseAngle }
+  })
+
+  for (const entry of entries) {
+    const key = entry.baseAngle.toFixed(6)
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(entry)
+  }
+
+  const angles: number[] = []
+  for (const group of grouped.values()) {
+    const ordered = [...group].sort((a, b) => a.node.cx - b.node.cx || a.node.id.localeCompare(b.node.id))
+    const gap = Math.min(maxSectorGap, minAngleGap)
+    ordered.forEach((entry, groupIndex) => {
+      const offset = (groupIndex - (ordered.length - 1) / 2) * gap
+      angles[entry.index] = entry.baseAngle + offset
+    })
+  }
+
+  return angles
+}
 
 export function calculateRingCoordinates(
   layerNodes: Map<number, LaidOutNode[]>,
+  angleHints?: Map<string, number>,
 ): { nodes: LaidOutNode[] } {
-  const BASE_RADIUS = 10
-  const RING_GAP = 8
   const nodes: LaidOutNode[] = []
 
   const sortedLayers = [...layerNodes.entries()].sort(([a], [b]) => a - b)
@@ -15,37 +72,38 @@ export function calculateRingCoordinates(
     if (layer.length === 0) continue
 
     if (dist === 0) {
-      let cxSum = 0, topSum = 0
-      for (const n of layer) { cxSum += n.cx; topSum += n.top }
-      const cxCenter = cxSum / layer.length
-      const topCenter = topSum / layer.length
+      let cxSum = 0, centerYSum = 0
       for (const n of layer) {
-        nodes.push({ ...n, cx: n.cx - cxCenter, top: n.top - topCenter })
+        cxSum += n.cx
+        centerYSum += n.top + NODE_H / 2
+      }
+      const cxCenter = cxSum / layer.length
+      const centerY = centerYSum / layer.length
+      for (const n of layer) {
+        nodes.push({
+          ...n,
+          cx: n.cx - cxCenter,
+          top: n.top + NODE_H / 2 - centerY - NODE_H / 2,
+        })
       }
       continue
     }
 
-    const radius = BASE_RADIUS + (dist - 1) * RING_GAP
-    const angleStep = (2 * Math.PI) / layer.length
-    const startAngle = layer.length === 2 && dist % 2 === 1 ? 0 : -Math.PI / 2
+    const radius = radiusForLayer(dist, layer.length)
+    const angles = anglesForLayer(layer, dist, radius, angleHints)
 
     for (let i = 0; i < layer.length; i++) {
-      const angle = i * angleStep + startAngle
+      const angle = angles[i]
       nodes.push({
         ...layer[i],
         cx: radius * Math.cos(angle),
-        top: radius * Math.sin(angle),
+        top: radius * Math.sin(angle) - NODE_H / 2,
       })
     }
   }
 
   return { nodes }
 }
-
-const NODE_W = 2
-const NODE_H = 4
-const COUPLE_GAP = 0.2
-const UNIT_GAP = 1.5
 
 function coupleWidth(memberCount: number): number {
   return memberCount * NODE_W + Math.max(0, memberCount - 1) * COUPLE_GAP
@@ -205,6 +263,94 @@ export function calcRelationshipDistances(
   return distances
 }
 
+interface AngleInfo {
+  distance: number
+  angle: number
+  priority: number
+}
+
+interface AngleEdge {
+  id: string
+  cost: number
+  angle: number
+  priority: number
+}
+
+function relationshipAngleEdges(m: Member): AngleEdge[] {
+  return [
+    ...m.spouses.map(r => ({ id: r.id, cost: 1, angle: 0, priority: 0 })),
+    ...m.parents.map(r => ({ id: r.id, cost: 1, angle: -Math.PI / 2, priority: 1 })),
+    ...m.children.map(r => ({ id: r.id, cost: 1, angle: Math.PI / 2, priority: 1 })),
+    ...m.godparents.map(r => ({ id: r.id, cost: 1, angle: -Math.PI / 2, priority: 2 })),
+    ...m.godchildren.map(r => ({ id: r.id, cost: 1, angle: Math.PI / 2, priority: 2 })),
+    ...m.siblings.map(r => ({ id: r.id, cost: 2, angle: Math.PI, priority: 3 })),
+  ]
+}
+
+function buildRelationAngleHints(
+  protagonistId: string,
+  members: Member[],
+): Map<string, number> {
+  const byId = new Map(members.map(m => [m.id, m]))
+  const info = new Map<string, AngleInfo>()
+  if (!byId.has(protagonistId)) return new Map()
+
+  const queue: Array<{ id: string; distance: number; angle: number; priority: number }> = [
+    { id: protagonistId, distance: 0, angle: 0, priority: 0 },
+  ]
+  info.set(protagonistId, { distance: 0, angle: 0, priority: 0 })
+
+  while (queue.length > 0) {
+    queue.sort((a, b) => a.distance - b.distance || a.priority - b.priority)
+    const current = queue.shift()!
+    const knownCurrent = info.get(current.id)
+    if (!knownCurrent) continue
+    if (
+      knownCurrent.distance < current.distance ||
+      (knownCurrent.distance === current.distance && knownCurrent.priority < current.priority)
+    ) {
+      continue
+    }
+
+    const m = byId.get(current.id)
+    if (!m) continue
+
+    for (const edge of relationshipAngleEdges(m)) {
+      if (!byId.has(edge.id)) continue
+      const nextDistance = current.distance + edge.cost
+      const nextPriority = current.id === protagonistId
+        ? edge.priority
+        : current.priority + 10 + edge.priority
+      const nextAngle = current.id === protagonistId ? edge.angle : current.angle
+      const known = info.get(edge.id)
+      if (
+        known &&
+        (known.distance < nextDistance ||
+          (known.distance === nextDistance && known.priority <= nextPriority))
+      ) {
+        continue
+      }
+      info.set(edge.id, {
+        distance: nextDistance,
+        angle: nextAngle,
+        priority: nextPriority,
+      })
+      queue.push({
+        id: edge.id,
+        distance: nextDistance,
+        angle: nextAngle,
+        priority: nextPriority,
+      })
+    }
+  }
+
+  const angles = new Map<string, number>()
+  for (const [id, item] of info) {
+    if (id !== protagonistId) angles.set(id, item.angle)
+  }
+  return angles
+}
+
 function buildCouples(
   members: Member[],
   byId: Map<string, Member>,
@@ -245,6 +391,17 @@ function buildCouples(
   return couples
 }
 
+function syncCoupleCenters(couples: Couple[], nodes: LaidOutNode[]) {
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+  for (const c of couples) {
+    const memberNodes = c.memberIds
+      .map(id => nodeById.get(id))
+      .filter(Boolean) as LaidOutNode[]
+    if (memberNodes.length === 0) continue
+    c.cx = memberNodes.reduce((sum, n) => sum + n.cx, 0) / memberNodes.length
+  }
+}
+
 export async function layoutProtagonist(
   members: Member[],
   protagonistId: string,
@@ -278,6 +435,7 @@ export async function layoutProtagonist(
   }
 
   const layerGroups = groupByDistance(distances)
+  const angleHints = buildRelationAngleHints(protagonistId, members)
 
   const layerNodes = new Map<number, LaidOutNode[]>()
   for (const [dist, ids] of layerGroups) {
@@ -286,28 +444,30 @@ export async function layoutProtagonist(
     layerNodes.set(dist, nodes)
   }
 
-  const { nodes } = calculateRingCoordinates(layerNodes)
-
-  const couples = buildCouples(members, byId)
-  const connectors = buildProtagonistConnectors(nodes, couples, byId)
+  const { nodes } = calculateRingCoordinates(layerNodes, angleHints)
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const n of nodes) {
     minX = Math.min(minX, n.cx - NODE_W / 2)
     maxX = Math.max(maxX, n.cx + NODE_W / 2)
-    minY = Math.min(minY, n.top - NODE_H / 2)
-    maxY = Math.max(maxY, n.top + NODE_H / 2)
+    minY = Math.min(minY, n.top)
+    maxY = Math.max(maxY, n.top + NODE_H)
   }
 
-  const width = maxX - minX + NODE_W * 2
-  const height = maxY - minY + NODE_H * 2
-  const dx = width / 2
-  const dy = height / 2
+  const halfWidth = Math.max(Math.abs(minX), Math.abs(maxX)) + NODE_W
+  const halfHeight = Math.max(Math.abs(minY), Math.abs(maxY)) + NODE_H
+  const width = halfWidth * 2
+  const height = halfHeight * 2
+  const dx = halfWidth
+  const dy = halfHeight
   for (const n of nodes) {
     n.cx += dx
     n.top += dy
   }
-  for (const c of couples) c.cx += dx
+
+  const couples = buildCouples(members, byId)
+  syncCoupleCenters(couples, nodes)
+  const connectors = buildProtagonistConnectors(nodes, couples, byId)
 
   return {
     nodes,
@@ -347,8 +507,8 @@ function buildConnectors(
         lines.push({
           kind: 'spouse',
           points: [
-            { x: a.cx, y: a.top },
-            { x: b.cx, y: b.top },
+            { x: a.cx, y: a.top + NODE_H / 2 },
+            { x: b.cx, y: b.top + NODE_H / 2 },
           ],
         })
       }
@@ -365,24 +525,73 @@ function buildConnectors(
     }
     if (childIds.size === 0) continue
 
-    const parentNodes = c.memberIds.map(id => nodeById.get(id)).filter(Boolean) as LaidOutNode[]
-    const childNodes = [...childIds].map(id => nodeById.get(id)).filter(Boolean) as LaidOutNode[]
+    for (const childId of childIds) {
+      const childNode = nodeById.get(childId)
+      const child = byId.get(childId)
+      if (!childNode || !child) continue
 
-    if (parentNodes.length === 0 || childNodes.length === 0) continue
+      const parentNodes = c.memberIds
+        .filter(parentId => {
+          const parent = byId.get(parentId)
+          return parent?.children.some(ch => ch.id === childId) ||
+            child.parents.some(p => p.id === parentId)
+        })
+        .map(id => nodeById.get(id))
+        .filter(Boolean) as LaidOutNode[]
 
-    const parentX = parentNodes.length === 2
-      ? (parentNodes[0].cx + parentNodes[1].cx) / 2
-      : parentNodes[0].cx
-    const parentY = parentNodes.length === 2
-      ? (parentNodes[0].top + parentNodes[1].top) / 2
-      : parentNodes[0].top
+      if (parentNodes.length === 0) continue
 
-    for (const cn of childNodes) {
+      const parentX = parentNodes.reduce((sum, n) => sum + n.cx, 0) / parentNodes.length
+      const parentCenterY = parentNodes.reduce((sum, n) => sum + n.top + NODE_H / 2, 0) / parentNodes.length
+      const childCenterY = childNode.top + NODE_H / 2
+      const childBelowParents = childCenterY >= parentCenterY
+      const parentY = childBelowParents
+        ? Math.max(...parentNodes.map(n => n.top + NODE_H))
+        : Math.min(...parentNodes.map(n => n.top))
+      const childY = childBelowParents ? childNode.top : childNode.top + NODE_H
+      const midY = (parentY + childY) / 2
+
       lines.push({
         kind: 'parent-child',
         points: [
           { x: parentX, y: parentY },
-          { x: cn.cx, y: cn.top },
+          { x: parentX, y: midY },
+        ],
+      })
+      if (Math.abs(parentX - childNode.cx) > 0.1) {
+        lines.push({
+          kind: 'parent-child',
+          points: [
+            { x: Math.min(parentX, childNode.cx), y: midY },
+            { x: Math.max(parentX, childNode.cx), y: midY },
+          ],
+        })
+      }
+      lines.push({
+        kind: 'parent-child',
+        points: [
+          { x: childNode.cx, y: midY },
+          { x: childNode.cx, y: childY },
+        ],
+      })
+    }
+  }
+
+  const emittedGod = new Set<string>()
+  for (const n of nodes) {
+    const m = byId.get(n.id)
+    if (!m) continue
+    for (const gc of m.godchildren) {
+      const key = `${n.id}>${gc.id}`
+      if (emittedGod.has(key)) continue
+      emittedGod.add(key)
+      const target = nodeById.get(gc.id)
+      if (!target) continue
+      lines.push({
+        kind: 'godparent',
+        points: [
+          { x: n.cx, y: n.top + NODE_H },
+          { x: target.cx, y: target.top },
         ],
       })
     }

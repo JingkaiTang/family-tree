@@ -88,6 +88,7 @@ const placedNodes = computed(() => {
     member: Member
     left: number
     top: number
+    relationDistance?: number
   }> = []
   for (const n of layout.value.nodes) {
     const member = props.members.find((m) => m.id === n.id)
@@ -97,6 +98,7 @@ const placedNodes = computed(() => {
       member,
       left: n.cx * CELL_PX + PADDING - NODE_W_PX / 2,
       top: n.top * CELL_PX + PADDING,
+      relationDistance: props.centerLayoutId ? n.generation : undefined,
     })
   }
   return rows
@@ -244,6 +246,7 @@ function onNodeDrop(payload: { id: string; dx: number; dy: number }) {
           :height="NODE_H_PX"
           :selected="selectedId === n.id"
           :is-viewpoint="viewpointId === n.id"
+          :relation-distance="n.relationDistance"
           :style="dragDelta[n.id] ? { zIndex: 50, transition: 'none' } : undefined"
           :kinship="viewpointId && getKinship ? (getKinship(viewpointId, n.id) ?? undefined) : undefined"
           @click="emit('select', n.id)"
