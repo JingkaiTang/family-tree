@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Current status (2026-05-31):** Implementation is landed on `main` through commit `4316123` and follow-up hardening. Automated tests cover the rewritten algorithm and edge cases; Web example smoke QA passed; Tauri visual QA for line crossing and large-family readability remains open.
+
 **Goal:** 重新设计主角视角布局算法，解决布局混乱、层次不清、节点重叠问题
 
 **Architecture:** 采用混合方案：BFS 计算关系距离 → 按距离分层 → 每层用 ELK 排列 → 计算环形坐标 → 生成连线
@@ -28,7 +30,7 @@
 - Modify: `src/core/protagonistLayout.ts:12-47`
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -85,12 +87,12 @@ describe('calcRelationshipDistances', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: FAIL with "calcRelationshipDistances is not exported"
 
-- [ ] **Step 3: 实现关系距离计算**
+- [x] **Step 3: 实现关系距离计算**
 
 ```typescript
 // protagonistLayout.ts
@@ -132,12 +134,12 @@ export function calcRelationshipDistances(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -152,7 +154,7 @@ git commit -m "feat: 重写关系距离计算 BFS"
 - Modify: `src/core/protagonistLayout.ts`
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -174,12 +176,12 @@ describe('groupByDistance', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: FAIL with "groupByDistance is not exported"
 
-- [ ] **Step 3: 实现按距离分层**
+- [x] **Step 3: 实现按距离分层**
 
 ```typescript
 // protagonistLayout.ts
@@ -195,12 +197,12 @@ export function groupByDistance(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -215,7 +217,7 @@ git commit -m "feat: 实现按距离分层"
 - Modify: `src/core/protagonistLayout.ts`
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -236,12 +238,12 @@ describe('layoutLayerWithElk', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: FAIL with "layoutLayerWithElk is not exported"
 
-- [ ] **Step 3: 实现每层 ELK 排列**
+- [x] **Step 3: 实现每层 ELK 排列**
 
 ```typescript
 // protagonistLayout.ts
@@ -387,12 +389,12 @@ async function getElk() {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -407,7 +409,7 @@ git commit -m "feat: 实现每层 ELK 排列"
 - Modify: `src/core/protagonistLayout.ts`
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -443,12 +445,12 @@ describe('calculateRingCoordinates', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: FAIL with "calculateRingCoordinates is not exported"
 
-- [ ] **Step 3: 实现环形坐标计算**
+- [x] **Step 3: 实现环形坐标计算**
 
 ```typescript
 // protagonistLayout.ts
@@ -484,12 +486,12 @@ export function calculateRingCoordinates(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -504,7 +506,7 @@ git commit -m "feat: 实现环形坐标计算"
 - Modify: `src/core/protagonistLayout.ts`
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -528,12 +530,12 @@ describe('buildProtagonistConnectors', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: FAIL with "buildProtagonistConnectors is not exported"
 
-- [ ] **Step 3: 实现连线生成**
+- [x] **Step 3: 实现连线生成**
 
 ```typescript
 // protagonistLayout.ts
@@ -601,12 +603,12 @@ export function buildProtagonistConnectors(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -621,7 +623,7 @@ git commit -m "feat: 实现连线生成"
 - Modify: `src/core/protagonistLayout.ts`
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -645,12 +647,12 @@ describe('layoutProtagonist', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: 实现完整布局流程**
+- [x] **Step 3: 实现完整布局流程**
 
 ```typescript
 // protagonistLayout.ts
@@ -763,12 +765,12 @@ function buildCouples(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -782,7 +784,7 @@ git commit -m "feat: 组合完整布局流程"
 **Files:**
 - Test: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写集成测试**
+- [x] **Step 1: 写集成测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -825,12 +827,12 @@ describe('集成测试', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认通过**
+- [x] **Step 2: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add src/core/protagonistLayout.test.ts
@@ -844,7 +846,7 @@ git commit -m "test: 添加集成测试"
 **Files:**
 - Modify: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 更新现有测试**
+- [x] **Step 1: 更新现有测试**
 
 ```typescript
 // protagonistLayout.test.ts
@@ -864,12 +866,12 @@ describe('布局结果', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认通过**
+- [x] **Step 2: 运行测试确认通过**
 
 Run: `npx vitest run src/core/protagonistLayout.test.ts`
 Expected: PASS
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add src/core/protagonistLayout.test.ts
@@ -883,17 +885,17 @@ git commit -m "test: 更新现有测试"
 **Files:**
 - None
 
-- [ ] **Step 1: 运行所有测试**
+- [x] **Step 1: 运行所有测试**
 
 Run: `npx vitest run`
 Expected: ALL PASS
 
-- [ ] **Step 2: 类型检查**
+- [x] **Step 2: 类型检查**
 
 Run: `npx tsc --noEmit`
 Expected: No errors
 
-- [ ] **Step 3: 提交最终版本**
+- [x] **Step 3: 提交最终版本**
 
 ```bash
 git add -A
@@ -904,11 +906,11 @@ git commit -m "feat: 主角视角布局重新设计完成"
 
 ## 验收标准检查
 
-- [ ] 选中人物后可切换到主角视角布局
-- [ ] 主角在画布中心
-- [ ] 辈分层次清晰（从内到外）
-- [ ] 直系亲属在内圈，远亲在外圈
-- [ ] 节点不重叠
-- [ ] 连线不交叉
-- [ ] 配偶同层并排
-- [ ] 与"视角"功能（称谓计算）独立
+- [x] 选中人物后可切换到主角视角布局
+- [x] 主角在画布中心
+- [x] 辈分层次清晰（从内到外）
+- [x] 直系亲属在内圈，远亲在外圈
+- [x] 节点不重叠
+- [ ] 连线不交叉（视觉验收待补，当前算法不提供全局保证）
+- [x] 配偶同层并排
+- [x] 与"视角"功能（称谓计算）独立

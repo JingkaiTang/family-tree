@@ -64,11 +64,18 @@ function getScale(): number {
 function focusStagePoint(stageX: number, stageY: number) {
   if (!pz) return
   const host = stageRef.value?.parentElement as HTMLElement | null
-  if (!host) return
-  const rect = host.getBoundingClientRect()
+  const stage = stageRef.value
+  if (!host || !stage) return
+  const hostRect = host.getBoundingClientRect()
+  const stageRect = stage.getBoundingClientRect()
   const scale = pz.getScale()
-  const x = rect.width / 2 - stageX * scale
-  const y = rect.height / 2 - stageY * scale
+  const current = pz.getPan()
+  const targetScreenX = stageRect.left + stageX * scale
+  const targetScreenY = stageRect.top + stageY * scale
+  const desiredScreenX = hostRect.left + hostRect.width / 2
+  const desiredScreenY = hostRect.top + hostRect.height / 2
+  const x = current.x + (desiredScreenX - targetScreenX) / scale
+  const y = current.y + (desiredScreenY - targetScreenY) / scale
   pz.pan(x, y, { animate: true, force: true })
 }
 

@@ -1,7 +1,7 @@
 import type { Member } from './schema'
 import type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './treeLayout'
 import type { ElkNode, ElkEdge, ElkGraph } from './elkLayout'
-import { getElk } from './elkLayout'
+import { getElk, layoutWithElk } from './elkLayout'
 
 export function calculateRingCoordinates(
   layerNodes: Map<number, LaidOutNode[]>,
@@ -10,7 +10,10 @@ export function calculateRingCoordinates(
   const RING_GAP = 8
   const nodes: LaidOutNode[] = []
 
-  for (const [dist, layer] of layerNodes) {
+  const sortedLayers = [...layerNodes.entries()].sort(([a], [b]) => a - b)
+  for (const [dist, layer] of sortedLayers) {
+    if (layer.length === 0) continue
+
     if (dist === 0) {
       let cxSum = 0, topSum = 0
       for (const n of layer) { cxSum += n.cx; topSum += n.top }
@@ -24,9 +27,10 @@ export function calculateRingCoordinates(
 
     const radius = BASE_RADIUS + (dist - 1) * RING_GAP
     const angleStep = (2 * Math.PI) / layer.length
+    const startAngle = layer.length === 2 && dist % 2 === 1 ? 0 : -Math.PI / 2
 
     for (let i = 0; i < layer.length; i++) {
-      const angle = i * angleStep - Math.PI / 2
+      const angle = i * angleStep + startAngle
       nodes.push({
         ...layer[i],
         cx: radius * Math.cos(angle),
@@ -160,6 +164,7 @@ export function calcRelationshipDistances(
 ): Map<string, RelationshipInfo> {
   const byId = new Map(members.map(m => [m.id, m]))
   const distances = new Map<string, RelationshipInfo>()
+  if (!byId.has(protagonistId)) return distances
 
   const queue: Array<{ id: string; dist: number }> = [
     { id: protagonistId, dist: 0 },
@@ -167,23 +172,29 @@ export function calcRelationshipDistances(
   distances.set(protagonistId, { distance: 0 })
 
   while (queue.length > 0) {
+    queue.sort((a, b) => a.dist - b.dist)
     const { id, dist } = queue.shift()!
+    if ((distances.get(id)?.distance ?? Infinity) < dist) continue
     const m = byId.get(id)
     if (!m) continue
 
-    const neighbors = [
-      ...m.parents.map(r => r.id),
-      ...m.children.map(r => r.id),
-      ...m.spouses.map(r => r.id),
-      ...m.godparents.map(r => r.id),
-      ...m.godchildren.map(r => r.id),
+    const neighbors: Array<{ id: string; cost: number }> = [
+      ...m.parents.map(r => ({ id: r.id, cost: 1 })),
+      ...m.children.map(r => ({ id: r.id, cost: 1 })),
+      ...m.spouses.map(r => ({ id: r.id, cost: 1 })),
+      ...m.godparents.map(r => ({ id: r.id, cost: 1 })),
+      ...m.godchildren.map(r => ({ id: r.id, cost: 1 })),
+      // 兄弟姐妹没有父母节点时也要可达；语义上仍按两步关系计算。
+      ...m.siblings.map(r => ({ id: r.id, cost: 2 })),
     ]
 
-    for (const nextId of neighbors) {
+    for (const { id: nextId, cost } of neighbors) {
       if (!byId.has(nextId)) continue
-      if (distances.has(nextId)) continue
-      distances.set(nextId, { distance: dist + 1 })
-      queue.push({ id: nextId, dist: dist + 1 })
+      const nextDist = dist + cost
+      const known = distances.get(nextId)
+      if (known && known.distance <= nextDist) continue
+      distances.set(nextId, { distance: nextDist })
+      queue.push({ id: nextId, dist: nextDist })
     }
   }
 
@@ -246,8 +257,21 @@ export async function layoutProtagonist(
   }
 
   const byId = new Map(members.map(m => [m.id, m]))
+  if (!byId.has(protagonistId)) {
+    return layoutWithElk(members)
+  }
 
   const distances = calcRelationshipDistances(protagonistId, members)
+  const orphanIds = members
+    .filter(m => !distances.has(m.id))
+    .map(m => m.id)
+
+  if (orphanIds.length > 0) {
+    const maxDistance = Math.max(...[...distances.values()].map(info => info.distance), 0)
+    for (const id of orphanIds) {
+      distances.set(id, { distance: maxDistance + 1 })
+    }
+  }
 
   const layerGroups = groupByDistance(distances)
 
@@ -286,7 +310,7 @@ export async function layoutProtagonist(
     couples,
     connectors,
     canvas: { width, height },
-    orphanIds: [],
+    orphanIds,
     offsetX: dx,
   }
 }

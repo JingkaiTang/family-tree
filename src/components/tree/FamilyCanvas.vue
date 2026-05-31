@@ -45,12 +45,34 @@ const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
 
 const layout = ref<LayoutResult>({ nodes: [], couples: [], connectors: [], canvas: { width: 0, height: 0 }, orphanIds: [], offsetX: 0 })
 
+let layoutRequestId = 0
+let lastFocusedCenterLayoutId: string | null = props.initialView && props.centerLayoutId ? props.centerLayoutId : null
+
 async function updateLayout() {
+  const requestId = ++layoutRequestId
+  let nextLayout: LayoutResult
   if (props.centerLayoutId) {
-    layout.value = await layoutProtagonist(props.members, props.centerLayoutId)
+    nextLayout = await layoutProtagonist(props.members, props.centerLayoutId)
   } else {
-    layout.value = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
+    nextLayout = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
   }
+  if (requestId !== layoutRequestId) return
+
+  layout.value = nextLayout
+
+  if (!props.centerLayoutId) {
+    const shouldFocusSelected = lastFocusedCenterLayoutId !== null && props.selectedId
+    lastFocusedCenterLayoutId = null
+    if (shouldFocusSelected) {
+      await nextTick()
+      focusMember(props.selectedId!)
+    }
+    return
+  }
+  if (props.centerLayoutId === lastFocusedCenterLayoutId) return
+  lastFocusedCenterLayoutId = props.centerLayoutId
+  await nextTick()
+  focusMember(props.centerLayoutId)
 }
 
 watch(() => [props.members, props.centerLayoutId, props.manualPositions], updateLayout, { immediate: true, deep: true })

@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Current status (2026-05-31):** Implementation is landed on `main` through commit `4316123` and follow-up hardening. The checklist below has been reconciled against the current code: implementation and automated verification steps are complete; Web example smoke QA passed; full Tauri/manual visual QA remains open where explicitly unchecked.
+
 **Goal:** 用 ELK.js 约束布局引擎替换手工 BFS 算法，解决重叠和位置不合理问题；新增以选中人物为中心的树状辐射布局模式
 
 **Architecture:** 
@@ -34,13 +36,13 @@
 **Files:**
 - Modify: `package.json`
 
-- [ ] **Step 1: 安装 elkjs**
+- [x] **Step 1: 安装 elkjs**
 
 ```bash
 npm install elkjs
 ```
 
-- [ ] **Step 2: 验证安装**
+- [x] **Step 2: 验证安装**
 
 ```bash
 npm ls elkjs
@@ -48,7 +50,7 @@ npm ls elkjs
 
 Expected: elkjs 版本显示
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add package.json package-lock.json
@@ -63,7 +65,7 @@ git commit -m "chore: add elkjs dependency"
 - Create: `src/core/elkLayout.ts`
 - Create: `src/core/elkLayout.test.ts`
 
-- [ ] **Step 1: 写失败测试 — 基本布局功能**
+- [x] **Step 1: 写失败测试 — 基本布局功能**
 
 ```typescript
 // src/core/elkLayout.test.ts
@@ -157,7 +159,7 @@ describe('layoutWithElk', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 ```bash
 npm test -- src/core/elkLayout.test.ts
@@ -165,7 +167,7 @@ npm test -- src/core/elkLayout.test.ts
 
 Expected: FAIL - "Cannot find module './elkLayout'"
 
-- [ ] **Step 3: 实现 elkLayout.ts 核心模块**
+- [x] **Step 3: 实现 elkLayout.ts 核心模块**
 
 ```typescript
 // src/core/elkLayout.ts
@@ -624,7 +626,7 @@ function buildConnectors(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 ```bash
 npm test -- src/core/elkLayout.test.ts
@@ -632,7 +634,7 @@ npm test -- src/core/elkLayout.test.ts
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/elkLayout.ts src/core/elkLayout.test.ts
@@ -647,7 +649,7 @@ git commit -m "feat: add ELK.js layout engine core module"
 - Modify: `src/core/treeLayout.ts`
 - Modify: `src/core/treeLayout.test.ts`
 
-- [ ] **Step 1: 修改 treeLayout.ts 导出**
+- [x] **Step 1: 修改 treeLayout.ts 导出**
 
 将 `layoutFamilyTree` 改为调用 `layoutWithElk`：
 
@@ -670,7 +672,7 @@ export async function layoutFamilyTree(
 }
 ```
 
-- [ ] **Step 2: 更新 FamilyCanvas.vue 调用**
+- [x] **Step 2: 更新 FamilyCanvas.vue 调用**
 
 ```typescript
 // src/components/tree/FamilyCanvas.vue 中的 layout computed 需要改为异步
@@ -685,7 +687,7 @@ watch(() => props.manualPositions, async () => {
 }, { deep: true })
 ```
 
-- [ ] **Step 3: 运行现有测试**
+- [x] **Step 3: 运行现有测试**
 
 ```bash
 npm test
@@ -705,7 +707,7 @@ Expected: 所有测试通过
 npm run dev
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/treeLayout.ts src/components/tree/FamilyCanvas.vue
@@ -720,7 +722,7 @@ git commit -m "feat: integrate ELK.js layout engine"
 - Create: `src/core/protagonistLayout.ts`
 - Create: `src/core/protagonistLayout.test.ts`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```typescript
 // src/core/protagonistLayout.test.ts
@@ -818,7 +820,7 @@ describe('layoutProtagonist', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 ```bash
 npm test -- src/core/protagonistLayout.test.ts
@@ -826,7 +828,7 @@ npm test -- src/core/protagonistLayout.test.ts
 
 Expected: FAIL
 
-- [ ] **Step 3: 实现主角视角布局算法**
+- [x] **Step 3: 实现主角视角布局算法**
 
 ```typescript
 // src/core/protagonistLayout.ts
@@ -1184,7 +1186,7 @@ function buildConnectors(
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 ```bash
 npm test -- src/core/protagonistLayout.test.ts
@@ -1192,7 +1194,7 @@ npm test -- src/core/protagonistLayout.test.ts
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/protagonistLayout.ts src/core/protagonistLayout.test.ts
@@ -1206,7 +1208,7 @@ git commit -m "feat: add protagonist-centered layout algorithm"
 **Files:**
 - Modify: `src/stores/ui.ts`
 
-- [ ] **Step 1: 添加 centerLayoutId 状态**
+- [x] **Step 1: 添加 centerLayoutId 状态**
 
 ```typescript
 // src/stores/ui.ts
@@ -1268,7 +1270,7 @@ export const useUiStore = defineStore('ui', () => {
 })
 ```
 
-- [ ] **Step 2: 运行 typecheck**
+- [x] **Step 2: 运行 typecheck**
 
 ```bash
 npm run typecheck
@@ -1276,7 +1278,7 @@ npm run typecheck
 
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/stores/ui.ts
@@ -1290,7 +1292,7 @@ git commit -m "feat: add centerLayoutId to UI store"
 **Files:**
 - Modify: `src/components/tree/FamilyCanvas.vue`
 
-- [ ] **Step 1: 添加布局模式 prop**
+- [x] **Step 1: 添加布局模式 prop**
 
 ```typescript
 // src/components/tree/FamilyCanvas.vue
@@ -1306,7 +1308,7 @@ const props = defineProps<{
 }>()
 ```
 
-- [ ] **Step 2: 根据 centerLayoutId 选择布局算法**
+- [x] **Step 2: 根据 centerLayoutId 选择布局算法**
 
 ```typescript
 import { layoutFamilyTree } from '@/core/treeLayout'
@@ -1325,7 +1327,7 @@ async function updateLayout() {
 watch(() => [props.members, props.centerLayoutId, props.manualPositions], updateLayout, { immediate: true, deep: true })
 ```
 
-- [ ] **Step 3: 运行 typecheck**
+- [x] **Step 3: 运行 typecheck**
 
 ```bash
 npm run typecheck
@@ -1333,7 +1335,7 @@ npm run typecheck
 
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/tree/FamilyCanvas.vue
@@ -1347,7 +1349,7 @@ git commit -m "feat: support protagonist layout in FamilyCanvas"
 **Files:**
 - Modify: `src/pages/TreeView.vue`
 
-- [ ] **Step 1: 添加"以选中为中心布局"按钮**
+- [x] **Step 1: 添加"以选中为中心布局"按钮**
 
 ```vue
 <!-- src/pages/TreeView.vue -->
@@ -1367,7 +1369,7 @@ git commit -m "feat: support protagonist layout in FamilyCanvas"
 </button>
 ```
 
-- [ ] **Step 2: 添加按钮处理函数**
+- [x] **Step 2: 添加按钮处理函数**
 
 ```typescript
 function setCenterLayout() {
@@ -1379,7 +1381,7 @@ function clearCenterLayout() {
 }
 ```
 
-- [ ] **Step 3: 传递 centerLayoutId 给 FamilyCanvas**
+- [x] **Step 3: 传递 centerLayoutId 给 FamilyCanvas**
 
 ```vue
 <FamilyCanvas
@@ -1397,13 +1399,13 @@ function clearCenterLayout() {
 />
 ```
 
-- [ ] **Step 4: 添加 centerLayoutId 到 storeRefs**
+- [x] **Step 4: 添加 centerLayoutId 到 storeRefs**
 
 ```typescript
 const { viewpointId, selectedId, centerLayoutId } = storeToRefs(ui)
 ```
 
-- [ ] **Step 5: 运行 typecheck**
+- [x] **Step 5: 运行 typecheck**
 
 ```bash
 npm run typecheck
@@ -1411,7 +1413,7 @@ npm run typecheck
 
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/pages/TreeView.vue
@@ -1422,7 +1424,7 @@ git commit -m "feat: add center layout button to TreeView"
 
 ## Task 8: 最终验证
 
-- [ ] **Step 1: 运行所有测试**
+- [x] **Step 1: 运行所有测试**
 
 ```bash
 npm test
@@ -1430,7 +1432,7 @@ npm test
 
 Expected: 所有测试通过
 
-- [ ] **Step 2: 运行 typecheck**
+- [x] **Step 2: 运行 typecheck**
 
 ```bash
 npm run typecheck
@@ -1460,7 +1462,7 @@ npm run dev
 - 验证远亲在外圈
 - 再次点击"退出中心布局"，回到传统布局
 
-- [ ] **Step 5: 最终 Commit**
+- [x] **Step 5: 最终 Commit**
 
 ```bash
 git add -A

@@ -3,6 +3,22 @@ import { calcRelationshipDistances, groupByDistance, layoutProtagonist, layoutLa
 import type { Member } from './schema'
 import type { LaidOutNode } from './treeLayout'
 
+function makeMember(id: string, overrides: Partial<Member> = {}): Member {
+  return {
+    id,
+    firstName: id,
+    lastName: '',
+    gender: 'other',
+    parents: [],
+    children: [],
+    siblings: [],
+    spouses: [],
+    godparents: [],
+    godchildren: [],
+    ...overrides,
+  }
+}
+
 describe('calcRelationshipDistances', () => {
   it('主角距离自己为 0', () => {
     const members: Member[] = [
@@ -10,6 +26,11 @@ describe('calcRelationshipDistances', () => {
     ]
     const distances = calcRelationshipDistances('1', members)
     expect(distances.get('1')?.distance).toBe(0)
+  })
+
+  it('主角不存在时返回空距离表', () => {
+    const distances = calcRelationshipDistances('missing', [makeMember('1')])
+    expect(distances.size).toBe(0)
   })
 
   it('配偶距离为 1', () => {
@@ -44,6 +65,15 @@ describe('calcRelationshipDistances', () => {
       { id: '1', firstName: '我', lastName: '', gender: 'male', parents: [{ id: '3', type: 'blood' }], children: [], siblings: [{ id: '2', type: 'blood' }], spouses: [], godparents: [], godchildren: [] },
       { id: '2', firstName: '兄弟', lastName: '', gender: 'male', parents: [{ id: '3', type: 'blood' }], children: [], siblings: [{ id: '1', type: 'blood' }], spouses: [], godparents: [], godchildren: [] },
       { id: '3', firstName: '父', lastName: '', gender: 'male', parents: [], children: [{ id: '1', type: 'blood' }, { id: '2', type: 'blood' }], siblings: [], spouses: [], godparents: [], godchildren: [] }
+    ]
+    const distances = calcRelationshipDistances('1', members)
+    expect(distances.get('2')?.distance).toBe(2)
+  })
+
+  it('直连兄弟姐妹缺少父母节点时仍按 2 步关系计算', () => {
+    const members: Member[] = [
+      makeMember('1', { siblings: [{ id: '2', type: 'blood' }] }),
+      makeMember('2', { siblings: [{ id: '1', type: 'blood' }] }),
     ]
     const distances = calcRelationshipDistances('1', members)
     expect(distances.get('2')?.distance).toBe(2)
@@ -131,6 +161,42 @@ describe('calculateRingCoordinates', () => {
       }
     }
   })
+
+  it('同层只有两个节点时左右展开，避免退化成竖线', () => {
+    const result = calculateRingCoordinates(new Map([
+      [1, [
+        { id: '2', cx: 0, top: 0, generation: 1 },
+        { id: '3', cx: 2, top: 0, generation: 1 },
+      ]],
+    ]))
+    const a = result.nodes.find(n => n.id === '2')!
+    const b = result.nodes.find(n => n.id === '3')!
+    expect(Math.abs(a.top - b.top)).toBeLessThan(1e-9)
+    expect(Math.abs(a.cx - b.cx)).toBeGreaterThan(0)
+  })
+
+  it('双节点外层交替方向，避免多层退化成同一条横线', () => {
+    const result = calculateRingCoordinates(new Map([
+      [2, [
+        { id: '4', cx: 0, top: 0, generation: 2 },
+        { id: '5', cx: 2, top: 0, generation: 2 },
+      ]],
+    ]))
+    const a = result.nodes.find(n => n.id === '4')!
+    const b = result.nodes.find(n => n.id === '5')!
+    expect(Math.abs(a.cx - b.cx)).toBeLessThan(1e-9)
+    expect(Math.abs(a.top - b.top)).toBeGreaterThan(0)
+  })
+
+  it('跳过空层并保持坐标有限', () => {
+    const result = calculateRingCoordinates(new Map([
+      [0, []],
+      [1, [{ id: '2', cx: 0, top: 0, generation: 1 }]],
+    ]))
+    expect(result.nodes).toHaveLength(1)
+    expect(Number.isFinite(result.nodes[0].cx)).toBe(true)
+    expect(Number.isFinite(result.nodes[0].top)).toBe(true)
+  })
 })
 
 describe('layoutLayerWithElk', () => {
@@ -183,6 +249,32 @@ describe('集成测试', () => {
     const protagonist = result.nodes.find(n => n.id === '1')
     expect(protagonist?.cx).toBeCloseTo(result.canvas.width / 2, 0)
     expect(protagonist?.top).toBeCloseTo(result.canvas.height / 2, 0)
+  })
+
+  it('中心人物不存在时退回普通布局并保持画布有效', async () => {
+    const members: Member[] = [
+      makeMember('a'),
+      makeMember('b'),
+    ]
+    const result = await layoutProtagonist(members, 'missing')
+    expect(result.nodes.map(n => n.id).sort()).toEqual(['a', 'b'])
+    expect(result.orphanIds).toEqual([])
+    expect(Number.isFinite(result.canvas.width)).toBe(true)
+    expect(Number.isFinite(result.canvas.height)).toBe(true)
+  })
+
+  it('不连通成员不会被中心布局丢弃，并标记为 orphanIds', async () => {
+    const members: Member[] = [
+      makeMember('me', { parents: [{ id: 'dad', type: 'blood' }] }),
+      makeMember('dad', { children: [{ id: 'me', type: 'blood' }] }),
+      makeMember('stranger'),
+    ]
+    const result = await layoutProtagonist(members, 'me')
+    expect(result.nodes.map(n => n.id).sort()).toEqual(['dad', 'me', 'stranger'])
+    expect(result.orphanIds).toEqual(['stranger'])
+    const stranger = result.nodes.find(n => n.id === 'stranger')!
+    const dad = result.nodes.find(n => n.id === 'dad')!
+    expect(stranger.generation).toBeGreaterThan(dad.generation)
   })
 })
 
