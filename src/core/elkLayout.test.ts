@@ -57,6 +57,47 @@ describe('layoutWithElk', () => {
     const hNode = result.nodes.find(n => n.id === 'H')!
     const wNode = result.nodes.find(n => n.id === 'W')!
     expect(hNode.generation).toBe(wNode.generation)
+    expect(hNode.top).toBe(wNode.top)
+    expect(Math.abs(hNode.cx - wNode.cx)).toBeGreaterThanOrEqual(2)
+  })
+
+  it('已婚独生子女对齐父母时，夫妻节点整体移动且不重叠', async () => {
+    const members = [
+      makeMember('GPA', {
+        gender: 'male',
+        children: [{ id: 'DAD', type: 'blood' }],
+        spouses: [{ id: 'GMA', type: 'married' }],
+      }),
+      makeMember('GMA', {
+        gender: 'female',
+        children: [{ id: 'DAD', type: 'blood' }],
+        spouses: [{ id: 'GPA', type: 'married' }],
+      }),
+      makeMember('DAD', {
+        gender: 'male',
+        parents: [{ id: 'GPA', type: 'blood' }, { id: 'GMA', type: 'blood' }],
+        children: [{ id: 'KID', type: 'blood' }],
+        spouses: [{ id: 'MOM', type: 'married' }],
+      }),
+      makeMember('MOM', {
+        gender: 'female',
+        children: [{ id: 'KID', type: 'blood' }],
+        spouses: [{ id: 'DAD', type: 'married' }],
+      }),
+      makeMember('KID', {
+        parents: [{ id: 'DAD', type: 'blood' }, { id: 'MOM', type: 'blood' }],
+      }),
+    ]
+    const result = await layoutWithElk(members)
+    const gpa = result.nodes.find(n => n.id === 'GPA')!
+    const gma = result.nodes.find(n => n.id === 'GMA')!
+    const dad = result.nodes.find(n => n.id === 'DAD')!
+    const mom = result.nodes.find(n => n.id === 'MOM')!
+    const kid = result.nodes.find(n => n.id === 'KID')!
+
+    expect(dad.cx).toBeCloseTo((gpa.cx + gma.cx) / 2, 6)
+    expect(kid.cx).toBeCloseTo((dad.cx + mom.cx) / 2, 6)
+    expect(Math.abs(dad.cx - mom.cx)).toBeGreaterThanOrEqual(2)
   })
 
   it('节点不会重叠', async () => {

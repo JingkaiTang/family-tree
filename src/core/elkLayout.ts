@@ -45,6 +45,14 @@ const UNIT_GAP = 1.5
 const ROW_GAP = 3
 const ROW_HEIGHT = NODE_H + ROW_GAP
 
+function coupleWidth(memberCount: number): number {
+  return memberCount * NODE_W + Math.max(0, memberCount - 1) * COUPLE_GAP
+}
+
+function memberCenterX(coupleLeft: number, memberIndex: number): number {
+  return coupleLeft + NODE_W / 2 + memberIndex * (NODE_W + COUPLE_GAP)
+}
+
 export interface ElkNode {
   id: string
   width: number
@@ -92,7 +100,10 @@ export async function layoutWithElk(
 
   const result = convertElkResult(layouted, couples, coupleOfMember, gen, members)
 
+  compressCoupleRows(result.nodes, couples)
   alignOnlyChildren(result.nodes, couples, byId, opts?.manualPositions)
+  compactChildGroups(result.nodes, couples, byId)
+  repackCoupleRows(result.nodes, couples)
 
   if (opts?.manualPositions) {
     for (const n of result.nodes) {
@@ -121,6 +132,165 @@ export async function layoutWithElk(
   return result
 }
 
+function compressCoupleRows(nodes: LaidOutNode[], couples: Couple[]) {
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+  const byGeneration = new Map<number, Couple[]>()
+  for (const c of couples) {
+    if (!byGeneration.has(c.generation)) byGeneration.set(c.generation, [])
+    byGeneration.get(c.generation)!.push(c)
+  }
+
+  for (const row of byGeneration.values()) {
+    const ordered = [...row].sort((a, b) => a.cx - b.cx)
+    let left = 0
+    for (const c of ordered) {
+      setCoupleLeft(c, left, nodeById)
+      left += coupleWidth(c.memberIds.length) + UNIT_GAP
+    }
+  }
+}
+
+function setCoupleLeft(
+  c: Couple,
+  left: number,
+  nodeById: Map<string, LaidOutNode>,
+) {
+  c.cx = left + coupleWidth(c.memberIds.length) / 2
+  c.memberIds.forEach((id, idx) => {
+    const n = nodeById.get(id)
+    if (n) n.cx = memberCenterX(left, idx)
+  })
+}
+
+function compactChildGroups(
+  nodes: LaidOutNode[],
+  couples: Couple[],
+  byId: Map<string, Member>,
+) {
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+  const coupleByMember = new Map<string, Couple>()
+  for (const c of couples) {
+    for (const id of c.memberIds) coupleByMember.set(id, c)
+  }
+
+  const generations = [...new Set(couples.map(c => c.generation))].sort((a, b) => a - b)
+  for (const generation of generations.slice(1)) {
+    const rowCouples = couples.filter(c => c.generation === generation)
+    const assigned = new Set<string>()
+    const groups: Array<{
+      anchorX: number
+      children: Array<{ couple: Couple; childId?: string }>
+    }> = []
+
+    const parentCouples = couples
+      .filter(c => c.generation < generation)
+      .sort((a, b) => a.cx - b.cx)
+
+    for (const parentCouple of parentCouples) {
+      const childCouples: Array<{ couple: Couple; childId: string }> = []
+      for (const mid of parentCouple.memberIds) {
+        const member = byId.get(mid)
+        if (!member) continue
+        for (const child of member.children) {
+          const childCouple = coupleByMember.get(child.id)
+          if (!childCouple || childCouple.generation !== generation) continue
+          if (assigned.has(childCouple.id)) continue
+          assigned.add(childCouple.id)
+          childCouples.push({ couple: childCouple, childId: child.id })
+        }
+      }
+      if (childCouples.length > 0) {
+        groups.push({
+          anchorX: parentCouple.cx,
+          children: childCouples.sort((a, b) => a.couple.cx - b.couple.cx),
+        })
+      }
+    }
+
+    for (const c of rowCouples.sort((a, b) => a.cx - b.cx)) {
+      if (assigned.has(c.id)) continue
+      groups.push({ anchorX: c.cx, children: [{ couple: c }] })
+    }
+
+    const boundsForGroup = (group: { children: Array<{ couple: Couple }> }) => {
+      const memberNodes = group.children.flatMap(({ couple }) =>
+        couple.memberIds.map(id => nodeById.get(id)).filter(Boolean) as LaidOutNode[]
+      )
+      const left = Math.min(...memberNodes.map(n => n.cx - NODE_W / 2))
+      const right = Math.max(...memberNodes.map(n => n.cx + NODE_W / 2))
+      return { memberNodes, left, right }
+    }
+
+    for (const group of groups) {
+      if (group.children.length === 1 && group.children[0].childId) {
+        const { couple, childId } = group.children[0]
+        const childIndex = Math.max(0, couple.memberIds.indexOf(childId))
+        const childOffset = NODE_W / 2 + childIndex * (NODE_W + COUPLE_GAP)
+        setCoupleLeft(couple, group.anchorX - childOffset, nodeById)
+        continue
+      }
+
+      const totalWidth = group.children.reduce(
+        (sum, { couple }) => sum + coupleWidth(couple.memberIds.length),
+        0,
+      ) + Math.max(0, group.children.length - 1) * UNIT_GAP
+      let left = group.anchorX - totalWidth / 2
+      for (const { couple } of group.children) {
+        setCoupleLeft(couple, left, nodeById)
+        left += coupleWidth(couple.memberIds.length) + UNIT_GAP
+      }
+    }
+
+    const orderedGroups = groups.sort((a, b) => boundsForGroup(a).left - boundsForGroup(b).left)
+    let cursor: number | null = null
+    for (const group of orderedGroups) {
+      const bounds = boundsForGroup(group)
+      if (cursor !== null && bounds.left < cursor + UNIT_GAP) {
+        const delta = cursor + UNIT_GAP - bounds.left
+        for (const n of bounds.memberNodes) n.cx += delta
+        for (const { couple } of group.children) couple.cx += delta
+        bounds.left += delta
+        bounds.right += delta
+      }
+      cursor = bounds.right
+    }
+  }
+}
+
+function repackCoupleRows(nodes: LaidOutNode[], couples: Couple[]) {
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+  const byGeneration = new Map<number, Couple[]>()
+  for (const c of couples) {
+    if (!byGeneration.has(c.generation)) byGeneration.set(c.generation, [])
+    byGeneration.get(c.generation)!.push(c)
+  }
+
+  const boundsFor = (c: Couple) => {
+    const memberNodes = c.memberIds
+      .map(id => nodeById.get(id))
+      .filter(Boolean) as LaidOutNode[]
+    const left = Math.min(...memberNodes.map(n => n.cx - NODE_W / 2))
+    const right = Math.max(...memberNodes.map(n => n.cx + NODE_W / 2))
+    return { memberNodes, left, right }
+  }
+
+  for (const row of byGeneration.values()) {
+    const ordered = [...row].sort((a, b) => boundsFor(a).left - boundsFor(b).left)
+    let cursor: number | null = null
+    for (const c of ordered) {
+      const bounds = boundsFor(c)
+      if (cursor !== null && bounds.left < cursor + UNIT_GAP) {
+        const delta = cursor + UNIT_GAP - bounds.left
+        for (const n of bounds.memberNodes) n.cx += delta
+        c.cx += delta
+        bounds.left += delta
+        bounds.right += delta
+      }
+      cursor = bounds.right
+    }
+  }
+}
+
 function alignOnlyChildren(
   nodes: LaidOutNode[],
   couples: Couple[],
@@ -128,6 +298,10 @@ function alignOnlyChildren(
   manualPositions?: Record<string, { cx: number; top: number }>,
 ) {
   const nodeById = new Map(nodes.map(n => [n.id, n]))
+  const coupleByMember = new Map<string, Couple>()
+  for (const c of couples) {
+    for (const id of c.memberIds) coupleByMember.set(id, c)
+  }
 
   for (const c of couples) {
     const childSet = new Set<string>()
@@ -145,12 +319,20 @@ function alignOnlyChildren(
     const parentIds = new Set(c.memberIds)
     const allParentsMatchCouple = child.parents.every(p => parentIds.has(p.id))
     if (!allParentsMatchCouple) continue
+    const childCouple = coupleByMember.get(onlyChildId)
+    const shiftedMemberIds = childCouple?.memberIds ?? [onlyChildId]
+    if (shiftedMemberIds.some(id => manualPositions?.[id])) continue
     const parentNodes = c.memberIds.map(id => nodeById.get(id)).filter(Boolean) as LaidOutNode[]
     if (parentNodes.length > 0) {
       const parentX = parentNodes.length === 2
         ? (parentNodes[0].cx + parentNodes[1].cx) / 2
         : parentNodes[0].cx
-      childNode.cx = parentX
+      const delta = parentX - childNode.cx
+      for (const id of shiftedMemberIds) {
+        const n = nodeById.get(id)
+        if (n) n.cx += delta
+      }
+      if (childCouple) childCouple.cx += delta
     }
   }
 }
@@ -232,7 +414,7 @@ function buildElkGraph(
 
   const elkNodes: ElkNode[] = couples.map(c => ({
     id: c.id,
-    width: c.memberIds.length === 2 ? NODE_W * 2 + COUPLE_GAP : NODE_W,
+    width: coupleWidth(c.memberIds.length),
     height: NODE_H,
   }))
 
@@ -346,19 +528,13 @@ function convertElkResult(
     if (!couple) continue
 
     const elkX = elkNode.x || 0
-    const elkY = elkNode.y || 0
-
-    couple.cx = elkX + (couple.memberIds.length === 2 ? NODE_W + COUPLE_GAP / 2 : NODE_W / 2)
+    couple.cx = elkX + coupleWidth(couple.memberIds.length) / 2
 
     couple.memberIds.forEach((id, idx) => {
-      const offset = couple.memberIds.length === 2
-        ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
-        : 0
-
       nodes.push({
         id,
-        cx: elkX + offset + NODE_W / 2,
-        top: elkY + (couple.generation - minGen) * ROW_HEIGHT,
+        cx: memberCenterX(elkX, idx),
+        top: (couple.generation - minGen) * ROW_HEIGHT,
         generation: couple.generation,
       })
     })

@@ -36,6 +36,24 @@ function buildUserFixture(): Member[] {
   ]
 }
 
+function expectNoNodeOverlap(nodes: Array<{ cx: number; top: number }>) {
+  const NODE_W = 2
+  const NODE_H = 4
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i]
+      const b = nodes[j]
+      const overlap = !(
+        a.cx + NODE_W / 2 <= b.cx - NODE_W / 2 ||
+        b.cx + NODE_W / 2 <= a.cx - NODE_W / 2 ||
+        a.top + NODE_H <= b.top ||
+        b.top + NODE_H <= a.top
+      )
+      expect(overlap).toBe(false)
+    }
+  }
+}
+
 describe('layoutFamilyTree — 基本正确性', () => {
   it('覆盖全部 7 位成员', async () => {
     const r = await layoutFamilyTree(buildUserFixture())
@@ -77,6 +95,7 @@ describe('layoutFamilyTree — 基本正确性', () => {
     const tl = r.nodes.find((n) => n.id === 'tang_lingen')!
     const yx = r.nodes.find((n) => n.id === 'yao_xuehua')!
     expect(Math.abs(tl.cx - yx.cx)).toBeLessThan(3)
+    expect(Math.abs(tl.cx - yx.cx)).toBeGreaterThanOrEqual(2)
   })
 
   it('所有节点 cx 都是非负数（已平移）', async () => {
@@ -90,6 +109,11 @@ describe('layoutFamilyTree — 基本正确性', () => {
     const pcLines = r.connectors.filter((c) => c.kind === 'parent-child')
     expect(spouseLines.length).toBe(3)
     expect(pcLines.length).toBeGreaterThan(3)
+  })
+
+  it('复杂默认布局中任意卡片不重叠', async () => {
+    const r = await layoutFamilyTree(buildUserFixture())
+    expectNoNodeOverlap(r.nodes)
   })
 })
 
@@ -141,6 +165,41 @@ describe('layoutFamilyTree — 单子女横线不拉长', () => {
         Math.abs(c.points[0].x - c.points[1].x) > 1e-9,
     )
     expect(horizontal.length).toBe(0)
+  })
+
+  it('已婚独生子女对齐父母时，仍保持夫妻卡片不重叠', async () => {
+    const r = await layoutFamilyTree([
+      mk('gpa', 'male', [], ['dad'], ['gma']),
+      mk('gma', 'female', [], ['dad'], ['gpa']),
+      mk('dad', 'male', ['gpa', 'gma'], ['kid'], ['mom']),
+      mk('mom', 'female', [], ['kid'], ['dad']),
+      mk('kid', 'male', ['dad', 'mom'], [], []),
+    ])
+    const gpa = r.nodes.find((n) => n.id === 'gpa')!
+    const gma = r.nodes.find((n) => n.id === 'gma')!
+    const dad = r.nodes.find((n) => n.id === 'dad')!
+    const mom = r.nodes.find((n) => n.id === 'mom')!
+    const kid = r.nodes.find((n) => n.id === 'kid')!
+
+    expect(dad.cx).toBeCloseTo((gpa.cx + gma.cx) / 2, 6)
+    expect(kid.cx).toBeCloseTo((dad.cx + mom.cx) / 2, 6)
+    expect(Math.abs(dad.cx - mom.cx)).toBeGreaterThanOrEqual(2)
+    expectNoNodeOverlap(r.nodes)
+  })
+
+  it('三代默认行距不叠加 ELK y 坐标，保持紧凑一致', async () => {
+    const r = await layoutFamilyTree([
+      mk('gpa', 'male', [], ['dad'], ['gma']),
+      mk('gma', 'female', [], ['dad'], ['gpa']),
+      mk('dad', 'male', ['gpa', 'gma'], ['kid'], ['mom']),
+      mk('mom', 'female', [], ['kid'], ['dad']),
+      mk('kid', 'male', ['dad', 'mom'], [], []),
+    ])
+    const gpa = r.nodes.find((n) => n.id === 'gpa')!
+    const dad = r.nodes.find((n) => n.id === 'dad')!
+    const kid = r.nodes.find((n) => n.id === 'kid')!
+    expect(dad.top - gpa.top).toBeCloseTo(7, 6)
+    expect(kid.top - dad.top).toBeCloseTo(7, 6)
   })
 
   it('独生子女有姻亲另一对父母时：横线长度 = 父母-孩子距离，不超出', async () => {

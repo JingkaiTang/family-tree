@@ -47,6 +47,14 @@ const NODE_H = 4
 const COUPLE_GAP = 0.2
 const UNIT_GAP = 1.5
 
+function coupleWidth(memberCount: number): number {
+  return memberCount * NODE_W + Math.max(0, memberCount - 1) * COUPLE_GAP
+}
+
+function memberCenterX(coupleLeft: number, memberIndex: number): number {
+  return coupleLeft + NODE_W / 2 + memberIndex * (NODE_W + COUPLE_GAP)
+}
+
 interface RelationshipInfo {
   distance: number
 }
@@ -74,7 +82,7 @@ export async function layoutLayerWithElk(
 
   const elkNodes: ElkNode[] = couples.map(c => ({
     id: c.id,
-    width: c.memberIds.length === 2 ? NODE_W * 2 + COUPLE_GAP : NODE_W,
+    width: coupleWidth(c.memberIds.length),
     height: NODE_H,
   }))
 
@@ -101,16 +109,12 @@ export async function layoutLayerWithElk(
     const elkX = elkNode.x || 0
     const elkY = elkNode.y || 0
 
-    couple.cx = elkX + (couple.memberIds.length === 2 ? NODE_W + COUPLE_GAP / 2 : NODE_W / 2)
+    couple.cx = elkX + coupleWidth(couple.memberIds.length) / 2
 
     couple.memberIds.forEach((id, idx) => {
-      const offset = couple.memberIds.length === 2
-        ? (idx === 0 ? -(NODE_W + COUPLE_GAP) / 2 : (NODE_W + COUPLE_GAP) / 2)
-        : 0
-
       nodes.push({
         id,
-        cx: elkX + offset + NODE_W / 2,
+        cx: memberCenterX(elkX, idx),
         top: elkY,
         generation: distances.get(id)?.distance ?? 0,
       })
