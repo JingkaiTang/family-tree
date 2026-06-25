@@ -77,6 +77,21 @@ describe('buildFamilyGraphModel', () => {
     })
   })
 
+  it('does not create a spouse-only union when spouses share a parent union', () => {
+    const a = member('a')
+    const b = member('b')
+    const c = member('c')
+    const kid = member('kid')
+    linkParent(kid, a)
+    linkParent(kid, b)
+    linkParent(kid, c)
+    linkSpouse(a, b)
+
+    const model = buildFamilyGraphModel([a, b, c, kid])
+
+    expect(model.unions.map((union) => union.id)).toEqual(['parents:a+b+c'])
+  })
+
   it('orders child ids by birth date then id', () => {
     const dad = member('dad')
     const zEarly = member('z_early', { birthDate: '1990-01-01' })

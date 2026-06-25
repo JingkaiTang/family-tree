@@ -54,8 +54,8 @@ export function buildFamilyGraphModel(members: Member[]): FamilyGraphModel {
     )
   }
 
-  const parentPartnerKeys = new Set(
-    [...unionsById.values()].map((union) => union.partnerIds.join('+')),
+  const parentPartnerIdSets = [...unionsById.values()].map(
+    (union) => new Set(union.partnerIds),
   )
 
   for (const person of sortedMembers) {
@@ -64,7 +64,13 @@ export function buildFamilyGraphModel(members: Member[]): FamilyGraphModel {
 
       const partnerIds = [person.id, spouse.id].sort(compareIds)
       const partnerKey = partnerIds.join('+')
-      if (parentPartnerKeys.has(partnerKey)) continue
+      if (
+        parentPartnerIdSets.some((parentIds) =>
+          partnerIds.every((id) => parentIds.has(id)),
+        )
+      ) {
+        continue
+      }
 
       const unionId = `spouse:${partnerKey}`
       if (!unionsById.has(unionId)) {
