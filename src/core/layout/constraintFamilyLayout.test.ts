@@ -46,6 +46,25 @@ function expectNoOverlap(nodes: Array<{ cx: number; top: number }>) {
   }
 }
 
+function hasHorizontalParentChildSegment(
+  connectors: Awaited<ReturnType<typeof layoutConstraintFamilyTree>>['connectors'],
+  x1: number,
+  x2: number,
+) {
+  const minX = Math.min(x1, x2)
+  const maxX = Math.max(x1, x2)
+  return connectors.some(connector => {
+    if (connector.kind !== 'parent-child' || connector.points.length !== 2) {
+      return false
+    }
+
+    const [start, end] = connector.points
+    return Math.abs(start.y - end.y) < 1e-6
+      && Math.abs(Math.min(start.x, end.x) - minX) < 1e-6
+      && Math.abs(Math.max(start.x, end.x) - maxX) < 1e-6
+  })
+}
+
 describe('layoutConstraintFamilyTree', () => {
   it('returns an empty layout for empty input', async () => {
     const result = await layoutConstraintFamilyTree([])
@@ -71,6 +90,52 @@ describe('layoutConstraintFamilyTree', () => {
     const childNode = result.nodes.find(node => node.id === 'child')!
     expect(parentNode.top).toBeLessThan(childNode.top)
     expect(parentNode.generation).toBeLessThan(childNode.generation)
+  })
+
+  it('extends parent-child sibling bus only to the nearest child boundary', async () => {
+    const dad = member('dad')
+    const leftKid = member('leftKid')
+    const rightKid = member('rightKid')
+    linkParent(leftKid, dad)
+    linkParent(rightKid, dad)
+
+    const result = await layoutConstraintFamilyTree([dad, leftKid, rightKid], {
+      manualPositions: {
+        leftKid: { cx: 20, top: 30 },
+        rightKid: { cx: 25, top: 30 },
+      },
+    })
+
+    const dadNode = result.nodes.find(node => node.id === 'dad')!
+    const leftNode = result.nodes.find(node => node.id === 'leftKid')!
+    const rightNode = result.nodes.find(node => node.id === 'rightKid')!
+    const childMin = Math.min(leftNode.cx, rightNode.cx)
+    const childMax = Math.max(leftNode.cx, rightNode.cx)
+
+    expect(hasHorizontalParentChildSegment(result.connectors, childMin, childMax)).toBe(true)
+    expect(hasHorizontalParentChildSegment(result.connectors, dadNode.cx, childMin)).toBe(true)
+    expect(hasHorizontalParentChildSegment(result.connectors, dadNode.cx, childMax)).toBe(false)
+  })
+
+  it('applies manualPositions and routes parent-child connectors to final child coordinates', async () => {
+    const dad = member('dad')
+    const kid = member('kid')
+    linkParent(kid, dad)
+
+    const result = await layoutConstraintFamilyTree([dad, kid], {
+      manualPositions: { kid: { cx: 20, top: 30 } },
+    })
+
+    const kidNode = result.nodes.find(node => node.id === 'kid')!
+    expect(kidNode.cx).toBeCloseTo(20 + result.offsetX, 6)
+    expect(kidNode.top).toBeCloseTo(30, 6)
+    expect(result.connectors.some(connector =>
+      connector.kind === 'parent-child'
+      && connector.points.some(point =>
+        Math.abs(point.x - kidNode.cx) < 1e-6
+        && Math.abs(point.y - kidNode.top) < 1e-6,
+      ),
+    )).toBe(true)
   })
 
   it('keeps spouses on the same row with stable horizontal spacing', async () => {

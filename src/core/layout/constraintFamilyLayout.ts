@@ -462,12 +462,20 @@ function buildConnectors(
           { x: childMax, y: midY },
         ],
       })
-      if (parentX < childMin - 0.1 || parentX > childMax + 0.1) {
+      if (parentX < childMin - 0.1) {
         lines.push({
           kind: 'parent-child',
           points: [
-            { x: Math.min(parentX, childMin), y: midY },
-            { x: Math.max(parentX, childMax), y: midY },
+            { x: parentX, y: midY },
+            { x: childMin, y: midY },
+          ],
+        })
+      } else if (parentX > childMax + 0.1) {
+        lines.push({
+          kind: 'parent-child',
+          points: [
+            { x: childMax, y: midY },
+            { x: parentX, y: midY },
           ],
         })
       }
