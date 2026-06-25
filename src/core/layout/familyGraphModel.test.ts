@@ -79,14 +79,23 @@ describe('buildFamilyGraphModel', () => {
 
   it('orders child ids by birth date then id', () => {
     const dad = member('dad')
-    const older = member('older', { birthDate: '1990-01-01' })
-    const younger = member('younger', { birthDate: '2000-01-01' })
-    linkParent(younger, dad)
-    linkParent(older, dad)
+    const zEarly = member('z_early', { birthDate: '1990-01-01' })
+    const bSameDay = member('b_same_day', { birthDate: '1990-01-01' })
+    const aSameDay = member('a_same_day', { birthDate: '1990-01-01' })
+    const aLater = member('a_later', { birthDate: '2000-01-01' })
+    linkParent(aLater, dad)
+    linkParent(zEarly, dad)
+    linkParent(bSameDay, dad)
+    linkParent(aSameDay, dad)
 
-    const model = buildFamilyGraphModel([dad, younger, older])
+    const model = buildFamilyGraphModel([dad, aLater, zEarly, bSameDay, aSameDay])
 
-    expect(model.unions[0].childIds).toEqual(['older', 'younger'])
+    expect(model.unions[0].childIds).toEqual([
+      'a_same_day',
+      'b_same_day',
+      'z_early',
+      'a_later',
+    ])
   })
 
   it('separates disconnected components', () => {
