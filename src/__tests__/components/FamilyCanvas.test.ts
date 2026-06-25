@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import FamilyCanvas from '@/components/tree/FamilyCanvas.vue'
 import { mk } from '@/__tests__/fixtures/families'
 import type { Member } from '@/core/schema'
@@ -20,8 +20,24 @@ const { layoutFamilyTree, layoutProtagonist } = vi.hoisted(() => ({
 
 vi.mock('@/core/treeLayout', () => ({
   layoutFamilyTree,
+}))
+
+vi.mock('@/core/protagonistLayout', () => ({
   layoutProtagonist,
 }))
+
+const PanZoomStub = defineComponent({
+  name: 'PanZoomWrapper',
+  props: ['initialView'],
+  emits: ['view-change'],
+  setup(_, { expose, slots }) {
+    expose({
+      focusStagePoint: vi.fn(),
+      getScale: vi.fn(() => 1),
+    })
+    return () => h('div', slots.default?.())
+  },
+})
 
 // 默认 mock：带孤儿节点
 const defaultLayout = {
@@ -73,7 +89,7 @@ describe('FamilyCanvas', () => {
       props: { members: [] },
       global: {
         plugins: [createPinia()],
-        stubs: { PanZoomWrapper: { template: '<div><slot /></div>' } },
+        stubs: { PanZoomWrapper: PanZoomStub },
       },
     })
     await nextTick()
@@ -87,7 +103,7 @@ describe('FamilyCanvas', () => {
       props: { members: makeFamily(['A', 'B']) },
       global: {
         plugins: [createPinia()],
-        stubs: { PanZoomWrapper: { template: '<div><slot /></div>' } },
+        stubs: { PanZoomWrapper: PanZoomStub },
       },
     })
     await nextTick()
@@ -101,7 +117,7 @@ describe('FamilyCanvas', () => {
       props: { members: makeFamily(['A', 'B']) },
       global: {
         plugins: [createPinia()],
-        stubs: { PanZoomWrapper: { template: '<div><slot /></div>' } },
+        stubs: { PanZoomWrapper: PanZoomStub },
       },
     })
     await nextTick()
@@ -118,7 +134,7 @@ describe('FamilyCanvas', () => {
       props: { members: [] },
       global: {
         plugins: [createPinia()],
-        stubs: { PanZoomWrapper: { template: '<div><slot /></div>' } },
+        stubs: { PanZoomWrapper: PanZoomStub },
       },
     })
     await nextTick()
@@ -141,11 +157,11 @@ describe('FamilyCanvas', () => {
       props: { members: makeFamily(['A']), centerLayoutId: 'A' },
       global: {
         plugins: [createPinia()],
-        stubs: { PanZoomWrapper: { template: '<div><slot /></div>' } },
+        stubs: { PanZoomWrapper: PanZoomStub },
       },
     })
     await nextTick()
     await nextTick()
-    expect(wrapper.find('.bg-amber-50').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('位成员未显示')
   })
 })
