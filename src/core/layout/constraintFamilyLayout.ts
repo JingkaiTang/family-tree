@@ -32,6 +32,11 @@ interface ComponentLayout {
   units: RowUnit[]
 }
 
+interface GodparentEdge {
+  godparentId: string
+  godchildId: string
+}
+
 interface Bounds {
   minX: number
   maxX: number
@@ -56,12 +61,14 @@ export async function layoutConstraintFamilyTree(
   const model = buildFamilyGraphModel(members)
   const memberById = new Map(model.people.map(person => [person.id, person.member]))
   const unionById = new Map(model.unions.map(union => [union.id, union]))
+  const godparentEdges = collectGodparentEdges(members, memberById)
+  const components = mergeComponentsByGodparentEdges(model.components, godparentEdges)
   const allNodes: LaidOutNode[] = []
   const allUnits: RowUnit[] = []
   let componentCursor = 0
 
-  for (const component of model.components) {
-    const componentLayout = layoutComponent(component, unionById)
+  for (const component of components) {
+    const componentLayout = layoutComponent(component, unionById, godparentEdges)
     const bounds = measureNodes(componentLayout.nodes)
     const dx = componentCursor - bounds.minX
     shiftLayout(componentLayout, dx)
@@ -107,11 +114,12 @@ export async function layoutConstraintFamilyTree(
 function layoutComponent(
   component: FamilyComponent,
   unionById: Map<string, FamilyUnionNode>,
+  godparentEdges: GodparentEdge[],
 ): ComponentLayout {
   const unions = component.unionIds
     .map(id => unionById.get(id))
     .filter((union): union is FamilyUnionNode => Boolean(union))
-  const generationById = assignGenerations(component.personIds, unions)
+  const generationById = assignGenerations(component.personIds, unions, godparentEdges)
   const rows = buildRows(component.personIds, unions, generationById)
   const nodeById = new Map<string, LaidOutNode>()
 
@@ -141,9 +149,13 @@ function layoutComponent(
 function assignGenerations(
   personIds: string[],
   unions: FamilyUnionNode[],
+  godparentEdges: GodparentEdge[],
 ): Map<string, number> {
   const generations = new Map(personIds.map(id => [id, 0]))
-  const maxIterations = Math.max(1, personIds.length * Math.max(1, unions.length))
+  const maxIterations = Math.max(
+    1,
+    personIds.length * Math.max(1, unions.length + godparentEdges.length),
+  )
 
   for (let i = 0; i < maxIterations; i++) {
     let changed = false
@@ -171,6 +183,19 @@ function assignGenerations(
       }
     }
 
+    for (const edge of godparentEdges) {
+      const godparentGeneration = generations.get(edge.godparentId)
+      if (godparentGeneration === undefined || !generations.has(edge.godchildId)) {
+        continue
+      }
+
+      const nextGeneration = godparentGeneration + 1
+      if ((generations.get(edge.godchildId) ?? 0) < nextGeneration) {
+        generations.set(edge.godchildId, nextGeneration)
+        changed = true
+      }
+    }
+
     if (!changed) break
   }
 
@@ -180,6 +205,99 @@ function assignGenerations(
   }
 
   return generations
+}
+
+function collectGodparentEdges(
+  members: Member[],
+  memberById: Map<string, Member>,
+): GodparentEdge[] {
+  const edgesByKey = new Map<string, GodparentEdge>()
+
+  const addEdge = (godparentId: string, godchildId: string) => {
+    if (godparentId === godchildId) return
+    if (!memberById.has(godparentId) || !memberById.has(godchildId)) return
+
+    const key = `${godparentId}>${godchildId}`
+    if (edgesByKey.has(key)) return
+    edgesByKey.set(key, { godparentId, godchildId })
+  }
+
+  for (const member of members) {
+    for (const godchild of member.godchildren) {
+      addEdge(member.id, godchild.id)
+    }
+    for (const godparent of member.godparents) {
+      addEdge(godparent.id, member.id)
+    }
+  }
+
+  return [...edgesByKey.values()].sort((a, b) =>
+    compareIds(a.godparentId, b.godparentId) || compareIds(a.godchildId, b.godchildId),
+  )
+}
+
+function mergeComponentsByGodparentEdges(
+  components: FamilyComponent[],
+  godparentEdges: GodparentEdge[],
+): FamilyComponent[] {
+  if (godparentEdges.length === 0) return components
+
+  const parentByComponentId = new Map(components.map(component => [component.id, component.id]))
+  const componentIdByPersonId = new Map<string, string>()
+  for (const component of components) {
+    for (const personId of component.personIds) {
+      componentIdByPersonId.set(personId, component.id)
+    }
+  }
+
+  const find = (componentId: string): string => {
+    const parentId = parentByComponentId.get(componentId)
+    if (!parentId || parentId === componentId) return componentId
+
+    const rootId = find(parentId)
+    parentByComponentId.set(componentId, rootId)
+    return rootId
+  }
+
+  const union = (leftId: string, rightId: string) => {
+    const leftRoot = find(leftId)
+    const rightRoot = find(rightId)
+    if (leftRoot === rightRoot) return
+
+    const [rootId, mergedId] = [leftRoot, rightRoot].sort(compareIds)
+    parentByComponentId.set(mergedId, rootId)
+  }
+
+  for (const edge of godparentEdges) {
+    const godparentComponentId = componentIdByPersonId.get(edge.godparentId)
+    const godchildComponentId = componentIdByPersonId.get(edge.godchildId)
+    if (!godparentComponentId || !godchildComponentId) continue
+    union(godparentComponentId, godchildComponentId)
+  }
+
+  const mergedComponents = new Map<string, { personIds: Set<string>; unionIds: Set<string> }>()
+  for (const component of components) {
+    const rootId = find(component.id)
+    const merged = mergedComponents.get(rootId) ?? {
+      personIds: new Set<string>(),
+      unionIds: new Set<string>(),
+    }
+
+    for (const personId of component.personIds) merged.personIds.add(personId)
+    for (const unionId of component.unionIds) merged.unionIds.add(unionId)
+    mergedComponents.set(rootId, merged)
+  }
+
+  return [...mergedComponents.values()]
+    .map(component => {
+      const personIds = [...component.personIds].sort(compareIds)
+      return {
+        id: `component:${personIds.join('+')}`,
+        personIds,
+        unionIds: [...component.unionIds].sort(compareIds),
+      }
+    })
+    .sort((a, b) => compareIds(a.personIds[0] ?? '', b.personIds[0] ?? ''))
 }
 
 function buildRows(

@@ -92,6 +92,20 @@ describe('layoutConstraintFamilyTree', () => {
     expect(parentNode.generation).toBeLessThan(childNode.generation)
   })
 
+  it('places godparents above godchildren and keeps the godparent connector', async () => {
+    const gdad = member('gdad')
+    const gson = member('gson')
+    gdad.godchildren = [{ id: 'gson', type: 'godchild' }]
+    gson.godparents = [{ id: 'gdad', type: 'godparent' }]
+
+    const result = await layoutConstraintFamilyTree([gdad, gson])
+
+    const gdadNode = result.nodes.find(node => node.id === 'gdad')!
+    const gsonNode = result.nodes.find(node => node.id === 'gson')!
+    expect(gdadNode.top).toBeLessThan(gsonNode.top)
+    expect(result.connectors.filter(connector => connector.kind === 'godparent')).toHaveLength(1)
+  })
+
   it('extends parent-child sibling bus only to the nearest child boundary', async () => {
     const dad = member('dad')
     const leftKid = member('leftKid')
