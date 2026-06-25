@@ -138,6 +138,21 @@ describe('layoutConstraintFamilyTree', () => {
     )).toBe(true)
   })
 
+  it('keeps parent-child connectors continuous for small manual child offsets', async () => {
+    const dad = member('dad')
+    const kid = member('kid')
+    linkParent(kid, dad)
+
+    const result = await layoutConstraintFamilyTree([dad, kid], {
+      manualPositions: { kid: { cx: 1.05, top: 7 } },
+    })
+
+    const dadNode = result.nodes.find(node => node.id === 'dad')!
+    const kidNode = result.nodes.find(node => node.id === 'kid')!
+    expect(Math.abs(kidNode.cx - dadNode.cx)).toBeCloseTo(0.05, 6)
+    expect(hasHorizontalParentChildSegment(result.connectors, dadNode.cx, kidNode.cx)).toBe(true)
+  })
+
   it('keeps spouses on the same row with stable horizontal spacing', async () => {
     const a = member('a')
     const b = member('b')
@@ -151,6 +166,23 @@ describe('layoutConstraintFamilyTree', () => {
     expect(aNode.top).toBe(bNode.top)
     expect(distance).toBeGreaterThanOrEqual(2)
     expect(distance).toBeLessThan(3)
+  })
+
+  it('routes spouse connector endpoints to each manually moved spouse center', async () => {
+    const a = member('a')
+    const b = member('b')
+    linkSpouse(a, b)
+
+    const result = await layoutConstraintFamilyTree([a, b], {
+      manualPositions: { b: { cx: 3.2, top: 10 } },
+    })
+
+    const aNode = result.nodes.find(node => node.id === 'a')!
+    const bNode = result.nodes.find(node => node.id === 'b')!
+    const spouseConnector = result.connectors.find(connector => connector.kind === 'spouse')!
+    const pointByX = [...spouseConnector.points].sort((left, right) => left.x - right.x)
+    expect(pointByX[0]).toEqual({ x: aNode.cx, y: aNode.top + 2 })
+    expect(pointByX[1]).toEqual({ x: bNode.cx, y: bNode.top + 2 })
   })
 
   it('keeps siblings under same parents contiguous and ordered by birthDate', async () => {

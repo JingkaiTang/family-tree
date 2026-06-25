@@ -17,6 +17,7 @@ const SPOUSE_GAP = 0.2
 const SIBLING_GAP = 1.5
 const COMPONENT_GAP = 4
 const ROW_HEIGHT = 7
+const EPSILON = 1e-6
 
 interface RowUnit {
   id: string
@@ -418,12 +419,11 @@ function buildConnectors(
     for (let i = 0; i < partnerNodes.length - 1; i++) {
       const a = partnerNodes[i]
       const b = partnerNodes[i + 1]
-      const y = a.top + NODE_H / 2
       lines.push({
         kind: 'spouse',
         points: [
-          { x: a.cx, y },
-          { x: b.cx, y },
+          { x: a.cx, y: a.top + NODE_H / 2 },
+          { x: b.cx, y: b.top + NODE_H / 2 },
         ],
       })
     }
@@ -462,7 +462,7 @@ function buildConnectors(
           { x: childMax, y: midY },
         ],
       })
-      if (parentX < childMin - 0.1) {
+      if (parentX < childMin - EPSILON) {
         lines.push({
           kind: 'parent-child',
           points: [
@@ -470,7 +470,7 @@ function buildConnectors(
             { x: childMin, y: midY },
           ],
         })
-      } else if (parentX > childMax + 0.1) {
+      } else if (parentX > childMax + EPSILON) {
         lines.push({
           kind: 'parent-child',
           points: [
@@ -479,7 +479,7 @@ function buildConnectors(
           ],
         })
       }
-    } else if (Math.abs(childNodes[0].cx - parentX) > 0.1) {
+    } else if (Math.abs(childNodes[0].cx - parentX) > EPSILON) {
       lines.push({
         kind: 'parent-child',
         points: [
