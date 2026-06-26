@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- **家族树可视化** — 基于 `elkjs` 的自动布局，支持缩放、拖拽和手工位置覆盖
+- **家族树可视化** — 默认使用强约束家庭单元布局：配偶/父母作为家庭单元，子女按代际和出生日期稳定排列；支持缩放、拖拽和默认布局下的手工位置覆盖
 - **中心布局模式** — 可将选中成员作为中心，按关系距离生成环形主角视角布局
 - **中文称谓自动计算** — 输入任意两个成员，自动推算出正确的中文亲戚称呼
   - 直系亲属：父母、祖父母、子女、孙辈……
@@ -25,7 +25,7 @@
 | 样式 | Tailwind CSS |
 | 构建工具 | Vite 6 |
 | 桌面框架 | Tauri 2 (Rust) |
-| 家族树布局 | elkjs（主布局）；relatives-tree 适配层保留为兼容/行为记录 |
+| 家族树布局 | 自研强约束家庭单元布局；elkjs 保留为旧布局引擎与中心布局辅助 |
 | 缩放/拖拽 | @panzoom/panzoom |
 | 数据校验 | Zod |
 | 测试 | Vitest |
@@ -118,8 +118,9 @@ src/
 │   │   ├── index.ts         # 统一入口：override → 干亲 → BFS → 翻译
 │   │   ├── pathFinder.ts    # BFS 寻路 + 路径规范化
 │   │   └── chineseTerms.ts  # 路径 → 中文称谓翻译
-│   ├── treeLayout.ts        # 默认布局门面，调用 ELK 布局
-│   ├── elkLayout.ts         # ELK.js 家族树布局引擎
+│   ├── treeLayout.ts        # 默认布局门面，调用强约束家庭单元布局
+│   ├── layout/              # 默认家族树语义模型与约束布局引擎
+│   ├── elkLayout.ts         # ELK.js 旧布局引擎与中心布局辅助
 │   ├── protagonistLayout.ts # 以选中人物为中心的关系距离布局
 │   ├── relativesAdapter.ts  # relatives-tree 兼容适配与历史行为测试
 │   └── migrate.ts           # Schema 版本迁移
