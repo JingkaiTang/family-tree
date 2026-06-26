@@ -115,6 +115,27 @@ describe('layoutFamilyTree — 基本正确性', () => {
     const r = await layoutFamilyTree(buildUserFixture())
     expectNoNodeOverlap(r.nodes)
   })
+
+  it('默认布局使用强约束家庭单元：同父母子女连续且父母居中', async () => {
+    const list = [
+      mk('dad', 'male', [], ['a', 'b', 'c'], ['mom']),
+      mk('mom', 'female', [], ['a', 'b', 'c'], ['dad']),
+      mk('a', 'male', ['dad', 'mom'], [], []),
+      mk('b', 'female', ['dad', 'mom'], [], []),
+      mk('c', 'male', ['dad', 'mom'], [], []),
+    ]
+    const r = await layoutFamilyTree(list)
+    const dad = r.nodes.find((n) => n.id === 'dad')!
+    const mom = r.nodes.find((n) => n.id === 'mom')!
+    const children = r.nodes
+      .filter((n) => ['a', 'b', 'c'].includes(n.id))
+      .sort((x, y) => x.cx - y.cx)
+
+    expect(dad.top).toBe(mom.top)
+    expect(children.map((n) => n.id)).toEqual(['a', 'b', 'c'])
+    expect(children.every((child) => child.top > dad.top)).toBe(true)
+    expect((children[0].cx + children[2].cx) / 2).toBeCloseTo((dad.cx + mom.cx) / 2, 6)
+  })
 })
 
 describe('layoutFamilyTree — 边界情况', () => {
@@ -167,7 +188,7 @@ describe('layoutFamilyTree — 单子女横线不拉长', () => {
     expect(horizontal.length).toBe(0)
   })
 
-  it('已婚独生子女对齐父母时，仍保持夫妻卡片不重叠', async () => {
+  it('已婚独生子女以夫妻单元对齐父母时，仍保持夫妻卡片不重叠', async () => {
     const r = await layoutFamilyTree([
       mk('gpa', 'male', [], ['dad'], ['gma']),
       mk('gma', 'female', [], ['dad'], ['gpa']),
@@ -181,7 +202,7 @@ describe('layoutFamilyTree — 单子女横线不拉长', () => {
     const mom = r.nodes.find((n) => n.id === 'mom')!
     const kid = r.nodes.find((n) => n.id === 'kid')!
 
-    expect(dad.cx).toBeCloseTo((gpa.cx + gma.cx) / 2, 6)
+    expect((dad.cx + mom.cx) / 2).toBeCloseTo((gpa.cx + gma.cx) / 2, 6)
     expect(kid.cx).toBeCloseTo((dad.cx + mom.cx) / 2, 6)
     expect(Math.abs(dad.cx - mom.cx)).toBeGreaterThanOrEqual(2)
     expectNoNodeOverlap(r.nodes)
