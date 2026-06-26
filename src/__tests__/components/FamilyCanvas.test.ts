@@ -11,6 +11,7 @@ import { defineComponent, h, nextTick } from 'vue'
 import FamilyCanvas from '@/components/tree/FamilyCanvas.vue'
 import { mk } from '@/__tests__/fixtures/families'
 import type { Member } from '@/core/schema'
+import { useFamilyStore } from '@/stores/family'
 
 // 模拟 layoutFamilyTree 返回预计算结果，避免依赖真实 ELK 布局
 const { layoutFamilyTree, layoutProtagonist } = vi.hoisted(() => ({
@@ -163,5 +164,30 @@ describe('FamilyCanvas', () => {
     await nextTick()
     await nextTick()
     expect(wrapper.text()).not.toContain('位成员未显示')
+  })
+
+  it('center layout does not persist manual positions on node drop', async () => {
+    const members = makeFamily(['A'])
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.$patch((state) => {
+      state.data.members = { A: members[0] }
+    })
+
+    const wrapper = mount(FamilyCanvas, {
+      props: { members, centerLayoutId: 'A' },
+      global: {
+        plugins: [pinia],
+        stubs: { PanZoomWrapper: PanZoomStub },
+      },
+    })
+    await nextTick()
+    await nextTick()
+
+    const node = wrapper.findComponent({ name: 'MemberNode' })
+    await node.vm.$emit('drop', { id: 'A', dx: 10, dy: 10 })
+
+    expect(family.data.manualPositions.A).toBeUndefined()
   })
 })

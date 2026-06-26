@@ -188,6 +188,7 @@ function onNodeDrop(payload: { id: string; dx: number; dy: number }) {
   const base = placedNodes.value.find((p) => p.id === payload.id)
   delete dragDelta[payload.id]
   if (!base) return
+  if (props.centerLayoutId) return
   const stageDx = payload.dx / scale
   const stageDy = payload.dy / scale
   // 本次 drop 之前节点的"起始 left/top"其实就是 base.left/top（base 包含了 manualPositions 的覆盖）
