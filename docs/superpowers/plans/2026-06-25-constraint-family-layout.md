@@ -26,25 +26,25 @@ Primary success criteria:
 
 ## File Structure
 
-- Create `src/core/layout/familyGraphModel.ts`  
+- Create `src/core/layout/familyGraphModel.ts`
   Converts raw `Member[]` into people, parent unions, spouse-only unions, child groups, and connected components.
 
-- Create `src/core/layout/familyGraphModel.test.ts`  
+- Create `src/core/layout/familyGraphModel.test.ts`
   Tests union construction, stable ids, single-parent groups, spouse-only groups, and component separation.
 
-- Create `src/core/layout/constraintFamilyLayout.ts`  
+- Create `src/core/layout/constraintFamilyLayout.ts`
   Computes deterministic coordinates and connectors from the semantic model.
 
-- Create `src/core/layout/constraintFamilyLayout.test.ts`  
+- Create `src/core/layout/constraintFamilyLayout.test.ts`
   Tests generation constraints, sibling continuity, no overlap, manual position behavior, component packing, and connector routing.
 
-- Modify `src/core/treeLayout.ts`  
+- Modify `src/core/treeLayout.ts`
   Switches the public default layout facade from ELK to `layoutConstraintFamilyTree`.
 
-- Modify `src/core/treeLayout.test.ts`  
+- Modify `src/core/treeLayout.test.ts`
   Updates tests to assert the new default layout invariants instead of ELK-specific behavior.
 
-- Keep `src/core/elkLayout.ts` unchanged  
+- Keep `src/core/elkLayout.ts` unchanged
   It remains available for comparison or fallback until the new layout has visual confidence.
 
 ---
