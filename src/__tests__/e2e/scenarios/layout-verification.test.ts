@@ -253,10 +253,14 @@ describe('L3 布局验证 — generation 连续性', () => {
 describe('L3 布局验证 — 多 union 回归', () => {
   it('多组亲子 union 下，各组子女保持连续', async () => {
     const r = await layoutFamilyTree(Object.values(multiUnionFamily()))
-    const abChildren = r.nodes
-      .filter((n) => ['childAB1', 'childAB2'].includes(n.id))
+    const childIds = r.nodes
+      .filter((n) => ['childAB1', 'childAB2', 'childAC'].includes(n.id))
       .sort((a, b) => a.cx - b.cx)
-    expect(abChildren.map((n) => n.id)).toEqual(['childAB1', 'childAB2'])
+      .map((n) => n.id)
+    expect(childIds).toEqual(expect.arrayContaining(['childAB1', 'childAB2', 'childAC']))
+    const indexAB1 = childIds.indexOf('childAB1')
+    const indexAB2 = childIds.indexOf('childAB2')
+    expect(indexAB2).toBe(indexAB1 + 1)
   })
 
   it('多组件成员不会和主家庭重叠', async () => {
