@@ -10,7 +10,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { layoutWithElk } from '@/core/elkLayout'
-import { mk, addParent, addSpouse, addSibling } from '@/__tests__/fixtures/families'
+import { layoutFamilyTree } from '@/core/treeLayout'
+import { mk, addParent, addSpouse, addSibling, multiUnionFamily } from '@/__tests__/fixtures/families'
 import type { Member } from '@/core/schema'
 
 const NODE_W = 2  // cell 单位宽度
@@ -246,6 +247,22 @@ describe('L3 布局验证 — generation 连续性', () => {
     const r = await layoutWithElk(fourGen())
     const gens = [...new Set(r.nodes.map((n) => n.generation))].sort((a, b) => a - b)
     expect(gens.length).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe('L3 布局验证 — 多 union 回归', () => {
+  it('多组亲子 union 下，各组子女保持连续', async () => {
+    const r = await layoutFamilyTree(Object.values(multiUnionFamily()))
+    const abChildren = r.nodes
+      .filter((n) => ['childAB1', 'childAB2'].includes(n.id))
+      .sort((a, b) => a.cx - b.cx)
+    expect(abChildren.map((n) => n.id)).toEqual(['childAB1', 'childAB2'])
+  })
+
+  it('多组件成员不会和主家庭重叠', async () => {
+    const r = await layoutFamilyTree(Object.values(multiUnionFamily()))
+    expect(r.nodes.some((n) => n.id === 'stranger')).toBe(true)
+    expect(nonOverlapping(r.nodes)).toBe(true)
   })
 })
 

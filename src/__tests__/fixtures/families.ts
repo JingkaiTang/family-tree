@@ -125,3 +125,24 @@ export function extendedFamily(): Record<string, Member> {
 
   return m
 }
+
+export function multiUnionFamily(): Record<string, Member> {
+  const m: Record<string, Member> = {
+    parentA: mk('parentA', { gender: 'male' }),
+    parentB: mk('parentB', { gender: 'female' }),
+    parentC: mk('parentC', { gender: 'female' }),
+    childAB1: mk('childAB1', { gender: 'male', birthDate: '2000-01-01' }),
+    childAB2: mk('childAB2', { gender: 'female', birthDate: '2002-01-01' }),
+    childAC: mk('childAC', { gender: 'male', birthDate: '2010-01-01' }),
+    stranger: mk('stranger', { gender: 'other' }),
+  }
+  addSpouse(m.parentA, m.parentB)
+  addSpouse(m.parentA, m.parentC)
+  addParent(m.childAB1, m.parentA)
+  addParent(m.childAB1, m.parentB)
+  addParent(m.childAB2, m.parentA)
+  addParent(m.childAB2, m.parentB)
+  addParent(m.childAC, m.parentA)
+  addParent(m.childAC, m.parentC)
+  return m
+}
