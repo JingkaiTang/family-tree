@@ -11,7 +11,7 @@ import { describeRelation } from './chineseTerms'
  *    - 对方在我的 godchildren → 干儿子/干女儿
  *    不做嵌套链路（"干爹的妈妈"不走干亲再血缘，继续看有没有血缘连通）
  * 3. 否则 BFS 找最短路径，规范化后翻译
- * 4. 找不到路径 → "亲戚"（或空）
+ * 4. 找不到路径 → null
  */
 export function getKinship(
   fromId: string,
@@ -35,7 +35,7 @@ export function getKinship(
   }
 
   const path = findShortestPath(fromId, toId, members)
-  if (!path) return '亲戚'
+  if (!path) return null
   const normalized = normalizePath(path, members, fromId)
   return describeRelation(normalized, fromId, toId, members)
 }

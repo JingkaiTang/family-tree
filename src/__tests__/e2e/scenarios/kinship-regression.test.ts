@@ -204,22 +204,21 @@ describe('L3 称谓全量回归 — self 视角', () => {
 
   // ---- 堂兄弟姐妹 (父系兄弟的子女) ----
   it('self → 堂弟', () => expect(getKinship('self', 'cousin_p_m', m)).toBe('堂弟'))
-  // 堂姐 birthDate=1992, self=1990 → 系统识别为妹，应为 bug
-  it('self → 堂姐【BUG: 识别为堂妹】', () =>
+  // birthDate=1992, self=1990 → 年幼女性为堂妹
+  it('self → 堂妹', () =>
     expect(getKinship('self', 'cousin_p_f', m)).toBe('堂妹'))
 
   // ---- 表兄弟姐妹 (姑的子女) ----
-  // 表兄 birthDate=1994, self=1990 → 系统识别为弟，年龄对比 bug
-  it('self → 表兄(姑)【BUG: 识别为表弟】', () =>
+  // birthDate=1994, self=1990 → 年幼男性为表弟
+  it('self → 表弟(姑)', () =>
     expect(getKinship('self', 'cousin_ap_m', m)).toBe('表弟'))
   it('self → 表妹(姑)', () => expect(getKinship('self', 'cousin_ap_f', m)).toBe('表妹'))
 
   // ---- 表兄弟姐妹 (舅的子女) ----
-  // 舅的子女应当为"表"系，但系统输出"堂" — 分叉点性别判断 bug
-  it('self → 表兄(舅)【BUG: 识别为堂弟】', () =>
-    expect(getKinship('self', 'cousin_m_m', m)).toBe('堂弟'))
-  it('self → 表姐(舅)【BUG: 识别为堂妹】', () =>
-    expect(getKinship('self', 'cousin_m_f', m)).toBe('堂妹'))
+  it('self → 表弟(舅)', () =>
+    expect(getKinship('self', 'cousin_m_m', m)).toBe('表弟'))
+  it('self → 表妹(舅)', () =>
+    expect(getKinship('self', 'cousin_m_f', m)).toBe('表妹'))
 
   // ---- 表兄弟姐妹 (姨的子女) ----
   it('self → 表弟(姨)', () => expect(getKinship('self', 'cousin_am_m', m)).toBe('表弟'))
@@ -259,19 +258,20 @@ describe('L3 称谓全量回归 — 跨代/旁系', () => {
     expect(getKinship('dad', 'cousin_p_m', m)).toBe('侄子')
   })
 
-  // BUG: son → gpa 应为 "祖父"，系统返回 "曾祖父"（多跳了一代）
-  it('self 的子女 → 爷爷【BUG: 返回曾祖父】', () => {
+  it('self 的子女 → 爷爷', () => {
     expect(getKinship('son', 'gpa', m)).toBe('曾祖父')
   })
 
-  // BUG: son → mgp 应为 "外祖父"，系统返回 "曾祖父"
-  it('self 的子女 → 外公【BUG: 返回曾祖父】', () => {
+  it('self 的子女 → 外公', () => {
     expect(getKinship('son', 'mgp', m)).toBe('曾祖父')
   })
 
-  // BUG: son → uncle_p 应为 "叔父"，系统返回 "叔公"
-  it('self 的子女 → 叔叔【BUG: 返回叔公】', () => {
+  it('self 的子女 → 叔叔', () => {
     expect(getKinship('son', 'uncle_p', m)).toBe('叔公')
+  })
+
+  it('self 的子女 → 舅舅', () => {
+    expect(getKinship('son', 'uncle_m', m)).toBe('舅公')
   })
 })
 
@@ -280,8 +280,7 @@ describe('L3 边界场景', () => {
     expect(getKinship('self', 'self', m)).toBe('本人')
   })
 
-  // BUG: 不在关系网中的人返回 "亲戚" 而非 null
-  it('不认识的人返回亲戚【BUG: 应返 null】', () => {
+  it('不在关系网中的人返回 null', () => {
     const stranger: Member = {
       id: 'stranger', firstName: 'S', lastName: '',
       gender: 'male',
@@ -289,7 +288,7 @@ describe('L3 边界场景', () => {
       godparents: [], godchildren: [],
     }
     const result = getKinship('self', 'stranger', { ...m, stranger })
-    expect(result).toBe('亲戚')
+    expect(result).toBeNull()
   })
 
   it('通过妻子的关系链可达', () => {

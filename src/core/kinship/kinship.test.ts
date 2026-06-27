@@ -82,6 +82,7 @@ function buildFixture(): Record<string, Member> {
     // 表兄弟（姑姑的儿子）的子女
     cousin_p_f_m_son: mk('cousin_p_f_m_son', 'male'),      // 表兄弟的儿子
     cousin_p_f_m_daughter: mk('cousin_p_f_m_daughter', 'female'), // 表兄弟的女儿
+    cousin_p_f_m_son_daughter: mk('cousin_p_f_m_son_daughter', 'female'),
   }
 
   const addParent = (child: Member, parent: Member) => {
@@ -169,6 +170,7 @@ function buildFixture(): Record<string, Member> {
   // 表兄弟（姑姑的儿子）的子女
   addParent(m.cousin_p_f_m_son, m.cousin_p_f_m)
   addParent(m.cousin_p_f_m_daughter, m.cousin_p_f_m)
+  addParent(m.cousin_p_f_m_son_daughter, m.cousin_p_f_m_son)
 
   // 孙子（son 的儿子）
   addParent(m.gson, m.son)
@@ -211,6 +213,7 @@ describe('getKinship — high-frequency terms', () => {
     // 表兄弟的子女（姑姑的儿子=表兄弟，男→侄）
     ['self', 'cousin_p_f_m_son', '表侄'],
     ['self', 'cousin_p_f_m_daughter', '表侄女'],
+    ['self', 'cousin_p_f_m_son_daughter', '表侄孙女'],
   ]
 
   for (const [from, to, expected] of cases) {

@@ -218,11 +218,12 @@ function collateralLabel(
   const genDiff = up - down  // 代际差：正=长辈，0=同辈，负=晚辈
 
   // 分叉点：从共同祖先往下的第一步 = path[up]
-  // 当 up=1,down=1 时，分叉点就是父母，直接用 paternal
-  // 当 up>1 时，分叉点是 path[up]，其性别决定堂/表
+  // 同辈一代表亲只有“父亲的兄弟子女”算堂，其余姑舅姨子女都算表。
+  // 更远的父母表/堂辈仍保留原有按分叉性别区分的规则。
   const branchIsMale = up === 1
     ? paternal
     : (up < path.length ? path[up].toGender === 'male' : true)
+  const sameGenerationTang = collateralPrefixIsTang(up, paternal, branchIsMale)
 
   // --- 同辈：genDiff === 0 ---
   if (genDiff === 0) {
@@ -232,7 +233,7 @@ function collateralLabel(
       return siblingLabel(targetGender, selfVsTarget, path[1]?.relType)
     }
     if (up === 2) {
-      const prefix = branchIsMale ? '堂' : '表'
+      const prefix = sameGenerationTang ? '堂' : '表'
       const ageOrder = compareAgeById(targetId(path), selfId, members)
       if (targetGender === 'female') {
         if (ageOrder === 'older') return `${prefix}姐`
@@ -244,7 +245,7 @@ function collateralLabel(
         return `${prefix}兄弟`
       }
     }
-    return (branchIsMale ? '远房堂' : '远房表') + (targetGender === 'female' ? '姐妹' : '兄弟')
+    return (sameGenerationTang ? '远房堂' : '远房表') + (targetGender === 'female' ? '姐妹' : '兄弟')
   }
 
   // --- 长辈旁系：genDiff > 0 ---
@@ -267,11 +268,7 @@ function collateralLabel(
     // 祖父母辈（genDiff=2）
     if (genDiff === 2) {
       if (up === 3 && down === 1) {
-        // 祖父母的兄弟姐妹
-        if (paternal) {
-          return targetGender === 'female' ? '姑奶奶' : '叔公'
-        }
-        return targetGender === 'female' ? '姨姥' : '舅姥爷'
+        return grandCollateralLabel(path, paternal, targetGender)
       }
       // 祖辈的堂/表兄弟姐妹（如：up=4,down=2）
       const prefix = branchIsMale ? '堂' : '表'
@@ -303,7 +300,7 @@ function collateralLabel(
         return targetGender === 'female' ? '外甥女' : '外甥'
       }
       // 其他 absDiff=1 的组合（如 up=2,down=3）
-      return collateralNephewLabel(branchIsMale, throughMale, targetGender)
+      return collateralNephewLabel(sameGenerationTang, throughMale, targetGender)
     }
 
     if (absDiff === 2) {
@@ -313,8 +310,7 @@ function collateralLabel(
         }
         return targetGender === 'female' ? '外甥孙女' : '外甥孙'
       }
-      // 其他
-      return collateralNephewLabel(branchIsMale, throughMale, targetGender)
+      return collateralGrandNephewLabel(sameGenerationTang, throughMale, targetGender)
     }
 
     return throughMale
@@ -323,6 +319,28 @@ function collateralLabel(
   }
 
   return `${up}代上${down}代下旁系`
+}
+
+function collateralPrefixIsTang(up: number, paternal: boolean, branchIsMale: boolean): boolean {
+  if (up === 2) {
+    return paternal && branchIsMale
+  }
+  return branchIsMale
+}
+
+function grandCollateralLabel(
+  path: PathStep[],
+  paternal: boolean,
+  targetGender: TargetGender,
+): string {
+  if (paternal) {
+    const grandparentGender = path[1]?.toGender
+    if (grandparentGender === 'female') {
+      return targetGender === 'female' ? '姨奶奶' : '舅公'
+    }
+    return targetGender === 'female' ? '姑奶奶' : '叔公'
+  }
+  return targetGender === 'female' ? '姨姥' : '舅姥爷'
 }
 
 /** 从 path 获取最终目标 ID */
@@ -382,6 +400,18 @@ function collateralNephewLabel(
     return targetGender === 'female' ? `${prefix}侄女` : `${prefix}侄`
   }
   return targetGender === 'female' ? `${prefix}外甥女` : `${prefix}外甥`
+}
+
+function collateralGrandNephewLabel(
+  branchIsMale: boolean,
+  throughMale: boolean,
+  targetGender: TargetGender,
+): string {
+  const prefix = branchIsMale ? '堂' : '表'
+  if (throughMale) {
+    return targetGender === 'female' ? `${prefix}侄孙女` : `${prefix}侄孙`
+  }
+  return targetGender === 'female' ? `${prefix}外甥孙女` : `${prefix}外甥孙`
 }
 
 /**
