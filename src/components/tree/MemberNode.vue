@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { resolvePhotoUrl } from '@/services/tauriApi'
-import { relationDistanceTone } from './relationDistanceTone'
 
 const props = defineProps<{
   member: Member
@@ -17,7 +16,6 @@ const props = defineProps<{
   kinship?: string
   /** 是否是当前视角中心 */
   isViewpoint?: boolean
-  relationDistance?: number
 }>()
 
 const emit = defineEmits<{
@@ -66,8 +64,6 @@ const genderColor = computed(() => {
       return 'border-slate-300'
   }
 })
-
-const distanceTone = computed(() => relationDistanceTone(props.relationDistance))
 
 const lifeSpan = computed(() => {
   const b = props.member.birthDate?.slice(0, 4)
@@ -163,7 +159,7 @@ function onPointerCancel(e: PointerEvent) {
   <div
     class="absolute flex cursor-grab flex-col overflow-hidden rounded-xl border-2 shadow-sm transition-shadow select-none hover:shadow-md active:cursor-grabbing"
     :class="[
-      distanceTone,
+      'bg-white',
       genderColor,
       selected ? 'ring-2 ring-amber-400' : '',
       isViewpoint ? 'ring-2 ring-emerald-500' : '',

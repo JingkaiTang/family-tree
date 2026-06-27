@@ -14,17 +14,12 @@ import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 
 // 模拟 layoutFamilyTree 返回预计算结果，避免依赖真实 ELK 布局
-const { layoutFamilyTree, layoutProtagonist } = vi.hoisted(() => ({
+const { layoutFamilyTree } = vi.hoisted(() => ({
   layoutFamilyTree: vi.fn(),
-  layoutProtagonist: vi.fn(),
 }))
 
 vi.mock('@/core/treeLayout', () => ({
   layoutFamilyTree,
-}))
-
-vi.mock('@/core/protagonistLayout', () => ({
-  layoutProtagonist,
 }))
 
 const PanZoomStub = defineComponent({
@@ -71,15 +66,8 @@ function makeFamily(ids: string[]): Member[] {
 describe('FamilyCanvas', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    layoutFamilyTree.mockReset()
     layoutFamilyTree.mockResolvedValue(structuredClone(defaultLayout))
-    layoutProtagonist.mockResolvedValue({
-      nodes: [{ id: 'A', cx: 2, top: 0, generation: 0 }],
-      couples: [],
-      connectors: [],
-      canvas: { width: 4, height: 2 },
-      orphanIds: [],
-      offsetX: 0,
-    })
   })
 
   // ========== 空状态 ==========
@@ -145,7 +133,7 @@ describe('FamilyCanvas', () => {
 
   // ========== 孤儿无提示 ==========
   it('无孤儿时不显示孤儿提示', async () => {
-    layoutProtagonist.mockResolvedValueOnce({
+    layoutFamilyTree.mockResolvedValueOnce({
       nodes: [{ id: 'A', cx: 2, top: 0, generation: 0 }],
       couples: [],
       connectors: [],
@@ -155,7 +143,7 @@ describe('FamilyCanvas', () => {
     })
 
     const wrapper = mount(FamilyCanvas, {
-      props: { members: makeFamily(['A']), centerLayoutId: 'A' },
+      props: { members: makeFamily(['A']) },
       global: {
         plugins: [createPinia()],
         stubs: { PanZoomWrapper: PanZoomStub },
@@ -166,7 +154,7 @@ describe('FamilyCanvas', () => {
     expect(wrapper.text()).not.toContain('位成员未显示')
   })
 
-  it('center layout does not persist manual positions on node drop', async () => {
+  it('persists manual positions on node drop', async () => {
     const members = makeFamily(['A'])
     const pinia = createPinia()
     setActivePinia(pinia)
@@ -176,7 +164,7 @@ describe('FamilyCanvas', () => {
     })
 
     const wrapper = mount(FamilyCanvas, {
-      props: { members, centerLayoutId: 'A' },
+      props: { members },
       global: {
         plugins: [pinia],
         stubs: { PanZoomWrapper: PanZoomStub },
@@ -186,8 +174,24 @@ describe('FamilyCanvas', () => {
     await nextTick()
 
     const node = wrapper.findComponent({ name: 'MemberNode' })
-    await node.vm.$emit('drop', { id: 'A', dx: 10, dy: 10 })
+    await node.vm.$emit('drop', { id: 'A', dx: 55, dy: 55 })
 
-    expect(family.data.manualPositions.A).toBeUndefined()
+    expect(family.data.manualPositions.A).toEqual({ cx: 3, top: 1 })
+  })
+
+  it('ignores legacy centerLayoutId and always uses the default layout', async () => {
+    const members = makeFamily(['A'])
+
+    mount(FamilyCanvas, {
+      props: { members, centerLayoutId: 'A' },
+      global: {
+        plugins: [createPinia()],
+        stubs: { PanZoomWrapper: PanZoomStub },
+      },
+    })
+    await nextTick()
+    await nextTick()
+
+    expect(layoutFamilyTree).toHaveBeenCalledWith(members, { manualPositions: undefined })
   })
 })

@@ -3,7 +3,6 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import type { LayoutResult } from '@/core/treeLayout'
 import { layoutFamilyTree } from '@/core/treeLayout'
-import { layoutProtagonist } from '@/core/protagonistLayout'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import MemberNode from './MemberNode.vue'
 import { useFamilyStore } from '@/stores/family'
@@ -13,7 +12,6 @@ const props = defineProps<{
   rootId?: string
   selectedId?: string | null
   viewpointId?: string | null
-  centerLayoutId?: string | null
   getKinship?: (fromId: string, toId: string) => string | null
   /** 手工拖动后的节点位置（cell 单位，未平移的原始坐标） */
   manualPositions?: Record<string, { cx: number; top: number }>
@@ -38,7 +36,7 @@ const PADDING = 40
 /** 拖动吸附网格（像素） */
 const SNAP_PX = 5
 
-// 防抖/稳定：rootId 当前未用到（新布局是整图），保留以便以后支持"居中到某人"
+// 防抖/稳定：rootId 当前未用到（新布局是整图），保留给后续根节点相关能力。
 void props.rootId
 
 const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
@@ -46,36 +44,16 @@ const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
 const layout = ref<LayoutResult>({ nodes: [], couples: [], connectors: [], canvas: { width: 0, height: 0 }, orphanIds: [], offsetX: 0 })
 
 let layoutRequestId = 0
-let lastFocusedCenterLayoutId: string | null = props.initialView && props.centerLayoutId ? props.centerLayoutId : null
 
 async function updateLayout() {
   const requestId = ++layoutRequestId
-  let nextLayout: LayoutResult
-  if (props.centerLayoutId) {
-    nextLayout = await layoutProtagonist(props.members, props.centerLayoutId)
-  } else {
-    nextLayout = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
-  }
+  const nextLayout = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
   if (requestId !== layoutRequestId) return
 
   layout.value = nextLayout
-
-  if (!props.centerLayoutId) {
-    const shouldFocusSelected = lastFocusedCenterLayoutId !== null && props.selectedId
-    lastFocusedCenterLayoutId = null
-    if (shouldFocusSelected) {
-      await nextTick()
-      focusMember(props.selectedId!)
-    }
-    return
-  }
-  if (props.centerLayoutId === lastFocusedCenterLayoutId) return
-  lastFocusedCenterLayoutId = props.centerLayoutId
-  await nextTick()
-  focusMember(props.centerLayoutId)
 }
 
-watch(() => [props.members, props.centerLayoutId, props.manualPositions], updateLayout, { immediate: true, deep: true })
+watch(() => [props.members, props.manualPositions], updateLayout, { immediate: true, deep: true })
 
 const canvasSize = computed(() => ({
   width: Math.max(layout.value.canvas.width * CELL_PX + PADDING * 2, 600),
@@ -88,7 +66,6 @@ const placedNodes = computed(() => {
     member: Member
     left: number
     top: number
-    relationDistance?: number
   }> = []
   for (const n of layout.value.nodes) {
     const member = props.members.find((m) => m.id === n.id)
@@ -98,7 +75,6 @@ const placedNodes = computed(() => {
       member,
       left: n.cx * CELL_PX + PADDING - NODE_W_PX / 2,
       top: n.top * CELL_PX + PADDING,
-      relationDistance: props.centerLayoutId ? n.generation : undefined,
     })
   }
   return rows
@@ -188,7 +164,6 @@ function onNodeDrop(payload: { id: string; dx: number; dy: number }) {
   const base = placedNodes.value.find((p) => p.id === payload.id)
   delete dragDelta[payload.id]
   if (!base) return
-  if (props.centerLayoutId) return
   const stageDx = payload.dx / scale
   const stageDy = payload.dy / scale
   // 本次 drop 之前节点的"起始 left/top"其实就是 base.left/top（base 包含了 manualPositions 的覆盖）
@@ -247,7 +222,6 @@ function onNodeDrop(payload: { id: string; dx: number; dy: number }) {
           :height="NODE_H_PX"
           :selected="selectedId === n.id"
           :is-viewpoint="viewpointId === n.id"
-          :relation-distance="n.relationDistance"
           :style="dragDelta[n.id] ? { zIndex: 50, transition: 'none' } : undefined"
           :kinship="viewpointId && getKinship ? (getKinship(viewpointId, n.id) ?? undefined) : undefined"
           @click="emit('select', n.id)"
