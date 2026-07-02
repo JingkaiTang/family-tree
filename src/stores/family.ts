@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { FamilyData, Member, ProjectMeta } from '@/core/schema'
+import type { ChildLayoutAssignment, FamilyData, GridLayoutOverride, Member, ProjectMeta } from '@/core/schema'
 import { createEmptyFamily } from '@/core/schema'
 import { setLastProjectPath } from '@/services/prefs'
 
@@ -102,6 +102,64 @@ export const useFamilyStore = defineStore('family', () => {
   // ---------------- Relations (always bidirectional) ----------------
 
   type RelationKind = 'parent' | 'child' | 'sibling' | 'spouse' | 'godparent' | 'godchild'
+  type LinkCurrentSpouseResult = { ok: true; conflicts: string[] } | { ok: false; conflicts: string[] }
+
+  function currentSpouseId(member: Member): string | null {
+    return member.spouses.find((spouse) => spouse.type === 'married')?.id ?? null
+  }
+
+  function getCurrentSpouseConflicts(memberId: string, otherId: string): string[] {
+    const me = data.value.members[memberId]
+    const other = data.value.members[otherId]
+    if (!me || !other || memberId === otherId) return []
+
+    return [...new Set([currentSpouseId(me), currentSpouseId(other)])]
+      .filter((id): id is string => Boolean(id) && id !== memberId && id !== otherId)
+      .sort((left, right) => left.localeCompare(right))
+  }
+
+  function removeCurrentSpouse(memberId: string) {
+    const member = data.value.members[memberId]
+    if (!member) return
+
+    const spouseIds = member.spouses
+      .filter((spouse) => spouse.type === 'married')
+      .map((spouse) => spouse.id)
+    member.spouses = member.spouses.filter((spouse) => spouse.type !== 'married')
+
+    for (const spouseId of spouseIds) {
+      const spouse = data.value.members[spouseId]
+      if (!spouse) continue
+      spouse.spouses = spouse.spouses.filter((ref) => !(ref.id === memberId && ref.type === 'married'))
+    }
+  }
+
+  function linkCurrentSpouse(
+    memberId: string,
+    otherId: string,
+    opts: { replaceConflicts?: boolean } = {},
+  ): LinkCurrentSpouseResult {
+    if (memberId === otherId) return { ok: false, conflicts: [] }
+    const me = data.value.members[memberId]
+    const other = data.value.members[otherId]
+    if (!me || !other) return { ok: false, conflicts: [] }
+
+    const conflicts = getCurrentSpouseConflicts(memberId, otherId)
+    if (conflicts.length > 0 && !opts.replaceConflicts) {
+      return { ok: false, conflicts }
+    }
+
+    removeCurrentSpouse(memberId)
+    removeCurrentSpouse(otherId)
+    me.spouses = me.spouses.filter((spouse) => spouse.id !== otherId)
+    other.spouses = other.spouses.filter((spouse) => spouse.id !== memberId)
+    me.spouses.push({ id: otherId, type: 'married' })
+    other.spouses.push({ id: memberId, type: 'married' })
+    me.spouses.sort((left, right) => left.id.localeCompare(right.id))
+    other.spouses.sort((left, right) => left.id.localeCompare(right.id))
+    markDirty()
+    return { ok: true, conflicts }
+  }
 
   /**
    * 在 memberId 和 otherId 之间建立一条关系。
@@ -136,8 +194,8 @@ export const useFamilyStore = defineStore('family', () => {
       ensure(me.siblings, { id: otherId, type: 'blood' })
       ensure(other.siblings, { id: memberId, type: 'blood' })
     } else if (kind === 'spouse') {
-      ensure(me.spouses, { id: otherId, type: 'married' })
-      ensure(other.spouses, { id: memberId, type: 'married' })
+      linkCurrentSpouse(memberId, otherId)
+      return
     } else if (kind === 'godparent') {
       // other 是 me 的干爹/干妈
       ensure(me.godparents, { id: otherId, type: 'godparent' })
@@ -204,6 +262,29 @@ export const useFamilyStore = defineStore('family', () => {
     markDirty()
   }
 
+  function setChildLayoutAssignment(id: string, assignment: ChildLayoutAssignment | null) {
+    if (!data.value.members[id]) return
+    data.value.childLayoutAssignments ??= {}
+
+    if (!assignment || (!assignment.primaryParentId && !assignment.primarySpouseId)) {
+      delete data.value.childLayoutAssignments[id]
+    } else {
+      data.value.childLayoutAssignments[id] = assignment
+    }
+    markDirty()
+  }
+
+  function setGridLayoutOverride(slotId: string, override: GridLayoutOverride | null) {
+    data.value.gridLayoutOverrides ??= {}
+
+    if (!override) {
+      delete data.value.gridLayoutOverrides[slotId]
+    } else {
+      data.value.gridLayoutOverrides[slotId] = override
+    }
+    markDirty()
+  }
+
   /**
    * 把某成员的手工拖动位置写入 data.manualPositions。
    * 调用者需传入 cell 单位（与 treeLayout 的 LaidOutNode.cx/top 同），
@@ -254,11 +335,15 @@ export const useFamilyStore = defineStore('family', () => {
     upsertMember,
     updateMember,
     deleteMember,
+    getCurrentSpouseConflicts,
+    linkCurrentSpouse,
     linkRelation,
     unlinkRelation,
     setNicknameOverride,
     setRootMember,
     setDefaultViewpoint,
+    setChildLayoutAssignment,
+    setGridLayoutOverride,
     setManualPosition,
     clearManualPosition,
   }
