@@ -70,6 +70,27 @@ describe('layoutFamilyTree — 基本正确性', () => {
     expect(r.orphanIds).toEqual([])
   })
 
+  it('uses grid semantics by default: current spouses share a slot and child attaches to the primary family', async () => {
+    const list = [
+      mk('dad', 'male', [], ['kid'], ['mom']),
+      mk('mom', 'female', [], ['kid'], ['dad']),
+      mk('kid', 'male', ['dad', 'mom'], [], []),
+    ]
+    const r = await layoutFamilyTree(list, {
+      childLayoutAssignments: {
+        kid: { primaryParentId: 'dad', primarySpouseId: 'mom' },
+      },
+      gridLayoutOverrides: {},
+    })
+    const dad = r.nodes.find((n) => n.id === 'dad')!
+    const mom = r.nodes.find((n) => n.id === 'mom')!
+    const kid = r.nodes.find((n) => n.id === 'kid')!
+
+    expect(dad.top).toBe(mom.top)
+    expect(kid.top).toBeGreaterThan(dad.top)
+    expect(r.grid?.memberSlotIds.dad).toBe('couple:dad+mom')
+  })
+
   it('三代高度递增：顶代最小 top，末代最大 top', async () => {
     const r = await layoutFamilyTree(buildUserFixture())
     const tangLinGen = r.nodes.find((n) => n.id === 'tang_lingen')!
@@ -358,22 +379,16 @@ describe('layoutFamilyTree — 手工位置覆盖 (manualPositions)', () => {
     for (const n of r.nodes) expect(n.cx).toBeGreaterThanOrEqual(0)
   })
 
-  it('manualPositions 命中时覆盖节点坐标，连线端点跟随', async () => {
+  it('manualPositions 在网格布局中仅作为旧数据保留，不影响节点坐标', async () => {
     const members = simpleFamily()
-    const manual = { kid: { cx: 100, top: 100 } }
-    const r = await layoutFamilyTree(members, { manualPositions: manual })
-    const kid = r.nodes.find((n) => n.id === 'kid')!
-    expect(kid.cx).toBeCloseTo(100 + r.offsetX, 6)
-    expect(kid.top).toBeCloseTo(100, 6)
-
-    const toKid = r.connectors.filter(
-      (c) =>
-        c.kind === 'parent-child' &&
-        c.points.length === 2 &&
-        Math.abs(c.points[1].x - kid.cx) < 1e-6 &&
-        Math.abs(c.points[1].y - kid.top) < 1e-6,
-    )
-    expect(toKid.length).toBeGreaterThan(0)
+    const baseline = await layoutFamilyTree(members)
+    const r = await layoutFamilyTree(members, {
+      manualPositions: { kid: { cx: 50, top: 50 } },
+    })
+    const kidBase = baseline.nodes.find((n) => n.id === 'kid')!
+    const kidOver = r.nodes.find((n) => n.id === 'kid')!
+    expect(kidOver.cx).toBeCloseTo(kidBase.cx, 6)
+    expect(kidOver.top).toBeCloseTo(kidBase.top, 6)
   })
 
   it('manualPositions 中未命中的节点保持算法布局', async () => {

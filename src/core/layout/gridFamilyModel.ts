@@ -150,23 +150,42 @@ function assignGenerations(
     let changed = false
     for (const member of members) {
       const assignment = resolveChildAssignment(member, memberById, data)
-      if (!assignment) continue
 
-      const parentGeneration = generations.get(assignment.primaryParentId) ?? 0
-      if ((generations.get(member.id) ?? 0) < parentGeneration + 1) {
-        generations.set(member.id, parentGeneration + 1)
-        changed = true
-      }
-
-      if (assignment.primarySpouseId) {
-        const spouseGeneration = generations.get(assignment.primarySpouseId) ?? parentGeneration
-        const targetGeneration = Math.max(parentGeneration, spouseGeneration)
-        if ((generations.get(assignment.primaryParentId) ?? 0) !== targetGeneration) {
-          generations.set(assignment.primaryParentId, targetGeneration)
+      if (assignment) {
+        const parentGeneration = generations.get(assignment.primaryParentId) ?? 0
+        if ((generations.get(member.id) ?? 0) < parentGeneration + 1) {
+          generations.set(member.id, parentGeneration + 1)
           changed = true
         }
-        if ((generations.get(assignment.primarySpouseId) ?? 0) !== targetGeneration) {
-          generations.set(assignment.primarySpouseId, targetGeneration)
+
+        if (assignment.primarySpouseId) {
+          const spouseGeneration = generations.get(assignment.primarySpouseId) ?? parentGeneration
+          const targetGeneration = Math.max(parentGeneration, spouseGeneration)
+          if ((generations.get(assignment.primaryParentId) ?? 0) !== targetGeneration) {
+            generations.set(assignment.primaryParentId, targetGeneration)
+            changed = true
+          }
+          if ((generations.get(assignment.primarySpouseId) ?? 0) !== targetGeneration) {
+            generations.set(assignment.primarySpouseId, targetGeneration)
+            changed = true
+          }
+        }
+      }
+
+      for (const godparent of member.godparents) {
+        if (!memberById.has(godparent.id)) continue
+        const godparentGeneration = generations.get(godparent.id) ?? 0
+        if ((generations.get(member.id) ?? 0) < godparentGeneration + 1) {
+          generations.set(member.id, godparentGeneration + 1)
+          changed = true
+        }
+      }
+
+      for (const godchild of member.godchildren) {
+        if (!memberById.has(godchild.id)) continue
+        const godparentGeneration = generations.get(member.id) ?? 0
+        if ((generations.get(godchild.id) ?? 0) < godparentGeneration + 1) {
+          generations.set(godchild.id, godparentGeneration + 1)
           changed = true
         }
       }

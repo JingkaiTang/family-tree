@@ -1,12 +1,26 @@
-import type { Member } from './schema'
+import type { ChildLayoutAssignments, GridLayoutOverrides, ManualPositions, Member } from './schema'
+import { createEmptyFamily, type FamilyData } from './schema'
 import type { LayoutResult } from './elkLayout'
-import { layoutConstraintFamilyTree } from './layout/constraintFamilyLayout'
+import { layoutGridFamilyTree } from './layout/gridFamilyLayout'
 
 export type { LayoutResult, LaidOutNode, Couple, LayoutConnector } from './elkLayout'
 
+export interface LayoutFamilyTreeOptions {
+  manualPositions?: ManualPositions
+  childLayoutAssignments?: ChildLayoutAssignments
+  gridLayoutOverrides?: GridLayoutOverrides
+}
+
 export async function layoutFamilyTree(
   members: Member[],
-  opts?: { manualPositions?: Record<string, { cx: number; top: number }> },
+  opts: LayoutFamilyTreeOptions = {},
 ): Promise<LayoutResult> {
-  return layoutConstraintFamilyTree(members, opts)
+  const familyData: FamilyData = {
+    ...createEmptyFamily(),
+    members: Object.fromEntries(members.map((member) => [member.id, member])),
+    manualPositions: opts.manualPositions ?? {},
+    childLayoutAssignments: opts.childLayoutAssignments ?? {},
+    gridLayoutOverrides: opts.gridLayoutOverrides ?? {},
+  }
+  return layoutGridFamilyTree(familyData)
 }
