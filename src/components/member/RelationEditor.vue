@@ -49,8 +49,66 @@ const godchildrenList = computed(() =>
 const addKind = ref<RelationKind>('parent')
 const addTargetId = ref<string>('')
 
+const childLayoutValue = computed({
+  get() {
+    const assignment = family.data.childLayoutAssignments[props.memberId]
+    if (!assignment?.primaryParentId) return ''
+    return assignment.primarySpouseId
+      ? `${assignment.primaryParentId}+${assignment.primarySpouseId}`
+      : assignment.primaryParentId
+  },
+  set(value: string) {
+    if (!value) {
+      family.setChildLayoutAssignment(props.memberId, null)
+      return
+    }
+
+    const [primaryParentId, primarySpouseId] = value.split('+')
+    family.setChildLayoutAssignment(props.memberId, primarySpouseId
+      ? { primaryParentId, primarySpouseId }
+      : { primaryParentId },
+    )
+  },
+})
+
+const childLayoutOptions = computed(() => {
+  const member = me.value
+  if (!member) return []
+  return member.parents
+    .map((parent) => family.getMember(parent.id))
+    .filter((parent): parent is Member => Boolean(parent))
+    .flatMap((parent) => {
+      const spouse = parent.spouses.find((ref) => ref.type === 'married')
+      if (!spouse) return [{ value: parent.id, label: fullName(parent) }]
+
+      const spouseMember = family.getMember(spouse.id)
+      if (!spouseMember) return [{ value: parent.id, label: fullName(parent) }]
+
+      return [
+        { value: `${parent.id}+${spouse.id}`, label: `${fullName(parent)} + ${fullName(spouseMember)}` },
+        { value: parent.id, label: fullName(parent) },
+      ]
+    })
+})
+
 function addRelation() {
   if (!addTargetId.value) return
+  if (addKind.value === 'spouse') {
+    const conflicts = family.getCurrentSpouseConflicts(props.memberId, addTargetId.value)
+    if (conflicts.length > 0) {
+      const names = conflicts
+        .map((id) => family.getMember(id))
+        .filter((member): member is Member => Boolean(member))
+        .map(fullName)
+        .join('、')
+      const confirmed = window.confirm(`已有当前配偶：${names}。是否解除旧关系并建立新的当前配偶关系？`)
+      if (!confirmed) return
+    }
+    family.linkCurrentSpouse(props.memberId, addTargetId.value, { replaceConflicts: true })
+    addTargetId.value = ''
+    return
+  }
+
   family.linkRelation(props.memberId, addTargetId.value, addKind.value)
   addTargetId.value = ''
 }
@@ -84,6 +142,20 @@ function fullName(m: Member) {
           </button>
         </li>
       </ul>
+    </div>
+
+    <div v-if="parentsList.length > 0">
+      <div class="mb-1 text-xs font-medium text-slate-500">主布局归属</div>
+      <select
+        v-model="childLayoutValue"
+        data-testid="child-layout-assignment"
+        class="w-full rounded border border-slate-300 px-2 py-1"
+      >
+        <option value="">自动</option>
+        <option v-for="option in childLayoutOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
+      </select>
     </div>
 
     <div>
