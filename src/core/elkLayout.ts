@@ -19,6 +19,12 @@ export interface LayoutConnector {
   kind: 'parent-child' | 'spouse' | 'godparent'
 }
 
+export interface GridLayoutMetadata {
+  memberSlotIds: Record<string, string>
+  slotPositions: Record<string, { generation: number; order: number; cx: number }>
+  columnWidth: number
+}
+
 export interface LayoutResult {
   nodes: LaidOutNode[]
   couples: Couple[]
@@ -26,6 +32,7 @@ export interface LayoutResult {
   canvas: { width: number; height: number }
   orphanIds: string[]
   offsetX: number
+  grid?: GridLayoutMetadata
 }
 
 let ELK: any = null
