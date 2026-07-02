@@ -48,6 +48,14 @@ const defaultLayout = {
   canvas: { width: 4, height: 6 },
   orphanIds: ['orphan-1'],
   offsetX: 0,
+  grid: {
+    memberSlotIds: { A: 'person:A', B: 'person:B' },
+    slotPositions: {
+      'person:A': { generation: 0, order: 0, cx: 2 },
+      'person:B': { generation: 1, order: 0, cx: 2 },
+    },
+    columnWidth: 3.5,
+  },
 }
 
 const emptyLayout = {
@@ -154,7 +162,7 @@ describe('FamilyCanvas', () => {
     expect(wrapper.text()).not.toContain('位成员未显示')
   })
 
-  it('persists manual positions on node drop', async () => {
+  it('persists grid slot order on node drop', async () => {
     const members = makeFamily(['A'])
     const pinia = createPinia()
     setActivePinia(pinia)
@@ -174,9 +182,10 @@ describe('FamilyCanvas', () => {
     await nextTick()
 
     const node = wrapper.findComponent({ name: 'MemberNode' })
-    await node.vm.$emit('drop', { id: 'A', dx: 55, dy: 55 })
+    await node.vm.$emit('drop', { id: 'A', dx: 220, dy: 55 })
 
-    expect(family.data.manualPositions.A).toEqual({ cx: 3, top: 1 })
+    expect(family.data.gridLayoutOverrides['person:A']).toEqual({ order: 1 })
+    expect(family.data.manualPositions.A).toBeUndefined()
   })
 
   it('ignores legacy centerLayoutId and always uses the default layout', async () => {
@@ -192,6 +201,10 @@ describe('FamilyCanvas', () => {
     await nextTick()
     await nextTick()
 
-    expect(layoutFamilyTree).toHaveBeenCalledWith(members, { manualPositions: undefined })
+    expect(layoutFamilyTree).toHaveBeenCalledWith(members, {
+      manualPositions: undefined,
+      childLayoutAssignments: undefined,
+      gridLayoutOverrides: undefined,
+    })
   })
 })

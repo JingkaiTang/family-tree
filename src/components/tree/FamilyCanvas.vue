@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import type { Member } from '@/core/schema'
+import type { ChildLayoutAssignments, GridLayoutOverrides, ManualPositions, Member } from '@/core/schema'
 import type { LayoutResult } from '@/core/treeLayout'
 import { layoutFamilyTree } from '@/core/treeLayout'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
@@ -14,7 +14,9 @@ const props = defineProps<{
   viewpointId?: string | null
   getKinship?: (fromId: string, toId: string) => string | null
   /** 手工拖动后的节点位置（cell 单位，未平移的原始坐标） */
-  manualPositions?: Record<string, { cx: number; top: number }>
+  manualPositions?: ManualPositions
+  childLayoutAssignments?: ChildLayoutAssignments
+  gridLayoutOverrides?: GridLayoutOverrides
   /** 初始 pan/zoom；父级从 UI store 读取后下传，挂载时恢复 */
   initialView?: PanzoomView | null
 }>()
@@ -33,8 +35,6 @@ const NODE_W_PX = 110
 const NODE_H_PX = 210
 const CELL_PX = 55
 const PADDING = 40
-/** 拖动吸附网格（像素） */
-const SNAP_PX = 5
 
 // 防抖/稳定：rootId 当前未用到（新布局是整图），保留给后续根节点相关能力。
 void props.rootId
@@ -47,13 +47,21 @@ let layoutRequestId = 0
 
 async function updateLayout() {
   const requestId = ++layoutRequestId
-  const nextLayout = await layoutFamilyTree(props.members, { manualPositions: props.manualPositions })
+  const nextLayout = await layoutFamilyTree(props.members, {
+    manualPositions: props.manualPositions,
+    childLayoutAssignments: props.childLayoutAssignments,
+    gridLayoutOverrides: props.gridLayoutOverrides,
+  })
   if (requestId !== layoutRequestId) return
 
   layout.value = nextLayout
 }
 
-watch(() => [props.members, props.manualPositions], updateLayout, { immediate: true, deep: true })
+watch(
+  () => [props.members, props.manualPositions, props.childLayoutAssignments, props.gridLayoutOverrides],
+  updateLayout,
+  { immediate: true, deep: true },
+)
 
 const canvasSize = computed(() => ({
   width: Math.max(layout.value.canvas.width * CELL_PX + PADDING * 2, 600),
@@ -161,24 +169,19 @@ function onNodeDrag(payload: { id: string; dx: number; dy: number }) {
 
 function onNodeDrop(payload: { id: string; dx: number; dy: number }) {
   const scale = screenToStageScale()
-  const base = placedNodes.value.find((p) => p.id === payload.id)
   delete dragDelta[payload.id]
-  if (!base) return
-  const stageDx = payload.dx / scale
-  const stageDy = payload.dy / scale
-  // 本次 drop 之前节点的"起始 left/top"其实就是 base.left/top（base 包含了 manualPositions 的覆盖）
-  let newLeft = base.left + stageDx
-  let newTop = base.top + stageDy
-  // 吸附到 5px 网格
-  newLeft = Math.round(newLeft / SNAP_PX) * SNAP_PX
-  newTop = Math.round(newTop / SNAP_PX) * SNAP_PX
-  // 反算成 layout 的 cell 坐标（含 offsetX 平移）→ 存储前需要把 offsetX 加回去
-  //   placedNodes.left = (n.cx * CELL_PX + PADDING) - NODE_W_PX / 2
-  //   其中 n.cx 已包含平移；原始 n.cx - offsetX 才是持久化的坐标
-  const cxWithOffset = (newLeft + NODE_W_PX / 2 - PADDING) / CELL_PX
-  const top = (newTop - PADDING) / CELL_PX
-  const cx = cxWithOffset - layout.value.offsetX
-  family.setManualPosition(payload.id, cx, top)
+
+  const slotId = layout.value.grid?.memberSlotIds[payload.id]
+  if (!slotId) return
+  const slotPosition = layout.value.grid?.slotPositions[slotId]
+  const columnWidth = layout.value.grid?.columnWidth
+  if (!slotPosition || !columnWidth) return
+
+  const stageDxCells = payload.dx / scale / CELL_PX
+  const deltaOrder = Math.round(stageDxCells / columnWidth)
+  family.setGridLayoutOverride(slotId, {
+    order: slotPosition.order + deltaOrder,
+  })
 }
 </script>
 
