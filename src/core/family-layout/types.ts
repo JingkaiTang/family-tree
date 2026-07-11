@@ -113,6 +113,16 @@ export interface ParentageGroup {
   sourceUnitId: string
   childPersonIds: string[]
 }
+export interface LineageCluster {
+  id: string
+  unitIds: string[]
+  personIds: string[]
+  kind: 'core' | 'bridge' | 'supercomponent'
+}
+export interface OrderedGeneration {
+  generation: number
+  unitIds: string[]
+}
 export interface AuxiliaryRelation {
   id: string
   kind: 'historical-partnership' | 'secondary-partnership' | 'secondary-parentage' | 'godparent'
