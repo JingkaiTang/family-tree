@@ -40,6 +40,97 @@ describe('routeFamilyLanes', () => {
     }
   })
 
+  it('allocates lanes from the complete horizontal footprint including a source connector', () => {
+    const firstParent = narrowUnit('first-parent', 0, 0, 'first')
+    const secondParent = narrowUnit('second-parent', 200, 0, 'second')
+    const firstChildren = [
+      narrowUnit('first-child-left', 400, 576, ''),
+      narrowUnit('first-child-right', 640, 576, ''),
+    ]
+    const secondChildren = [
+      narrowUnit('second-child-left', 100, 576, ''),
+      narrowUnit('second-child-right', 340, 576, ''),
+    ]
+    const units = [firstParent, secondParent, ...firstChildren, ...secondChildren]
+    const parentageGroups = [{
+      id: 'parentage:first',
+      sourceUnitId: firstParent.id,
+      childPersonIds: firstChildren.map(unit => unit.memberIds[0]),
+    }, {
+      id: 'parentage:second',
+      sourceUnitId: secondParent.id,
+      childPersonIds: secondChildren.map(unit => unit.memberIds[0]),
+    }]
+    const geometry = geometryFor(units, [firstParent, secondParent])
+    const metrics = { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }
+
+    const result = routeFamilyLanes({ geometry, units, parentageGroups, metrics })
+
+    expect(result.diagnostics).toEqual([])
+    for (const left of result.routes[0].segments) {
+      for (const right of result.routes[1].segments) {
+        expect(positiveCollinearOverlap(left, right)).toBe(false)
+      }
+    }
+    expect(new Set(result.routes.flatMap(route => route.segments
+      .filter(segment => segment.orientation === 'horizontal')
+      .map(segment => segment.points[0].y))).size).toBeGreaterThan(1)
+    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, metrics))
+      .toEqual([])
+  })
+
+  it('tracks shifted terminal stubs outside the route lane y', () => {
+    const firstParent = narrowUnit('first-parent', 500, 0, 'first', 2)
+    const secondParent = narrowUnit('second-parent', 100, 0, 'second', 2)
+    const thirdParent = narrowUnit('third-parent', 104, 0, 'third', 2)
+    const firstChildren = [100, 104, 1000].map((x, index) => (
+      narrowUnit(`first-child-${index}`, x, 576, '', 2)
+    ))
+    const secondChildren = [400, 640].map((x, index) => (
+      narrowUnit(`second-child-${index}`, x, 576, '', 2)
+    ))
+    const thirdChildren = [700, 940].map((x, index) => (
+      narrowUnit(`third-child-${index}`, x, 576, '', 2)
+    ))
+    const units = [
+      firstParent,
+      secondParent,
+      thirdParent,
+      ...firstChildren,
+      ...secondChildren,
+      ...thirdChildren,
+    ]
+    const parentageGroups = [{
+      id: 'parentage:first',
+      sourceUnitId: firstParent.id,
+      childPersonIds: firstChildren.map(unit => unit.memberIds[0]),
+    }, {
+      id: 'parentage:second',
+      sourceUnitId: secondParent.id,
+      childPersonIds: secondChildren.map(unit => unit.memberIds[0]),
+    }, {
+      id: 'parentage:third',
+      sourceUnitId: thirdParent.id,
+      childPersonIds: thirdChildren.map(unit => unit.memberIds[0]),
+    }]
+    const geometry = geometryFor(units, [firstParent, secondParent, thirdParent])
+    const metrics = { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }
+
+    const result = routeFamilyLanes({ geometry, units, parentageGroups, metrics })
+
+    expect(result.routes.map(route => route.routeOwnerId)).toEqual([
+      'parentage:first',
+      'parentage:second',
+    ])
+    expect(result.diagnostics).toEqual([{
+      code: 'UNROUTABLE_PRIMARY_EDGE',
+      ids: ['parentage:third'],
+      message: 'Unable to route primary family edge parentage:third',
+    }])
+    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, metrics))
+      .toEqual([])
+  })
+
   it('attaches each owner exactly to its hub and child top ports', () => {
     const fixture = overlappingFamilyFixture(5)
 
@@ -387,6 +478,30 @@ function singleUnit(id: string, x: number, y: number, accent: string): FamilyUni
       x,
       y,
       width: DEFAULT_LAYOUT_METRICS.cardWidth,
+      height: DEFAULT_LAYOUT_METRICS.cardHeight,
+    },
+  }
+}
+
+function narrowUnit(
+  id: string,
+  centerX: number,
+  y: number,
+  accent: string,
+  size = 8,
+): FamilyUnit & { rect: Rect } {
+  return {
+    id: `unit:person:${id}`,
+    kind: 'single',
+    memberIds: [id],
+    generation: y === 0 ? 0 : 1,
+    width: size,
+    lineageAffinity: {},
+    accent,
+    rect: {
+      x: centerX - size / 2,
+      y,
+      width: size,
       height: DEFAULT_LAYOUT_METRICS.cardHeight,
     },
   }

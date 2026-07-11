@@ -14,6 +14,54 @@ describe('validateScene', () => {
     expect(validateScene(scene, DEFAULT_LAYOUT_METRICS)).toEqual([])
   })
 
+  it('keeps a normal bridge path topologically connected through bridge endpoints', () => {
+    const scene = emptyScene()
+    scene.hubs = [{ id: 'hub:source', unitId: 'unit:source', point: { x: 0, y: 20 } }]
+    scene.cards = [placedCard('child', 'unit:child', 36, 20, 8)]
+    scene.routes = [route('parentage:bridge', [{
+      orientation: 'horizontal',
+      points: [{ x: 0, y: 20 }, { x: 10, y: 20 }],
+    }, {
+      orientation: 'bridge',
+      points: [{ x: 10, y: 20 }, { x: 20, y: 10 }, { x: 30, y: 20 }],
+    }, {
+      orientation: 'horizontal',
+      points: [{ x: 30, y: 20 }, { x: 40, y: 20 }],
+    }])]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toEqual([])
+  })
+
+  it('does not connect a disconnected component through a bridge interior point', () => {
+    const scene = emptyScene()
+    scene.hubs = [{ id: 'hub:source', unitId: 'unit:source', point: { x: 0, y: 20 } }]
+    scene.cards = [
+      placedCard('child', 'unit:child', 36, 20, 8),
+      placedCard('detached', 'unit:detached', 16, 0, 8),
+    ]
+    scene.routes = [route('parentage:disconnected', [{
+      orientation: 'horizontal',
+      points: [{ x: 0, y: 20 }, { x: 10, y: 20 }],
+    }, {
+      orientation: 'bridge',
+      points: [{ x: 10, y: 20 }, { x: 20, y: 10 }, { x: 30, y: 20 }],
+    }, {
+      orientation: 'horizontal',
+      points: [{ x: 30, y: 20 }, { x: 40, y: 20 }],
+    }, {
+      orientation: 'vertical',
+      points: [{ x: 20, y: 0 }, { x: 20, y: 10 }],
+    }])]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toContainEqual({
+        code: 'UNROUTABLE_PRIMARY_EDGE',
+        ids: ['parentage:disconnected'],
+        message: 'Route parentage:disconnected is disconnected',
+      })
+  })
+
   it('reports card and unit overlaps deterministically', () => {
     const scene = emptyScene()
     scene.units = [placedUnit('unit:b', 'b', 40, 0), placedUnit('unit:a', 'a', 0, 0)]
@@ -128,12 +176,12 @@ function placedUnit(id: string, personId: string, x: number, y: number) {
   }
 }
 
-function placedCard(id: string, unitId: string, x: number, y: number) {
+function placedCard(id: string, unitId: string, x: number, y: number, size = 100) {
   return {
     id,
     unitId,
     generation: y === 0 ? 0 : 1,
-    rect: { x, y, width: 100, height: 100 },
+    rect: { x, y, width: size, height: size },
   }
 }
 

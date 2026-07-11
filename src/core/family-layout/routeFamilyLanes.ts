@@ -89,29 +89,31 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
     (right.maxX - right.minX) - (left.maxX - left.minX)
     || left.group.id.localeCompare(right.group.id)
   ))
-  const lanesByParentBottom = new Map<number, LaneOccupancy[]>()
+  const horizontalOccupancyByY = new Map<number, LaneOccupancy>()
   const verticalOccupancy: VerticalOccupancy[] = []
   const rawRoutes: RoutedFamilyEdge[] = []
 
   for (const request of requests) {
-    const lanes = lanesByParentBottom.get(request.parentBottom) ?? []
-    lanesByParentBottom.set(request.parentBottom, lanes)
-    const lane = allocateLane(request, lanes, input.metrics)
-    if (lane === undefined) {
-      diagnostics.push(unroutable(request.group.id))
-      continue
+    let acceptedRoute: RoutedFamilyEdge | undefined
+    const lastLaneIndex = maximumLaneIndex(request, input.metrics)
+    for (let laneIndex = 0; laneIndex <= lastLaneIndex; laneIndex++) {
+      const laneY = request.parentBottom
+        + input.metrics.routeSubgrid * (laneIndex + 2)
+      if (childBusConflictsAtY(request, laneY, horizontalOccupancyByY)) continue
+      const verticalOccupancyStart = verticalOccupancy.length
+      const candidate = buildRoute(request, laneY, verticalOccupancy, input.metrics)
+      const blocked = horizontalFootprintConflicts(candidate, horizontalOccupancyByY)
+        || routeIntersectsObstacle(candidate, request, input.geometry, input.metrics)
+      if (blocked) {
+        verticalOccupancy.length = verticalOccupancyStart
+        continue
+      }
+      registerHorizontalFootprint(candidate, horizontalOccupancyByY)
+      acceptedRoute = candidate
+      break
     }
-    const verticalOccupancyStart = verticalOccupancy.length
-    const route = buildRoute(request, lane.y, verticalOccupancy, input.metrics)
-    if (routeIntersectsObstacle(route, request, input.geometry, input.metrics)) {
-      verticalOccupancy.length = verticalOccupancyStart
-      lane.intervals = lane.intervals.filter(interval => (
-        interval.routeOwnerId !== request.group.id
-      ))
-      diagnostics.push(unroutable(request.group.id))
-      continue
-    }
-    rawRoutes.push(route)
+    if (acceptedRoute === undefined) diagnostics.push(unroutable(request.group.id))
+    else rawRoutes.push(acceptedRoute)
   }
 
   const routes = addCrossingBridges(rawRoutes, input.metrics.routeSubgrid)
@@ -120,36 +122,78 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
   return { routes, diagnostics }
 }
 
-function allocateLane(
+function maximumLaneIndex(
   request: RouteRequest,
-  lanes: LaneOccupancy[],
   metrics: LayoutMetrics,
-): LaneOccupancy | undefined {
-  const occupiedMinX = request.childPorts.length === 1
-    ? Math.min(request.minX, request.sourceHub.x)
-    : request.minX
-  const occupiedMaxX = request.childPorts.length === 1
-    ? Math.max(request.maxX, request.sourceHub.x)
-    : request.maxX
-  const maximumLaneIndex = Math.floor(
+): number {
+  return Math.floor(
     (request.childClearanceTop - request.parentBottom) / metrics.routeSubgrid,
   ) - 2
-  for (let laneIndex = 0; laneIndex <= maximumLaneIndex; laneIndex++) {
-    const y = request.parentBottom + metrics.routeSubgrid * (laneIndex + 2)
-    const lane = lanes[laneIndex] ?? { y, intervals: [] }
-    if (lane.intervals.some(interval => (
-      interval.routeOwnerId !== request.group.id
-      && intervalsOverlapOrTouch(occupiedMinX, occupiedMaxX, interval.minX, interval.maxX)
-    ))) continue
-    if (lanes[laneIndex] === undefined) lanes[laneIndex] = lane
-    lane.intervals.push({
-      minX: occupiedMinX,
-      maxX: occupiedMaxX,
-      routeOwnerId: request.group.id,
+}
+
+function childBusConflictsAtY(
+  request: RouteRequest,
+  y: number,
+  occupancyByY: Map<number, LaneOccupancy>,
+): boolean {
+  if (request.childPorts.length <= 1) return false
+  return occupancyByY.get(y)?.intervals.some(interval => (
+    interval.routeOwnerId !== request.group.id
+    && intervalsOverlapOrTouch(
+      request.minX,
+      request.maxX,
+      interval.minX,
+      interval.maxX,
+    )
+  )) ?? false
+}
+
+function horizontalFootprintConflicts(
+  route: RoutedFamilyEdge,
+  occupancyByY: Map<number, LaneOccupancy>,
+): boolean {
+  return horizontalFootprint(route).some(interval => (
+    occupancyByY.get(interval.y)?.intervals.some(occupied => (
+      occupied.routeOwnerId !== route.routeOwnerId
+      && intervalsOverlapOrTouch(
+        interval.minX,
+        interval.maxX,
+        occupied.minX,
+        occupied.maxX,
+      )
+    )) ?? false
+  ))
+}
+
+function registerHorizontalFootprint(
+  route: RoutedFamilyEdge,
+  occupancyByY: Map<number, LaneOccupancy>,
+) {
+  for (const interval of horizontalFootprint(route)) {
+    const occupancy = occupancyByY.get(interval.y) ?? { y: interval.y, intervals: [] }
+    if (!occupancyByY.has(interval.y)) occupancyByY.set(interval.y, occupancy)
+    occupancy.intervals.push({
+      minX: interval.minX,
+      maxX: interval.maxX,
+      routeOwnerId: route.routeOwnerId,
     })
-    return lane
   }
-  return undefined
+}
+
+function horizontalFootprint(route: RoutedFamilyEdge): Array<{
+  y: number
+  minX: number
+  maxX: number
+}> {
+  return route.segments.flatMap(segment => {
+    if (segment.orientation !== 'horizontal') return []
+    const [start, end] = segment.points
+    return [{
+      y: start.y,
+      minX: Math.min(start.x, end.x),
+      maxX: Math.max(start.x, end.x),
+    }]
+  })
 }
 
 function buildRoute(

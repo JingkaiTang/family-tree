@@ -49,9 +49,13 @@ function validateRouteTerminals(
   const cardPorts = scene.cards.map(card => topPort(card.rect))
   const hubLeaves = leaves.filter(point => hubPoints.some(hub => samePoint(point, hub)))
   const cardLeaves = leaves.filter(point => cardPorts.some(port => samePoint(point, port)))
+  if (!graphIsConnected) diagnostics.push({
+    code: 'UNROUTABLE_PRIMARY_EDGE',
+    ids: [route.routeOwnerId],
+    message: `Route ${route.routeOwnerId} is disconnected`,
+  })
   if (
-    !graphIsConnected
-    || hubLeaves.length !== 1
+    hubLeaves.length !== 1
     || cardLeaves.length === 0
     || leaves.some(point => (
       !hubPoints.some(hub => samePoint(point, hub))
@@ -140,12 +144,8 @@ function routeLeaves(route: RoutedFamilyEdge): Point[] {
     segment.points[0],
     segment.points.at(-1)!,
   ])
-  return uniquePoints(endpoints.filter(point => !route.segments.some(segment => (
-    !samePoint(point, segment.points[0])
-    && !samePoint(point, segment.points.at(-1)!)
-    && pointOnPolyline(point, segment)
-  ))).filter(point => (
-    route.segments.filter(segment => pointOnPolyline(point, segment)).length === 1
+  return uniquePoints(endpoints.filter(point => (
+    route.segments.filter(segment => pointTopologicallyOnSegment(point, segment)).length === 1
   )))
 }
 
@@ -155,7 +155,10 @@ function connectedSegments(segments: RouteSegment[]): boolean {
   while (pending.length > 0) {
     const index = pending.pop()!
     for (let candidate = 0; candidate < segments.length; candidate++) {
-      if (visited.has(candidate) || !polylinesIntersect(segments[index], segments[candidate])) continue
+      if (
+        visited.has(candidate)
+        || !segmentsTopologicallyConnect(segments[index], segments[candidate])
+      ) continue
       visited.add(candidate)
       pending.push(candidate)
     }
@@ -163,10 +166,26 @@ function connectedSegments(segments: RouteSegment[]): boolean {
   return visited.size === segments.length
 }
 
-function polylinesIntersect(left: RouteSegment, right: RouteSegment): boolean {
+function segmentsTopologicallyConnect(left: RouteSegment, right: RouteSegment): boolean {
+  if (left.orientation === 'bridge') {
+    return bridgeEndpoints(left).some(point => pointTopologicallyOnSegment(point, right))
+  }
+  if (right.orientation === 'bridge') {
+    return bridgeEndpoints(right).some(point => pointTopologicallyOnSegment(point, left))
+  }
   return polylineLegs(left).some(leftLeg => polylineLegs(right).some(rightLeg => (
     segmentsIntersect(leftLeg[0], leftLeg[1], rightLeg[0], rightLeg[1])
   )))
+}
+
+function pointTopologicallyOnSegment(point: Point, segment: RouteSegment): boolean {
+  return segment.orientation === 'bridge'
+    ? bridgeEndpoints(segment).some(endpoint => samePoint(point, endpoint))
+    : pointOnPolyline(point, segment)
+}
+
+function bridgeEndpoints(segment: RouteSegment): [Point, Point] {
+  return [segment.points[0], segment.points.at(-1)!]
 }
 
 function pointOnPolyline(point: Point, segment: RouteSegment): boolean {
