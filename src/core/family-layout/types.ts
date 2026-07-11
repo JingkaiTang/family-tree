@@ -158,6 +158,10 @@ export interface RoutedFamilyEdge {
   accent: string
   segments: RouteSegment[]
 }
+export interface RouteFamilyLanesResult {
+  routes: RoutedFamilyEdge[]
+  diagnostics: LayoutDiagnostic[]
+}
 export interface LayoutScene {
   units: PlacedFamilyUnit[]
   cards: PlacedPersonCard[]

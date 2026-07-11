@@ -7,6 +7,7 @@ import {
   DEFAULT_LAYOUT_METRICS,
   EMPTY_LAYOUT_PREFERENCES,
 } from './types'
+import type { RouteSegment } from './types'
 
 export function member(id: string, patch: Partial<Member> = {}): Member {
   return {
@@ -51,4 +52,24 @@ export function buildProjectedInput(data: FamilyData) {
     DEFAULT_LAYOUT_METRICS,
   )
   return { normalized, projected, built }
+}
+
+export function segmentKey(segment: RouteSegment): string {
+  const points = segment.points.map(point => `${point.x},${point.y}`).join('>')
+  return `${segment.orientation}:${points}`
+}
+
+export function positiveCollinearOverlap(left: RouteSegment, right: RouteSegment): boolean {
+  if (left.orientation !== right.orientation) return false
+  if (left.orientation === 'bridge' || right.orientation === 'bridge') return false
+  const [a0, a1] = left.points
+  const [b0, b1] = right.points
+  if (left.orientation === 'horizontal') {
+    if (a0.y !== b0.y) return false
+    return Math.max(Math.min(a0.x, a1.x), Math.min(b0.x, b1.x))
+      < Math.min(Math.max(a0.x, a1.x), Math.max(b0.x, b1.x))
+  }
+  if (a0.x !== b0.x) return false
+  return Math.max(Math.min(a0.y, a1.y), Math.min(b0.y, b1.y))
+    < Math.min(Math.max(a0.y, a1.y), Math.max(b0.y, b1.y))
 }
