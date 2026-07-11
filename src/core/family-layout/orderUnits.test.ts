@@ -150,6 +150,107 @@ describe('orderUnits', () => {
     expect(JSON.stringify(second)).toBe(JSON.stringify(first))
   })
 
+  it('orders a 200-unit reverse-parentage row completely and deterministically', () => {
+    const edgeCount = 100
+    const parentIds = Array.from({ length: edgeCount }, (_, index) => (
+      `parent-${index.toString().padStart(3, '0')}`
+    ))
+    const childIds = Array.from({ length: edgeCount }, (_, index) => (
+      `child-${index.toString().padStart(3, '0')}`
+    ))
+    const units = [
+      ...parentIds.map(id => single(id, 0)),
+      ...childIds.map(id => single(id, 1)),
+    ]
+    const parentageGroups = parentIds.map((parentId, index) => ({
+      id: `parentage:${parentId}`,
+      sourceUnitId: `unit:person:${parentId}`,
+      childPersonIds: [childIds[edgeCount - index - 1]],
+    }))
+
+    const rows = orderUnits(input(
+      units,
+      people([...parentIds, ...childIds].map(id => [id])),
+      { parentageGroups },
+    ))
+
+    const orderedUnitIds = rows.flatMap(row => row.unitIds)
+    expect(rows).toEqual([{
+      generation: 0,
+      unitIds: parentIds.map(id => `unit:person:${id}`),
+    }, {
+      generation: 1,
+      unitIds: [...childIds].reverse().map(id => `unit:person:${id}`),
+    }])
+    expect(orderedUnitIds).toHaveLength(200)
+    expect(new Set(orderedUnitIds).size).toBe(200)
+  })
+
+  it.each(['adopted', 'step'] as const)(
+    'keeps blood cores stronger than %s affinity inside a supercomponent',
+    type => {
+      const units = [
+        single('a-root'),
+        single('b-root'),
+        single('a-child'),
+        single('b-child'),
+        couple('a-bridge-b-bridge', ['a-bridge', 'b-bridge']),
+      ]
+      const personFacts = people([
+        ['a-root', '1970-01-01'],
+        ['b-root', '1971-01-01'],
+        ['a-child', '1980-01-01'],
+        ['b-child', '1981-01-01'],
+        ['a-bridge', '1990-01-01'],
+        ['b-bridge', '1991-01-01'],
+      ])
+      const primaryParentages: ParentageFact[] = [{
+        id: 'parentage:a-root',
+        parentIds: ['a-root'],
+        childIds: ['a-child', 'a-bridge'],
+        typeByChildId: { 'a-child': 'blood', 'a-bridge': 'blood' },
+      }, {
+        id: 'parentage:b-root',
+        parentIds: ['b-root'],
+        childIds: ['b-child', 'b-bridge'],
+        typeByChildId: { 'b-child': 'blood', 'b-bridge': 'blood' },
+      }, {
+        id: 'parentage:cross-affinity',
+        parentIds: ['a-child'],
+        childIds: ['b-child'],
+        typeByChildId: { 'b-child': type },
+      }]
+      const clusters: LineageCluster[] = [{
+        id: 'supercomponent:core:a-root+core:b-root',
+        kind: 'supercomponent',
+        unitIds: units.map(unit => unit.id).sort(),
+        personIds: personFacts.map(person => person.id).sort(),
+      }]
+
+      const [row] = orderUnits(input(units, personFacts, {
+        clusters,
+        primaryParentages,
+      }))
+      const position = (unitId: string) => row.unitIds.indexOf(unitId)
+      const adoptedDistance = Math.abs(
+        position('unit:person:a-child') - position('unit:person:b-child'),
+      )
+
+      expect(Math.abs(
+        position('unit:person:a-root') - position('unit:person:a-child'),
+      )).toBeLessThan(adoptedDistance)
+      expect(Math.abs(
+        position('unit:person:b-root') - position('unit:person:b-child'),
+      )).toBeLessThan(adoptedDistance)
+      expect(position('unit:partnership:a-bridge-b-bridge')).toBeGreaterThan(
+        Math.min(position('unit:person:a-child'), position('unit:person:b-child')),
+      )
+      expect(position('unit:partnership:a-bridge-b-bridge')).toBeLessThan(
+        Math.max(position('unit:person:a-root'), position('unit:person:b-root')),
+      )
+    },
+  )
+
   it.each(['adopted', 'step'] as const)(
     'uses %s parentage as 0.5 affinity without merging blood cores',
     type => {

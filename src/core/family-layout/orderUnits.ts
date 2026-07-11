@@ -49,6 +49,7 @@ export function orderUnits(input: OrderUnitsInput): OrderedGeneration[] {
     input,
     unitIdByPersonId,
   )
+  const lineageAffinity = buildLineageAffinity(input, unitIdByPersonId)
 
   for (const row of rows) {
     row.unitIds = applySiblingBlocks(
@@ -68,7 +69,9 @@ export function orderUnits(input: OrderUnitsInput): OrderedGeneration[] {
     input,
     unitIdByPersonId,
     constraintsByGeneration,
-    affinityLinks: buildAffinityLinks(input, unitIdByPersonId),
+    edges: parentageEdges(input.parentageGroups, unitIdByPersonId),
+    bloodCoreUnitIds: lineageAffinity.bloodCoreUnitIds,
+    affinityLinks: lineageAffinity.relationLinks,
     previousPositionByUnitId: buildPreviousPositions(input.previousScene),
   }
   for (let pass = 0; pass < 3; pass++) {
@@ -88,31 +91,47 @@ interface OrderingContext {
   input: OrderUnitsInput
   unitIdByPersonId: Map<string, string>
   constraintsByGeneration: Map<number, OrderConstraint[]>
+  edges: ParentageEdge[]
+  bloodCoreUnitIds: string[][]
   affinityLinks: AffinityLink[]
   previousPositionByUnitId: Map<string, number>
 }
 
 interface OrderConstraint { beforeId: string; afterId: string }
 interface AffinityLink { leftId: string; rightId: string; weight: number }
+interface ParentageEdge { sourceId: string; childId: string }
 interface Row { generation: number; unitIds: string[] }
+interface RowPosition { generation: number; index: number }
+interface LineageAffinity {
+  bloodCoreUnitIds: string[][]
+  relationLinks: AffinityLink[]
+}
 
 function sweep(rows: Row[], direction: 'down' | 'up', context: OrderingContext) {
   const orderedRows = direction === 'down' ? rows : [...rows].reverse()
   for (const row of orderedRows) {
+    const hasNeighbors = hasDirectionalNeighbors(row.unitIds, direction, context.edges)
+    if (!hasNeighbors && !hasInternalAffinity(
+      row.unitIds,
+      context.bloodCoreUnitIds,
+      context.affinityLinks,
+    )) continue
     const blocks = buildBlocks(
       row.unitIds,
       context.input.parentageGroups,
       context.input.clusters,
       context.unitIdByPersonId,
     )
-    const positions = positionsByUnitId(rows)
-    const candidateBlocks = [...blocks].sort((left, right) => {
-      const leftCenter = barycenter(left, direction, context.input.parentageGroups, context.unitIdByPersonId, positions)
-      const rightCenter = barycenter(right, direction, context.input.parentageGroups, context.unitIdByPersonId, positions)
-      if (leftCenter !== rightCenter) return leftCenter - rightCenter
-      return blockId(left).localeCompare(blockId(right))
-    })
-    acceptCandidate(rows, row, candidateBlocks.flat(), context)
+    if (hasNeighbors) {
+      const positions = positionsByUnitId(rows)
+      const candidateBlocks = [...blocks].sort((left, right) => {
+        const leftCenter = barycenter(left, direction, context.edges, positions)
+        const rightCenter = barycenter(right, direction, context.edges, positions)
+        if (leftCenter !== rightCenter) return leftCenter - rightCenter
+        return blockId(left).localeCompare(blockId(right))
+      })
+      acceptCandidate(rows, row, candidateBlocks.flat(), context)
+    }
 
     let improved = true
     while (improved) {
@@ -181,28 +200,20 @@ function scoreRows(rows: Row[], context: OrderingContext): number[] {
     }
   }
 
-  const edges = parentageEdges(context.input.parentageGroups, context.unitIdByPersonId)
-  let crossings = 0
-  for (let left = 0; left < edges.length; left++) {
-    for (let right = left + 1; right < edges.length; right++) {
-      const first = edges[left]
-      const second = edges[right]
-      if (first.sourceId === second.sourceId || first.childId === second.childId) continue
-      const firstSource = positions.get(first.sourceId)
-      const secondSource = positions.get(second.sourceId)
-      const firstChild = positions.get(first.childId)
-      const secondChild = positions.get(second.childId)
-      if (
-        firstSource !== undefined
-        && secondSource !== undefined
-        && firstChild !== undefined
-        && secondChild !== undefined
-        && (firstSource - secondSource) * (firstChild - secondChild) < 0
-      ) crossings++
-    }
-  }
+  const crossings = countCrossings(context.edges, rows)
 
   let lineageDistance = 0
+  for (const bloodCoreUnitIds of context.bloodCoreUnitIds) {
+    const corePositions = bloodCoreUnitIds
+      .map(unitId => positions.get(unitId))
+      .filter((position): position is number => position !== undefined)
+      .sort((left, right) => left - right)
+    let prefixSum = 0
+    corePositions.forEach((position, index) => {
+      lineageDistance += position * index - prefixSum
+      prefixSum += position
+    })
+  }
   for (const link of context.affinityLinks) {
     const left = positions.get(link.leftId)
     const right = positions.get(link.rightId)
@@ -216,7 +227,7 @@ function scoreRows(rows: Row[], context: OrderingContext): number[] {
     if (position !== undefined) previousMovement += Math.abs(position - previousPosition)
   }
   let totalSpan = 0
-  for (const edge of edges) {
+  for (const edge of context.edges) {
     const source = positions.get(edge.sourceId)
     const child = positions.get(edge.childId)
     if (source !== undefined && child !== undefined) totalSpan += Math.abs(source - child)
@@ -224,10 +235,122 @@ function scoreRows(rows: Row[], context: OrderingContext): number[] {
   return [savedViolations, crossings, lineageDistance, previousMovement, totalSpan]
 }
 
-function buildAffinityLinks(
+function countCrossings(edges: ParentageEdge[], rows: Row[]): number {
+  const rowPositionByUnitId = new Map<string, RowPosition>()
+  for (const row of rows) {
+    row.unitIds.forEach((unitId, index) => {
+      rowPositionByUnitId.set(unitId, { generation: row.generation, index })
+    })
+  }
+  const edgesByRowPair = new Map<string, Array<{
+    sourceIndex: number
+    childIndex: number
+    sourceId: string
+    childId: string
+  }>>()
+  for (const edge of edges) {
+    const source = rowPositionByUnitId.get(edge.sourceId)
+    const child = rowPositionByUnitId.get(edge.childId)
+    if (source === undefined || child === undefined) continue
+    const key = `${source.generation}\0${child.generation}`
+    const rowEdges = edgesByRowPair.get(key) ?? []
+    rowEdges.push({
+      sourceIndex: source.index,
+      childIndex: child.index,
+      sourceId: edge.sourceId,
+      childId: edge.childId,
+    })
+    edgesByRowPair.set(key, rowEdges)
+  }
+
+  let crossings = 0
+  for (const rowEdges of edgesByRowPair.values()) {
+    rowEdges.sort((left, right) => (
+      left.sourceIndex - right.sourceIndex
+      || left.childIndex - right.childIndex
+      || left.sourceId.localeCompare(right.sourceId)
+      || left.childId.localeCompare(right.childId)
+    ))
+    const childIndexes = [...new Set(rowEdges.map(edge => edge.childIndex))]
+      .sort((left, right) => left - right)
+    const rankByChildIndex = new Map(
+      childIndexes.map((childIndex, rank) => [childIndex, rank]),
+    )
+    const fenwick = new FenwickTree(childIndexes.length)
+    let insertedEdges = 0
+    let start = 0
+    while (start < rowEdges.length) {
+      let end = start + 1
+      while (
+        end < rowEdges.length
+        && rowEdges[end].sourceIndex === rowEdges[start].sourceIndex
+      ) end++
+      for (let index = start; index < end; index++) {
+        const childRank = rankByChildIndex.get(rowEdges[index].childIndex) ?? 0
+        crossings += insertedEdges - fenwick.prefixSum(childRank)
+      }
+      for (let index = start; index < end; index++) {
+        const childRank = rankByChildIndex.get(rowEdges[index].childIndex) ?? 0
+        fenwick.add(childRank, 1)
+        insertedEdges++
+      }
+      start = end
+    }
+  }
+  return crossings
+}
+
+function hasDirectionalNeighbors(
+  unitIds: string[],
+  direction: 'down' | 'up',
+  edges: ParentageEdge[],
+): boolean {
+  const rowUnitIds = new Set(unitIds)
+  return edges.some(edge => rowUnitIds.has(
+    direction === 'down' ? edge.childId : edge.sourceId,
+  ))
+}
+
+function hasInternalAffinity(
+  unitIds: string[],
+  bloodCoreUnitIds: string[][],
+  links: AffinityLink[],
+): boolean {
+  const rowUnitIds = new Set(unitIds)
+  return bloodCoreUnitIds.some(coreUnitIds => {
+    const affiliatedCount = coreUnitIds.filter(unitId => rowUnitIds.has(unitId)).length
+    return affiliatedCount > 1 && affiliatedCount < unitIds.length
+  }) || links.some(link => (
+    rowUnitIds.has(link.leftId) && rowUnitIds.has(link.rightId)
+  ))
+}
+
+class FenwickTree {
+  private readonly values: number[]
+
+  constructor(size: number) {
+    this.values = Array.from({ length: size + 1 }, () => 0)
+  }
+
+  add(index: number, value: number) {
+    for (let cursor = index + 1; cursor < this.values.length; cursor += cursor & -cursor) {
+      this.values[cursor] += value
+    }
+  }
+
+  prefixSum(index: number): number {
+    let result = 0
+    for (let cursor = index + 1; cursor > 0; cursor -= cursor & -cursor) {
+      result += this.values[cursor]
+    }
+    return result
+  }
+}
+
+function buildLineageAffinity(
   input: OrderUnitsInput,
   unitIdByPersonId: Map<string, string>,
-): AffinityLink[] {
+): LineageAffinity {
   const weights = new Map<string, AffinityLink>()
   const add = (leftId: string | undefined, rightId: string | undefined, weight: number) => {
     if (leftId === undefined || rightId === undefined || leftId === rightId) return
@@ -241,31 +364,51 @@ function buildAffinityLinks(
     })
   }
 
-  for (const cluster of input.clusters) {
-    const affiliatedUnitIds = input.units
-      .filter(unit => (
-        cluster.unitIds.includes(unit.id)
-        || unit.memberIds.some(personId => cluster.personIds.includes(personId))
-      ))
-      .map(unit => unit.id)
-      .sort()
-    for (let left = 0; left < affiliatedUnitIds.length; left++) {
-      for (let right = left + 1; right < affiliatedUnitIds.length; right++) {
-        add(affiliatedUnitIds[left], affiliatedUnitIds[right], 1)
-      }
+  const bloodCores = new StableDisjointSet(input.people.map(person => person.id))
+  for (const parentage of input.primaryParentages) {
+    for (const childId of parentage.childIds) {
+      if (parentage.typeByChildId[childId] !== 'blood') continue
+      for (const parentId of parentage.parentIds) bloodCores.union(parentId, childId)
+    }
+  }
+  const unitIdsByBloodCore = new Map<string, string[]>()
+  const bloodCoreIdsByUnitId = new Map<string, Set<string>>()
+  for (const unit of input.units) {
+    const bloodCoreIds = [...new Set(unit.memberIds.map(personId => bloodCores.find(personId)))]
+    bloodCoreIdsByUnitId.set(unit.id, new Set(bloodCoreIds))
+    for (const bloodCoreId of bloodCoreIds) {
+      const affiliatedUnitIds = unitIdsByBloodCore.get(bloodCoreId) ?? []
+      affiliatedUnitIds.push(unit.id)
+      unitIdsByBloodCore.set(bloodCoreId, affiliatedUnitIds)
     }
   }
   for (const parentage of input.primaryParentages) {
     for (const childId of parentage.childIds) {
-      const weight = parentage.typeByChildId[childId] === 'blood' ? 1 : 0.5
+      if (parentage.typeByChildId[childId] === 'blood') continue
       for (const parentId of parentage.parentIds) {
-        add(unitIdByPersonId.get(parentId), unitIdByPersonId.get(childId), weight)
+        const parentUnitId = unitIdByPersonId.get(parentId)
+        const childUnitId = unitIdByPersonId.get(childId)
+        const parentCoreIds = parentUnitId === undefined
+          ? undefined
+          : bloodCoreIdsByUnitId.get(parentUnitId)
+        const childCoreIds = childUnitId === undefined
+          ? undefined
+          : bloodCoreIdsByUnitId.get(childUnitId)
+        const sharesBloodCore = parentCoreIds !== undefined && childCoreIds !== undefined
+          && [...parentCoreIds].some(coreId => childCoreIds.has(coreId))
+        if (!sharesBloodCore) add(parentUnitId, childUnitId, 0.5)
       }
     }
   }
-  return [...weights.values()].sort((left, right) => (
-    left.leftId.localeCompare(right.leftId) || left.rightId.localeCompare(right.rightId)
-  ))
+  return {
+    bloodCoreUnitIds: [...unitIdsByBloodCore.values()]
+      .map(unitIds => [...unitIds].sort())
+      .filter(unitIds => unitIds.length > 1)
+      .sort((left, right) => (left[0] ?? '').localeCompare(right[0] ?? '')),
+    relationLinks: [...weights.values()].sort((left, right) => (
+      left.leftId.localeCompare(right.leftId) || left.rightId.localeCompare(right.rightId)
+    )),
+  }
 }
 
 function buildOrderConstraints(
@@ -393,7 +536,7 @@ function buildBlocks(
   clusters: LineageCluster[],
   unitIdByPersonId: Map<string, string>,
 ): string[][] {
-  const disjointSet = new UnitDisjointSet(unitIds)
+  const disjointSet = new StableDisjointSet(unitIds)
   const bridgeUnitIds = new Set(
     clusters.filter(cluster => cluster.kind === 'bridge').flatMap(cluster => cluster.unitIds),
   )
@@ -448,12 +591,11 @@ function constraintViolations(unitIds: string[], constraints: OrderConstraint[])
 function barycenter(
   block: string[],
   direction: 'down' | 'up',
-  parentageGroups: ParentageGroup[],
-  unitIdByPersonId: Map<string, string>,
+  edges: ParentageEdge[],
   positions: Map<string, number>,
 ): number {
   const neighbors: number[] = []
-  for (const edge of parentageEdges(parentageGroups, unitIdByPersonId)) {
+  for (const edge of edges) {
     if (direction === 'down' && block.includes(edge.childId)) {
       const position = positions.get(edge.sourceId)
       if (position !== undefined) neighbors.push(position)
@@ -475,7 +617,7 @@ function barycenter(
 function parentageEdges(
   parentageGroups: ParentageGroup[],
   unitIdByPersonId: Map<string, string>,
-) {
+): ParentageEdge[] {
   return parentageGroups.flatMap(group => group.childPersonIds.flatMap(childPersonId => {
     const childId = unitIdByPersonId.get(childPersonId)
     return childId === undefined || childId === group.sourceUnitId
@@ -489,7 +631,7 @@ function unitComponents(
   parentageGroups: ParentageGroup[],
   unitIdByPersonId: Map<string, string>,
 ): string[][] {
-  const disjointSet = new UnitDisjointSet(units.map(unit => unit.id))
+  const disjointSet = new StableDisjointSet(units.map(unit => unit.id))
   for (const edge of parentageEdges(parentageGroups, unitIdByPersonId)) {
     disjointSet.union(edge.sourceId, edge.childId)
   }
@@ -503,7 +645,7 @@ function unitComponents(
   return [...components.values()]
 }
 
-class UnitDisjointSet {
+class StableDisjointSet {
   private readonly parentById = new Map<string, string>()
 
   constructor(unitIds: string[]) {
