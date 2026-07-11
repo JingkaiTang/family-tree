@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LAYOUT_METRICS } from './types'
+import type { ParentageFact } from './types'
+import { DEFAULT_FAMILY_VIEW_POLICY, DEFAULT_LAYOUT_METRICS } from './types'
 import { familyData, linkSpouse, member } from './testHelpers'
 import { normalizeFacts } from './normalizeFacts'
 import { buildFamilyUnits } from './buildFamilyUnits'
@@ -151,5 +152,39 @@ describe('projectView', () => {
         message: 'Invalid primary partnership partnership:missing for parent',
       },
     ])
+  })
+
+  it('keeps public projection order stable for equivalent fact permutations', () => {
+    const people = normalizeFacts(familyData([
+      member('parent-b'),
+      member('child-b'),
+      member('parent-a'),
+      member('child-a'),
+    ])).facts.people
+    const parentages: ParentageFact[] = [{
+      id: 'parentage:parent-a',
+      parentIds: ['parent-a'],
+      childIds: ['child-a'],
+      typeByChildId: { 'child-a': 'blood' as const },
+    }, {
+      id: 'parentage:parent-b',
+      parentIds: ['parent-b'],
+      childIds: ['child-b'],
+      typeByChildId: { 'child-b': 'blood' as const },
+    }]
+    const forward = projectView({ people, partnerships: [], parentages }, DEFAULT_FAMILY_VIEW_POLICY)
+    const reversed = projectView({
+      people: [...people].reverse(),
+      partnerships: [],
+      parentages: [...parentages].reverse(),
+    }, DEFAULT_FAMILY_VIEW_POLICY)
+
+    expect({
+      people: reversed.people.map(person => person.id),
+      parentages: reversed.primaryParentages.map(parentage => parentage.id),
+    }).toEqual({
+      people: forward.people.map(person => person.id),
+      parentages: forward.primaryParentages.map(parentage => parentage.id),
+    })
   })
 })

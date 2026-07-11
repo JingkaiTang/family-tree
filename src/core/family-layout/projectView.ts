@@ -76,6 +76,7 @@ export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): Project
       ),
     }))
     .filter(parentage => parentage.childIds.length > 0)
+    .sort((a, b) => a.id.localeCompare(b.id))
   const auxiliaryRelations: AuxiliaryRelation[] = []
 
   if (view.showHistoricalPartnerships) {
@@ -131,7 +132,7 @@ export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): Project
   }
 
   return {
-    people: facts.people,
+    people: [...facts.people].sort((a, b) => a.id.localeCompare(b.id)),
     primaryPartnerships,
     primaryParentages,
     auxiliaryRelations: [
