@@ -285,6 +285,21 @@ export const useFamilyStore = defineStore('family', () => {
     markDirty()
   }
 
+  function setRowOrderPreference(id: string, unitIds: string[]) {
+    const uniqueIds = [...new Set(unitIds)]
+    const index = data.value.layoutPreferences.rowOrders.findIndex(row => row.id === id)
+    const next = { id, unitIds: uniqueIds }
+    if (index >= 0) data.value.layoutPreferences.rowOrders[index] = next
+    else data.value.layoutPreferences.rowOrders.push(next)
+    markDirty()
+  }
+
+  function setFamilyAccentAssignment(unitId: string, accent: string | null) {
+    if (accent === null) delete data.value.layoutPreferences.familyAccentAssignments[unitId]
+    else data.value.layoutPreferences.familyAccentAssignments[unitId] = accent
+    markDirty()
+  }
+
   /**
    * 把某成员的手工拖动位置写入 data.manualPositions。
    * 调用者需传入 cell 单位（与 treeLayout 的 LaidOutNode.cx/top 同），
@@ -344,6 +359,8 @@ export const useFamilyStore = defineStore('family', () => {
     setDefaultViewpoint,
     setChildLayoutAssignment,
     setGridLayoutOverride,
+    setRowOrderPreference,
+    setFamilyAccentAssignment,
     setManualPosition,
     clearManualPosition,
   }

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // 当前 schema 版本。每次 schema 有破坏性变更递增，并在 core/migrate.ts 添加迁移。
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 // ---------------- Enums ----------------
 export const Gender = z.enum(['male', 'female', 'other'])
@@ -57,7 +57,7 @@ export const NicknameOverrides = z.record(
 )
 export type NicknameOverrides = z.infer<typeof NicknameOverrides>
 
-/** 手工拖动后的节点位置。坐标单位与布局算法一致（cell，= 像素 / CELL_PX） */
+/** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */
 export const ManualPosition = z.object({
   cx: z.number(),
   top: z.number(),
@@ -81,14 +81,26 @@ export type GridLayoutOverride = z.infer<typeof GridLayoutOverride>
 export const GridLayoutOverrides = z.record(z.string(), GridLayoutOverride)
 export type GridLayoutOverrides = z.infer<typeof GridLayoutOverrides>
 
+export const RowOrderPreference = z.object({
+  id: z.string(),
+  unitIds: z.array(z.string()),
+})
+export const PersistedLayoutPreferences = z.object({
+  rowOrders: z.array(RowOrderPreference).default([]),
+  familyAccentAssignments: z.record(z.string(), z.string()).default({}),
+})
+export type PersistedLayoutPreferences = z.infer<typeof PersistedLayoutPreferences>
+
 export const FamilyData = z.object({
   schemaVersion: z.number(),
   members: z.record(z.string(), Member),
   nicknameOverrides: NicknameOverrides.default({}),
-  /** 手工拖动后的节点位置：memberId → {cx, top} */
+  /** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */
   manualPositions: ManualPositions.default({}),
   childLayoutAssignments: ChildLayoutAssignments.default({}),
+  /** @deprecated V2 slot order 仅为兼容旧文件保留，新写入使用 layoutPreferences。 */
   gridLayoutOverrides: GridLayoutOverrides.default({}),
+  layoutPreferences: PersistedLayoutPreferences.default({}),
   rootMemberId: z.string().optional(),
   /** 上次使用的视角成员 id；打开项目时自动恢复并聚焦到该节点 */
   defaultViewpointId: z.string().optional(),
@@ -113,6 +125,10 @@ export function createEmptyFamily(): FamilyData {
     manualPositions: {},
     childLayoutAssignments: {},
     gridLayoutOverrides: {},
+    layoutPreferences: {
+      rowOrders: [],
+      familyAccentAssignments: {},
+    },
   }
 }
 

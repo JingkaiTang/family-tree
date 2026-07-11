@@ -78,4 +78,35 @@ describe('family store relation invariants', () => {
     })
     expect(family.data.gridLayoutOverrides['couple:parent+spouse']).toEqual({ order: 3 })
   })
+
+  it('stores unique semantic row order without writing legacy layout fields', () => {
+    const family = useFamilyStore()
+
+    family.setRowOrderPreference('row:0', [
+      'unit:person:b',
+      'unit:person:a',
+      'unit:person:b',
+    ])
+    family.setRowOrderPreference('row:0', ['unit:person:a'])
+
+    expect(family.data.layoutPreferences.rowOrders).toEqual([{
+      id: 'row:0',
+      unitIds: ['unit:person:a'],
+    }])
+    expect(family.data.manualPositions).toEqual({})
+    expect(family.data.gridLayoutOverrides).toEqual({})
+    expect(family.isDirty).toBe(true)
+  })
+
+  it('persists and clears family accent assignments', () => {
+    const family = useFamilyStore()
+
+    family.setFamilyAccentAssignment('unit:person:a', '#123456')
+    expect(family.data.layoutPreferences.familyAccentAssignments).toEqual({
+      'unit:person:a': '#123456',
+    })
+
+    family.setFamilyAccentAssignment('unit:person:a', null)
+    expect(family.data.layoutPreferences.familyAccentAssignments).toEqual({})
+  })
 })

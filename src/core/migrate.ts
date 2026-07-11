@@ -1,3 +1,4 @@
+import { convertLegacyGridPreferences } from './family-layout/reconcilePreferences'
 import { type FamilyData, SCHEMA_VERSION, type Member } from './schema'
 
 type MutableFamily = Record<string, unknown> & {
@@ -5,6 +6,7 @@ type MutableFamily = Record<string, unknown> & {
   members?: Record<string, Member>
   childLayoutAssignments?: FamilyData['childLayoutAssignments']
   gridLayoutOverrides?: FamilyData['gridLayoutOverrides']
+  layoutPreferences?: FamilyData['layoutPreferences']
 }
 
 type SpouseType = Member['spouses'][number]['type']
@@ -28,11 +30,18 @@ export function migrate(raw: unknown): FamilyData {
   if (current.schemaVersion < 2) {
     current = migrateV1ToV2(current)
   }
+  if (current.schemaVersion < 3) {
+    current = migrateV2ToV3(current)
+  }
 
   current.schemaVersion = SCHEMA_VERSION
   current.members = current.members ?? {}
   current.childLayoutAssignments = current.childLayoutAssignments ?? {}
   current.gridLayoutOverrides = current.gridLayoutOverrides ?? {}
+  current.layoutPreferences = current.layoutPreferences ?? {
+    rowOrders: [],
+    familyAccentAssignments: {},
+  }
   return current as unknown as FamilyData
 }
 
@@ -45,6 +54,20 @@ function migrateV1ToV2(data: MutableFamily): MutableFamily {
     childLayoutAssignments: inferChildLayoutAssignments(members),
     gridLayoutOverrides: {},
     schemaVersion: 2,
+  }
+}
+
+function migrateV2ToV3(data: MutableFamily): MutableFamily {
+  const legacyData = {
+    ...data,
+    members: data.members ?? {},
+    childLayoutAssignments: data.childLayoutAssignments ?? {},
+    gridLayoutOverrides: data.gridLayoutOverrides ?? {},
+  } as unknown as FamilyData
+  return {
+    ...data,
+    layoutPreferences: convertLegacyGridPreferences(legacyData),
+    schemaVersion: 3,
   }
 }
 
