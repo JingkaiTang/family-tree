@@ -5,10 +5,14 @@ import type {
   OrderedGeneration,
   ParentageGroup,
   PlacedFamilyUnit,
-  PlacedPersonCard,
-  PlacedUnionHub,
   SceneGeometry,
 } from './types'
+import {
+  familyUnitWidth,
+  materializeSceneGeometry,
+} from './materializeSceneGeometry'
+
+export { familyUnitWidth } from './materializeSceneGeometry'
 
 export interface CompactGridInput {
   units: FamilyUnit[]
@@ -17,12 +21,6 @@ export interface CompactGridInput {
   metrics: LayoutMetrics
   previousScene?: LayoutScene
   changedIds?: string[]
-}
-
-export function familyUnitWidth(unit: FamilyUnit, metrics: LayoutMetrics): number {
-  return unit.kind === 'couple'
-    ? metrics.cardWidth * 2 + metrics.spouseGap
-    : metrics.cardWidth
 }
 
 export function compactGrid(input: CompactGridInput): SceneGeometry {
@@ -188,60 +186,12 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
       input.metrics.gridSize,
     )
   }
-  const cards: PlacedPersonCard[] = units.flatMap(unit => (
-    unit.memberIds.map((personId, index) => ({
-      id: personId,
-      unitId: unit.id,
-      generation: unit.generation,
-      rect: {
-        x: unit.rect.x + index * (input.metrics.cardWidth + input.metrics.spouseGap),
-        y: unit.rect.y,
-        width: input.metrics.cardWidth,
-        height: input.metrics.cardHeight,
-      },
-    }))
-  ))
-  const parentageOwnerIds = new Set(
-    input.parentageGroups.map(group => group.sourceUnitId),
-  )
-  const hubs: PlacedUnionHub[] = units
-    .filter(unit => unit.kind === 'couple' || parentageOwnerIds.has(unit.id))
-    .map(unit => ({
-      id: `hub:${unit.id}`,
-      unitId: unit.id,
-      point: {
-        x: unit.kind === 'couple'
-          ? unit.rect.x + input.metrics.cardWidth + input.metrics.spouseGap / 2
-          : unit.rect.x + input.metrics.cardWidth / 2,
-        y: unit.kind === 'couple'
-          ? unit.rect.y + input.metrics.cardHeight / 2
-          : unit.rect.y + input.metrics.cardHeight,
-      },
-    }))
-  const right = Math.max(...units.map(unit => unit.rect.x + unit.rect.width))
-  const bottom = Math.max(...units.map(unit => unit.rect.y + unit.rect.height))
-  const rows = input.rows.map(row => {
-    const originalOrder = new Map(row.unitIds.map((unitId, index) => [unitId, index]))
-    const unitIds = row.unitIds
-      .filter(unitId => placedUnitById.has(unitId))
-      .sort((leftId, rightId) => {
-        const left = placedUnitById.get(leftId)!
-        const right = placedUnitById.get(rightId)!
-        return left.rect.x - right.rect.x
-          || (originalOrder.get(leftId) ?? 0) - (originalOrder.get(rightId) ?? 0)
-          || leftId.localeCompare(rightId)
-      })
-    unitIds.forEach((unitId, order) => { placedUnitById.get(unitId)!.order = order })
-    return { id: `row:${row.generation}`, generation: row.generation, unitIds }
+  return materializeSceneGeometry({
+    placedUnits: units,
+    rows: input.rows,
+    parentageGroups: input.parentageGroups,
+    metrics: input.metrics,
   })
-
-  return {
-    units,
-    cards,
-    hubs,
-    rows,
-    bounds: { x: 0, y: 0, width: right, height: bottom },
-  }
 }
 
 function connectedComponents(

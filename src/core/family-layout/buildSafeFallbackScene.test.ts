@@ -111,6 +111,58 @@ describe('buildSafeFallbackScene', () => {
     expect(scene.diagnostics).toEqual([existing])
     expect(diagnostics).toEqual([existing])
   })
+
+  it('keeps stable ID order and one family gap across disconnected generations', () => {
+    const units = [
+      single('z-child', ['z-child-person'], 1),
+      single('z-parent', ['z-parent-person']),
+      single('a-child', ['a-child-person'], 1),
+      single('a-parent', ['a-parent-person']),
+    ]
+    const groups: ParentageGroup[] = [{
+      id: 'parentage:a-parent',
+      sourceUnitId: 'a-parent',
+      childPersonIds: ['z-child-person'],
+    }, {
+      id: 'parentage:z-parent',
+      sourceUnitId: 'z-parent',
+      childPersonIds: ['a-child-person'],
+    }]
+    const before = JSON.stringify({ units, groups })
+
+    const scene = buildSafeFallbackScene(
+      units,
+      groups,
+      DEFAULT_LAYOUT_METRICS,
+      [],
+    )
+
+    expect(scene.rows.map(row => row.unitIds)).toEqual([
+      ['a-parent', 'z-parent'],
+      ['a-child', 'z-child'],
+    ])
+    for (const row of scene.rows) {
+      const rowUnits = row.unitIds.map(unitId => (
+        scene.units.find(unit => unit.id === unitId)!
+      ))
+      for (let index = 1; index < rowUnits.length; index++) {
+        expect(rowUnits[index].rect.x - (
+          rowUnits[index - 1].rect.x + rowUnits[index - 1].rect.width
+        )).toBe(DEFAULT_LAYOUT_METRICS.familyGap)
+      }
+    }
+    expect(scene.cards.map(card => card.id).sort()).toEqual([
+      'a-child-person',
+      'a-parent-person',
+      'z-child-person',
+      'z-parent-person',
+    ])
+    expect(new Set(scene.cards.map(card => card.id)).size).toBe(scene.cards.length)
+    expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
+    expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
+    expect(scene.routes).toEqual([])
+    expect(JSON.stringify({ units, groups })).toBe(before)
+  })
 })
 
 function single(id: string, memberIds: string[], generation = 0): FamilyUnit {

@@ -1,4 +1,7 @@
-import { compactGrid } from './compactGrid'
+import {
+  familyUnitWidth,
+  materializeSceneGeometry,
+} from './materializeSceneGeometry'
 import type {
   FamilyUnit,
   LayoutDiagnostic,
@@ -6,6 +9,7 @@ import type {
   LayoutScene,
   OrderedGeneration,
   ParentageGroup,
+  PlacedFamilyUnit,
 } from './types'
 
 export function buildSafeFallbackScene(
@@ -26,7 +30,35 @@ export function buildSafeFallbackScene(
       generation,
       unitIds: [...unitIds].sort((left, right) => left.localeCompare(right)),
     }))
-  const geometry = compactGrid({ units, rows, parentageGroups, metrics })
+  const unitById = new Map(units.map(unit => [unit.id, unit]))
+  const firstGeneration = rows[0]?.generation ?? 0
+  const placedUnits: PlacedFamilyUnit[] = rows.flatMap(row => {
+    let nextLeft = 0
+    return row.unitIds.flatMap((unitId, order) => {
+      const unit = unitById.get(unitId)
+      if (unit === undefined) return []
+      const x = snapUp(nextLeft, metrics.gridSize)
+      const placedUnit: PlacedFamilyUnit = {
+        ...unit,
+        rect: {
+          x,
+          y: (row.generation - firstGeneration)
+            * (metrics.cardHeight + metrics.generationGap),
+          width: familyUnitWidth(unit, metrics),
+          height: metrics.cardHeight,
+        },
+        order,
+      }
+      nextLeft = x + placedUnit.rect.width + metrics.familyGap
+      return [placedUnit]
+    })
+  })
+  const geometry = materializeSceneGeometry({
+    placedUnits,
+    rows,
+    parentageGroups,
+    metrics,
+  })
   const fallbackDiagnostics: LayoutDiagnostic[] = [...diagnostics]
   const alreadyUnroutableOwnerIds = new Set(
     diagnostics
@@ -53,6 +85,10 @@ export function buildSafeFallbackScene(
     routes: [],
     diagnostics: fallbackDiagnostics,
   }
+}
+
+function snapUp(value: number, gridSize: number): number {
+  return Math.ceil(value / gridSize) * gridSize
 }
 
 function compareDiagnostics(left: LayoutDiagnostic, right: LayoutDiagnostic): number {
