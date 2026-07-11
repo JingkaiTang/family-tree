@@ -1,0 +1,144 @@
+import { describe, expect, it } from 'vitest'
+import { buildSafeFallbackScene } from './buildSafeFallbackScene'
+import { DEFAULT_LAYOUT_METRICS } from './types'
+import type { FamilyUnit, LayoutDiagnostic, ParentageGroup, Rect } from './types'
+
+describe('buildSafeFallbackScene', () => {
+  it('renders malformed cyclic units once without overlap or routes', () => {
+    const units = [single('z-parent', ['person-z']), single('a-parent', ['person-a'])]
+    const parentageGroups: ParentageGroup[] = [{
+      id: 'parentage:z-to-a',
+      sourceUnitId: 'z-parent',
+      childPersonIds: ['person-a'],
+    }, {
+      id: 'parentage:a-to-z',
+      sourceUnitId: 'a-parent',
+      childPersonIds: ['person-z'],
+    }]
+    const inputDiagnostic: LayoutDiagnostic = {
+      code: 'PARENTAGE_CYCLE',
+      ids: ['a-parent', 'z-parent'],
+      message: 'cycle retained from generation assignment',
+    }
+
+    const scene = buildSafeFallbackScene(
+      units,
+      parentageGroups,
+      DEFAULT_LAYOUT_METRICS,
+      [inputDiagnostic],
+    )
+
+    expect(scene.routes).toEqual([])
+    expect(scene.cards.map(card => card.id).sort()).toEqual(['person-a', 'person-z'])
+    expect(new Set(scene.cards.map(card => card.id)).size).toBe(scene.cards.length)
+    expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
+    expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
+    expect(scene.rows).toEqual([{
+      id: 'row:0',
+      generation: 0,
+      unitIds: ['a-parent', 'z-parent'],
+    }])
+    expect(scene.diagnostics).toContainEqual(inputDiagnostic)
+    expect(scene.diagnostics.filter(value => (
+      value.code === 'UNROUTABLE_PRIMARY_EDGE'
+    )).map(value => value.ids)).toEqual([
+      ['parentage:a-to-z'],
+      ['parentage:z-to-a'],
+    ])
+  })
+
+  it('places generation rows deterministically with compactGrid geometry', () => {
+    const units = [
+      single('child-b', ['child-b-person'], 1),
+      couple('parents', ['parent-a', 'parent-b'], 0),
+      single('child-a', ['child-a-person'], 1),
+    ]
+    const groups: ParentageGroup[] = [{
+      id: 'parentage:parents',
+      sourceUnitId: 'parents',
+      childPersonIds: ['child-a-person', 'child-b-person'],
+    }]
+
+    const first = buildSafeFallbackScene(
+      units,
+      groups,
+      DEFAULT_LAYOUT_METRICS,
+      [],
+    )
+    const second = buildSafeFallbackScene(
+      structuredClone(units),
+      structuredClone(groups),
+      structuredClone(DEFAULT_LAYOUT_METRICS),
+      [],
+    )
+
+    expect(first.rows.map(row => row.unitIds)).toEqual([
+      ['parents'],
+      ['child-a', 'child-b'],
+    ])
+    expect(first.cards.find(card => card.id === 'parent-b')!.rect.x).toBe(
+      first.cards.find(card => card.id === 'parent-a')!.rect.x
+        + DEFAULT_LAYOUT_METRICS.cardWidth
+        + DEFAULT_LAYOUT_METRICS.spouseGap,
+    )
+    expect(first.units.find(unit => unit.id === 'child-a')!.rect.y).toBe(
+      DEFAULT_LAYOUT_METRICS.cardHeight + DEFAULT_LAYOUT_METRICS.generationGap,
+    )
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first))
+  })
+
+  it('preserves an existing unroutable owner diagnostic without duplicating it', () => {
+    const units = [single('parent', ['parent-person'])]
+    const groups: ParentageGroup[] = [{
+      id: 'parentage:parent',
+      sourceUnitId: 'parent',
+      childPersonIds: ['missing-child'],
+    }]
+    const existing: LayoutDiagnostic = {
+      code: 'UNROUTABLE_PRIMARY_EDGE',
+      ids: ['parentage:parent'],
+      message: 'Unable to route primary family edge parentage:parent',
+    }
+    const diagnostics = [existing]
+
+    const scene = buildSafeFallbackScene(
+      units,
+      groups,
+      DEFAULT_LAYOUT_METRICS,
+      diagnostics,
+    )
+
+    expect(scene.diagnostics).toEqual([existing])
+    expect(diagnostics).toEqual([existing])
+  })
+})
+
+function single(id: string, memberIds: string[], generation = 0): FamilyUnit {
+  return {
+    id,
+    kind: 'single',
+    memberIds,
+    generation,
+    width: DEFAULT_LAYOUT_METRICS.cardWidth,
+    lineageAffinity: {},
+    accent: '#111111',
+  }
+}
+
+function couple(id: string, memberIds: string[], generation: number): FamilyUnit {
+  return {
+    ...single(id, memberIds, generation),
+    kind: 'couple',
+    width: DEFAULT_LAYOUT_METRICS.cardWidth * 2 + DEFAULT_LAYOUT_METRICS.spouseGap,
+  }
+}
+
+function hasOverlappingRects(rects: Rect[]): boolean {
+  return rects.some((left, leftIndex) => rects.some((right, rightIndex) => (
+    leftIndex < rightIndex
+    && left.x < right.x + right.width
+    && left.x + left.width > right.x
+    && left.y < right.y + right.height
+    && left.y + left.height > right.y
+  )))
+}
