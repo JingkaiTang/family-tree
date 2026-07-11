@@ -140,6 +140,13 @@ export interface PlacedFamilyUnit extends FamilyUnit { rect: Rect; order: number
 export interface PlacedPersonCard { id: string; unitId: string; rect: Rect; generation: number }
 export interface PlacedUnionHub { id: string; unitId: string; point: Point }
 export interface PlacedRow { id: string; generation: number; unitIds: string[] }
+export interface SceneGeometry {
+  units: PlacedFamilyUnit[]
+  cards: PlacedPersonCard[]
+  hubs: PlacedUnionHub[]
+  rows: PlacedRow[]
+  bounds: Rect
+}
 export interface RouteSegment {
   orientation: 'horizontal' | 'vertical' | 'bridge'
   points: Point[]
