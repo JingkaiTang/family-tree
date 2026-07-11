@@ -225,6 +225,48 @@ describe('compactGrid', () => {
     expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
   })
 
+  it('keeps collision shifts snapped when unit widths are not grid multiples', () => {
+    const firstParent = single('first-parent', 0)
+    const secondParent = single('second-parent', 0)
+    const child = single('shared-child', 1)
+    const metrics = { ...DEFAULT_LAYOUT_METRICS, cardWidth: 170 }
+
+    const scene = compactGrid({
+      units: [firstParent, secondParent, child],
+      rows: [{
+        generation: 0,
+        unitIds: [firstParent.id, secondParent.id],
+      }, {
+        generation: 1,
+        unitIds: [child.id],
+      }],
+      parentageGroups: [{
+        id: 'parentage:first-parent',
+        sourceUnitId: firstParent.id,
+        childPersonIds: ['shared-child'],
+      }, {
+        id: 'parentage:second-parent',
+        sourceUnitId: secondParent.id,
+        childPersonIds: ['shared-child'],
+      }],
+      metrics,
+    })
+    const parents = scene.units
+      .filter(unit => unit.generation === 0)
+      .sort((left, right) => left.rect.x - right.rect.x)
+
+    expect(scene.units.every(unit => unit.rect.x % metrics.gridSize === 0)).toBe(true)
+    expect(scene.cards.every(card => card.rect.x % metrics.gridSize === 0)).toBe(true)
+    expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
+    expect(
+      parents[1].rect.x - (parents[0].rect.x + parents[0].rect.width),
+    ).toBeGreaterThanOrEqual(metrics.familyGap)
+    expect(scene.hubs.map(hub => hub.point)).toEqual(parents.map(parent => ({
+      x: parent.rect.x + metrics.cardWidth / 2,
+      y: parent.rect.y + metrics.cardHeight,
+    })))
+  })
+
   it('preserves previous disconnected component order in geometry and row metadata', () => {
     const first = single('first')
     const second = single('second')
@@ -317,6 +359,31 @@ describe('compactGrid', () => {
     expect(JSON.stringify(compactGrid(structuredClone(value)))).toBe(
       JSON.stringify(compactGrid(structuredClone(value))),
     )
+  })
+
+  it('places 500 disconnected components completely and deterministically', () => {
+    const units = Array.from({ length: 500 }, (_, index) => (
+      single(`person-${index.toString().padStart(3, '0')}`)
+    ))
+    const value = {
+      units,
+      rows: [{ generation: 0, unitIds: units.map(unit => unit.id) }],
+      parentageGroups: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    }
+
+    const first = compactGrid(value)
+    const second = compactGrid(structuredClone(value))
+
+    expect(first.units).toHaveLength(500)
+    expect(new Set(first.units.map(unit => unit.id)).size).toBe(500)
+    expect(first.cards).toHaveLength(500)
+    expect(new Set(first.cards.map(card => card.id)).size).toBe(500)
+    expect(first.rows[0].unitIds).toHaveLength(500)
+    expect(first.units.every(unit => (
+      unit.rect.x % DEFAULT_LAYOUT_METRICS.gridSize === 0
+    ))).toBe(true)
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first))
   })
 
   it('does not mutate its input', () => {
