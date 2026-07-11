@@ -150,4 +150,79 @@ describe('assignGenerations', () => {
       message: 'Parentage cycle detected: unit:person:a',
     }])
   })
+
+  it('returns the same complete result for reordered logical input', () => {
+    const parent = member('parent')
+    const childA = member('child-a')
+    const childB = member('child-b')
+    const grandchild = member('grandchild')
+    linkParent(childA, parent)
+    linkParent(childB, parent)
+    linkParent(grandchild, childA)
+    const input = buildProjectedInput(familyData([grandchild, childB, parent, childA]))
+    const reordered = structuredClone(input.built)
+    reordered.units.reverse()
+    reordered.parentageGroups.reverse()
+    reordered.parentageGroups.forEach(group => group.childPersonIds.reverse())
+
+    const expected = assignGenerations(input.projected, input.built)
+    const actual = assignGenerations(input.projected, reordered)
+
+    expect(actual).toEqual(expected)
+  })
+
+  it('does not mutate projected family or built family units', () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const child = member('child')
+    linkSpouse(parentA, parentB)
+    linkParent(child, parentA)
+    linkParent(child, parentB)
+    const input = buildProjectedInput(familyData([child, parentA, parentB]))
+    const projectedBefore = structuredClone(input.projected)
+    const builtBefore = structuredClone(input.built)
+
+    assignGenerations(input.projected, input.built)
+
+    expect(input.projected).toEqual(projectedBefore)
+    expect(input.built).toEqual(builtBefore)
+  })
+
+  it('places a cyclic component one generation below its noncyclic predecessor', () => {
+    const input = buildProjectedInput(familyData([
+      member('predecessor'),
+      member('cycle-a'),
+      member('cycle-b'),
+    ]))
+    input.built.parentageGroups = [{
+      id: 'parentage:predecessor>cycle-a',
+      sourceUnitId: 'unit:person:predecessor',
+      childPersonIds: ['cycle-a'],
+    }, {
+      id: 'parentage:cycle-a>cycle-b',
+      sourceUnitId: 'unit:person:cycle-a',
+      childPersonIds: ['cycle-b'],
+    }, {
+      id: 'parentage:cycle-b>cycle-a',
+      sourceUnitId: 'unit:person:cycle-b',
+      childPersonIds: ['cycle-a'],
+    }]
+
+    const result = assignGenerations(input.projected, input.built)
+
+    expect(result.generationByUnitId).toEqual({
+      'unit:person:cycle-a': 1,
+      'unit:person:cycle-b': 1,
+      'unit:person:predecessor': 0,
+    })
+    expect(result.cyclicUnitIds).toEqual([
+      'unit:person:cycle-a',
+      'unit:person:cycle-b',
+    ])
+    expect(result.diagnostics).toEqual([{
+      code: 'PARENTAGE_CYCLE',
+      ids: ['unit:person:cycle-a', 'unit:person:cycle-b'],
+      message: 'Parentage cycle detected: unit:person:cycle-a, unit:person:cycle-b',
+    }])
+  })
 })
