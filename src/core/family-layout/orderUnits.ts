@@ -50,6 +50,7 @@ export function orderUnits(input: OrderUnitsInput): OrderedGeneration[] {
     unitIdByPersonId,
   )
   const lineageAffinity = buildLineageAffinity(input, unitIdByPersonId)
+  const edges = parentageEdges(input.parentageGroups, unitIdByPersonId)
 
   for (const row of rows) {
     row.unitIds = applySiblingBlocks(
@@ -59,6 +60,17 @@ export function orderUnits(input: OrderUnitsInput): OrderedGeneration[] {
       unitIdByPersonId,
     )
     row.unitIds = applyBridgeBands(row.unitIds, input.clusters)
+    if (
+      input.previousScene !== undefined
+      && input.changedIds === undefined
+      && !hasRowStructure(row.unitIds, edges, lineageAffinity)
+    ) {
+      row.unitIds = restorePreviousOrder(
+        row.unitIds,
+        row.generation,
+        input.previousScene,
+      )
+    }
     row.unitIds = improveConstraintOrder(
       row.unitIds,
       constraintsByGeneration.get(row.generation) ?? [],
@@ -69,7 +81,7 @@ export function orderUnits(input: OrderUnitsInput): OrderedGeneration[] {
     input,
     unitIdByPersonId,
     constraintsByGeneration,
-    edges: parentageEdges(input.parentageGroups, unitIdByPersonId),
+    edges,
     bloodCoreUnitIds: lineageAffinity.bloodCoreUnitIds,
     affinityLinks: lineageAffinity.relationLinks,
     previousPositionByUnitId: buildPreviousPositions(input.previousScene),
@@ -105,6 +117,52 @@ interface RowPosition { generation: number; index: number }
 interface LineageAffinity {
   bloodCoreUnitIds: string[][]
   relationLinks: AffinityLink[]
+}
+
+function hasRowStructure(
+  unitIds: string[],
+  edges: ParentageEdge[],
+  lineageAffinity: LineageAffinity,
+): boolean {
+  const rowUnitIds = new Set(unitIds)
+  return edges.some(edge => (
+    rowUnitIds.has(edge.sourceId) || rowUnitIds.has(edge.childId)
+  )) || hasInternalAffinity(
+    unitIds,
+    lineageAffinity.bloodCoreUnitIds,
+    lineageAffinity.relationLinks,
+  )
+}
+
+function restorePreviousOrder(
+  unitIds: string[],
+  generation: number,
+  scene: LayoutScene,
+): string[] {
+  const currentUnitIds = new Set(unitIds)
+  const previousRow = scene.rows
+    .filter(row => row.generation === generation)
+    .map(row => ({
+      row,
+      overlap: row.unitIds.filter(unitId => currentUnitIds.has(unitId)).length,
+    }))
+    .filter(value => value.overlap > 0)
+    .sort((left, right) => (
+      right.overlap - left.overlap || left.row.id.localeCompare(right.row.id)
+    ))[0]?.row
+  if (previousRow === undefined) return unitIds
+
+  const previousPositions = new Map(
+    previousRow.unitIds.map((unitId, index) => [unitId, index]),
+  )
+  const restoredIds = unitIds
+    .filter(unitId => previousPositions.has(unitId))
+    .sort((left, right) => (
+      (previousPositions.get(left) ?? 0) - (previousPositions.get(right) ?? 0)
+      || left.localeCompare(right)
+    ))
+  const newIds = unitIds.filter(unitId => !previousPositions.has(unitId))
+  return [...restoredIds, ...newIds]
 }
 
 function sweep(rows: Row[], direction: 'down' | 'up', context: OrderingContext) {

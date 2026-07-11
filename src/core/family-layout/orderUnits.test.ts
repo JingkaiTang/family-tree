@@ -287,6 +287,63 @@ describe('orderUnits', () => {
     },
   )
 
+  it('restores previous movement order for an isolated row without changedIds', () => {
+    const units = [
+      single('a'),
+      couple('pair', ['b-left', 'b-right']),
+      single('c'),
+    ]
+    const previousScene = sceneWithRows([{
+      id: 'row:0',
+      generation: 0,
+      unitIds: [
+        'unit:person:c',
+        'unit:partnership:pair',
+        'unit:person:a',
+      ],
+    }])
+
+    const [row] = orderUnits(input(units, people([
+      ['a', '1970-01-01'],
+      ['b-left', '1980-01-01'],
+      ['b-right', '1981-01-01'],
+      ['c', '1990-01-01'],
+    ]), { previousScene }))
+
+    expect(row.unitIds).toEqual([
+      'unit:person:c',
+      'unit:partnership:pair',
+      'unit:person:a',
+    ])
+    expect(row.unitIds.filter(id => id === 'unit:partnership:pair')).toHaveLength(1)
+  })
+
+  it('keeps a saved row ahead of conflicting previous movement order', () => {
+    const units = [single('a'), single('b'), single('c')]
+    const previousScene = sceneWithRows([{
+      id: 'row:0',
+      generation: 0,
+      unitIds: ['unit:person:c', 'unit:person:b', 'unit:person:a'],
+    }])
+    const preferences: LayoutPreferences = {
+      rowOrders: [{
+        id: 'row-preference-1',
+        unitIds: ['unit:person:a', 'unit:person:b', 'unit:person:c'],
+      }],
+      familyAccentAssignments: {},
+    }
+
+    expect(orderUnits(input(units, people([
+      ['a', '1970-01-01'],
+      ['b', '1980-01-01'],
+      ['c', '1990-01-01'],
+    ]), { preferences, previousScene }))[0].unitIds).toEqual([
+      'unit:person:a',
+      'unit:person:b',
+      'unit:person:c',
+    ])
+  })
+
   it('preserves previous order for a component untouched by changed people and relatives', () => {
     const units = [
       single('parent', 0),
