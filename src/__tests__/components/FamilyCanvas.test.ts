@@ -193,7 +193,7 @@ function mountCanvas(data: FamilyData, props = {}) {
   })
 }
 
-function mountStoreCanvas(data: FamilyData) {
+function mountStoreCanvas(data: FamilyData, props = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const family = useFamilyStore()
@@ -202,6 +202,7 @@ function mountStoreCanvas(data: FamilyData) {
   wrapper = mount(FamilyCanvas, {
     props: {
       data: family.data,
+      ...props,
       onRowOrderChange(rowId: string, unitIds: string[]) {
         family.setRowOrderPreference(rowId, unitIds)
         void wrapper.setProps({ data: family.data })
@@ -410,6 +411,7 @@ describe('FamilyCanvas', () => {
       showAuxiliaryRelations: false,
     })
     await flushPromises()
+    focusStagePoint.mockClear()
 
     expect(layoutFamilyTree).toHaveBeenLastCalledWith(Object.values(data.members), {
       data,
@@ -443,6 +445,7 @@ describe('FamilyCanvas', () => {
       },
       auxiliaryFocusPersonId: 'B',
     })
+    expect(focusStagePoint).not.toHaveBeenCalled()
   })
 
   it('queues one auxiliary refresh until a pending drop scene is accepted', async () => {
@@ -454,8 +457,10 @@ describe('FamilyCanvas', () => {
       .mockReturnValueOnce(auxiliary.promise)
     const { wrapper } = mountStoreCanvas(
       familyData([mk('A'), mk('B'), mk('C'), mk('D')]),
+      { viewpointId: 'A' },
     )
     await flushPromises()
+    focusStagePoint.mockClear()
 
     const node = await beginDrag(wrapper, 2, -500, 0)
     await node.trigger('pointerup', { pointerId: 1, clientX: 100, clientY: 100 })
@@ -480,6 +485,7 @@ describe('FamilyCanvas', () => {
     droppedScene.cards[2].rect.x = 0
     dropped.resolve(droppedScene)
     await flushPromises()
+    expect(focusStagePoint).not.toHaveBeenCalled()
 
     expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
     expect(layoutFamilyTree.mock.calls[2][1]).toMatchObject({
@@ -507,6 +513,7 @@ describe('FamilyCanvas', () => {
     })
     auxiliary.resolve(auxiliaryScene)
     await flushPromises()
+    expect(focusStagePoint).not.toHaveBeenCalled()
 
     expect(wrapper.findAll('[data-testid="family-unit"]')
       .map(unit => unit.attributes('style'))).toEqual([
@@ -902,6 +909,24 @@ describe('FamilyCanvas', () => {
     await flushPromises()
 
     expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
+  })
+
+  it('keeps the current viewport after an accepted family drop', async () => {
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+    const { wrapper } = mountStoreCanvas(
+      familyData([mk('A'), mk('B'), mk('C'), mk('D')]),
+      { viewpointId: 'A' },
+    )
+    await flushPromises()
+    focusStagePoint.mockClear()
+
+    const node = await beginDrag(wrapper, 2, -500, 0)
+    await node.trigger('pointerup', { pointerId: 1, clientX: 100, clientY: 100 })
+    await flushPromises()
+
+    expect(focusStagePoint).not.toHaveBeenCalled()
   })
 
   it('does not let a stale drop layout clear the active drag state', async () => {

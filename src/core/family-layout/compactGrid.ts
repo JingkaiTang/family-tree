@@ -89,13 +89,15 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
   const previousXByUnitId = new Map(
     input.previousScene?.units.map(unit => [unit.id, unit.rect.x]) ?? [],
   )
+  const reorderedRows = input.previousScene === undefined
+    || input.changedIds === undefined
+    ? []
+    : explicitlyReorderedRows(input.rows, input.previousScene)
   const fixedUnitIds = new Set<string>()
   if (input.previousScene !== undefined && input.changedIds !== undefined) {
     const changedIds = new Set(input.changedIds)
-    const reorderedUnitIds = changedRowUnitIds(input.rows, input.previousScene)
     for (const unit of units) {
       const unchanged = unit.memberIds.every(personId => !changedIds.has(personId))
-        && !reorderedUnitIds.has(unit.id)
       const previousX = previousXByUnitId.get(unit.id)
       if (!unchanged || previousX === undefined) continue
       unit.rect.x = previousX
@@ -188,6 +190,12 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
       input.metrics.gridSize,
     )
   }
+  materializeExplicitRowOrders(
+    reorderedRows,
+    placedUnitById,
+    previousXByUnitId,
+    input.metrics,
+  )
   return materializeSceneGeometry({
     placedUnits: units,
     rows: input.rows,
@@ -196,22 +204,48 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
   })
 }
 
-function changedRowUnitIds(
+function explicitlyReorderedRows(
   rows: OrderedGeneration[],
   previousScene: LayoutScene,
-): Set<string> {
-  const changed = new Set<string>()
+): OrderedGeneration[] {
+  const reordered: OrderedGeneration[] = []
   for (const row of rows) {
     const previous = previousScene.rows.find(value => value.generation === row.generation)
+    const currentIds = new Set(row.unitIds)
     if (
       previous === undefined
       || previous.unitIds.length !== row.unitIds.length
-      || previous.unitIds.some((unitId, index) => unitId !== row.unitIds[index])
-    ) {
-      row.unitIds.forEach(unitId => changed.add(unitId))
+      || previous.unitIds.some(unitId => !currentIds.has(unitId))
+      || previous.unitIds.every((unitId, index) => unitId === row.unitIds[index])
+    ) continue
+    reordered.push(row)
+  }
+  return reordered
+}
+
+function materializeExplicitRowOrders(
+  rows: OrderedGeneration[],
+  unitById: Map<string, PlacedFamilyUnit>,
+  previousXByUnitId: Map<string, number>,
+  metrics: LayoutMetrics,
+) {
+  for (const row of rows) {
+    const rowUnits = row.unitIds
+      .map(unitId => unitById.get(unitId))
+      .filter((unit): unit is PlacedFamilyUnit => unit !== undefined)
+    const previousXs = rowUnits
+      .map(unit => previousXByUnitId.get(unit.id))
+      .filter((x): x is number => x !== undefined)
+    if (rowUnits.length === 0 || previousXs.length === 0) continue
+    let nextLeft = snapDown(Math.min(...previousXs), metrics.gridSize)
+    for (const unit of rowUnits) {
+      unit.rect.x = nextLeft
+      nextLeft = snapUp(
+        unit.rect.x + unit.rect.width + metrics.familyGap,
+        metrics.gridSize,
+      )
     }
   }
-  return changed
 }
 
 function connectedComponents(

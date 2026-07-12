@@ -384,6 +384,54 @@ describe('compactGrid', () => {
     expect(scene.rows[0].unitIds).toEqual([second.id, first.id, added.id])
   })
 
+  it('keeps surviving component coordinates when a component is added', () => {
+    const first = single('first')
+    const second = single('second')
+    const added = single('added')
+    const previousScene = sceneAt(
+      [first, second],
+      [{ generation: 0, unitIds: [first.id, second.id] }],
+      { [first.id]: 240, [second.id]: 720 },
+    )
+
+    const scene = compactGrid({
+      units: [first, second, added],
+      rows: [{ generation: 0, unitIds: [first.id, second.id, added.id] }],
+      parentageGroups: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+      previousScene,
+      changedIds: ['added'],
+    })
+    const x = new Map(scene.units.map(unit => [unit.id, unit.rect.x]))
+
+    expect(x.get(first.id)).toBe(240)
+    expect(x.get(second.id)).toBe(720)
+  })
+
+  it('keeps surviving component coordinates when a component is deleted', () => {
+    const deleted = single('deleted')
+    const first = single('first')
+    const second = single('second')
+    const previousScene = sceneAt(
+      [deleted, first, second],
+      [{ generation: 0, unitIds: [deleted.id, first.id, second.id] }],
+      { [deleted.id]: 0, [first.id]: 480, [second.id]: 960 },
+    )
+
+    const scene = compactGrid({
+      units: [first, second],
+      rows: [{ generation: 0, unitIds: [first.id, second.id] }],
+      parentageGroups: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+      previousScene,
+      changedIds: ['deleted'],
+    })
+    const x = new Map(scene.units.map(unit => [unit.id, unit.rect.x]))
+
+    expect(x.get(first.id)).toBe(480)
+    expect(x.get(second.id)).toBe(960)
+  })
+
   it('uses metric-driven clear space between generation rows', () => {
     const parent = single('parent', 0)
     const child = single('child', 1)

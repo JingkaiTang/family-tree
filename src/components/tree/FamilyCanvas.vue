@@ -74,6 +74,7 @@ async function updateLayout(options: {
   data?: FamilyData
   previousScene?: LayoutScene
   changedIds?: string[]
+  preserveViewport?: boolean
 } = {}) {
   const requestId = ++layoutRequestId
   const pendingTokenAtRequest = pendingDropToken
@@ -115,7 +116,14 @@ async function updateLayout(options: {
   await nextTick()
   if (requestId !== layoutRequestId) return
   const viewpointId = props.viewpointId
-  if (viewpointId && !shouldSuppressFocus) focusMember(viewpointId)
+  if (
+    viewpointId
+    && !shouldSuppressFocus
+    && !shouldSettleDrag
+    && !options.preserveViewport
+  ) {
+    focusMember(viewpointId)
+  }
   flushQueuedAuxiliaryRefresh(nextScene)
 }
 
@@ -129,7 +137,7 @@ function requestAuxiliaryRefresh() {
     return
   }
   auxiliaryRefreshQueued = false
-  void updateLayout()
+  void updateLayout({ preserveViewport: true })
 }
 
 function flushQueuedAuxiliaryRefresh(previousScene: LayoutScene) {
@@ -140,7 +148,7 @@ function flushQueuedAuxiliaryRefresh(previousScene: LayoutScene) {
     || pendingSceneRecovery !== null
   ) return
   auxiliaryRefreshQueued = false
-  void updateLayout({ previousScene, changedIds: [] })
+  void updateLayout({ previousScene, changedIds: [], preserveViewport: true })
 }
 
 watch(
@@ -299,6 +307,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
     data: nextData,
     previousScene,
     changedIds,
+    preserveViewport: true,
   })
 }
 
@@ -329,6 +338,7 @@ function clearDrag(unitId: string) {
     data: recovery.data,
     previousScene: scene.value,
     changedIds: recovery.changedIds,
+    preserveViewport: true,
   })
 }
 

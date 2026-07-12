@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createEmptyFamily, type FamilyData, type Member } from './schema'
 import { validateScene } from './family-layout/validateScene'
 import { DEFAULT_LAYOUT_METRICS, type RouteSegment } from './family-layout/types'
+import { withRowOrderPreference } from './family-layout/reconcilePreferences'
 import { layoutFamilyTree } from './treeLayout'
 
 const HARD_DIAGNOSTIC_CODES = new Set([
@@ -78,6 +79,87 @@ describe('layoutFamilyTree routing regressions', () => {
     expect(validateScene(scene, DEFAULT_LAYOUT_METRICS).filter(diagnostic => (
       HARD_DIAGNOSTIC_CODES.has(diagnostic.code)
     ))).toEqual([])
+    expect(scene.diagnostics.filter(diagnostic => (
+      HARD_DIAGNOSTIC_CODES.has(diagnostic.code)
+    ))).toEqual([])
+  })
+
+  it('materializes a dropped same-row order even when untouched neighbors stay fixed', async () => {
+    const a = member('a')
+    const b = member('b')
+    const c = member('c')
+    const d = member('d')
+    const childAb = member('child-ab')
+    const childAc = member('child-ac')
+    const childAd = member('child-ad')
+    linkSpouse(a, b, 'married')
+    linkSpouse(a, c, 'divorced')
+    linkSpouse(a, d, 'divorced')
+    linkParent(childAb, a)
+    linkParent(childAb, b)
+    linkParent(childAc, a)
+    linkParent(childAc, c)
+    linkParent(childAd, a)
+    linkParent(childAd, d)
+    const members = [a, b, c, d, childAb, childAc, childAd]
+    const data = familyData(members)
+    const previousScene = await layoutFamilyTree(members, { data })
+    const desiredOrder = [
+      'unit:person:c',
+      'unit:person:d',
+      'unit:partnership:current:a+b',
+    ]
+    const nextData = withRowOrderPreference(data, 'row:0', desiredOrder)
+
+    const scene = await layoutFamilyTree(members, {
+      data: nextData,
+      previousScene,
+      changedIds: ['a', 'b', 'child-ab', 'child-ac', 'child-ad'],
+    })
+    const row = scene.rows.find(value => value.generation === 0)!
+    const xByUnitId = new Map(scene.units.map(unit => [unit.id, unit.rect.x]))
+
+    expect(row.unitIds).toEqual(desiredOrder)
+    expect([...row.unitIds].sort((left, right) => (
+      xByUnitId.get(left)! - xByUnitId.get(right)!
+    ))).toEqual(desiredOrder)
+  })
+
+  it('materializes a dropped child-row order independently of its parent-row order', async () => {
+    const firstParent = member('first-parent')
+    const secondParent = member('second-parent')
+    const firstChild = member('first-child')
+    const secondChild = member('second-child')
+    linkParent(firstChild, firstParent)
+    linkParent(secondChild, secondParent)
+    const members = [firstParent, secondParent, firstChild, secondChild]
+    const data = familyData(members)
+    const previousScene = await layoutFamilyTree(members, { data })
+    const parentOrder = ['unit:person:first-parent', 'unit:person:second-parent']
+    const desiredOrder = ['unit:person:second-child', 'unit:person:first-child']
+    const nextData = withRowOrderPreference(
+      withRowOrderPreference(data, 'row:0', parentOrder),
+      'row:1',
+      desiredOrder,
+    )
+
+    const scene = await layoutFamilyTree(members, {
+      data: nextData,
+      previousScene,
+      changedIds: ['second-parent', 'second-child'],
+    })
+    const parentRow = scene.rows.find(value => value.generation === 0)!
+    const row = scene.rows.find(value => value.generation === 1)!
+    const xByUnitId = new Map(scene.units.map(unit => [unit.id, unit.rect.x]))
+
+    expect(parentRow.unitIds).toEqual(parentOrder)
+    expect([...parentRow.unitIds].sort((left, right) => (
+      xByUnitId.get(left)! - xByUnitId.get(right)!
+    ))).toEqual(parentOrder)
+    expect(row.unitIds).toEqual(desiredOrder)
+    expect([...row.unitIds].sort((left, right) => (
+      xByUnitId.get(left)! - xByUnitId.get(right)!
+    ))).toEqual(desiredOrder)
     expect(scene.diagnostics.filter(diagnostic => (
       HARD_DIAGNOSTIC_CODES.has(diagnostic.code)
     ))).toEqual([])
