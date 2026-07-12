@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
@@ -10,9 +10,9 @@ import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
 
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}))
+const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }))
+
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 vi.mock('@/services/autosave', () => ({ flushNow: vi.fn() }))
 vi.mock('@/services/tauriApi', () => ({ gcMedia: vi.fn() }))
 vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
@@ -33,6 +33,10 @@ const FamilyCanvasStub = defineComponent({
 })
 
 describe('TreeView row order integration', () => {
+  beforeEach(() => {
+    routerPush.mockReset()
+  })
+
   it('persists the row order emitted by FamilyCanvas through the family store', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
@@ -89,5 +93,27 @@ describe('TreeView row order integration', () => {
       viewpointId: 'viewpoint',
       showAuxiliaryRelations: true,
     })
+  })
+
+  it('resets auxiliary visibility when closing the project', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const ui = useUiStore()
+    ui.setShowAuxiliaryRelations(true)
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          FamilyCanvas: FamilyCanvasStub,
+          SearchBar: true,
+        },
+      },
+    })
+
+    const back = wrapper.findAll('button').find(button => button.text() === '返回')!
+    await back.trigger('click')
+
+    expect(ui.showAuxiliaryRelations).toBe(false)
+    expect(routerPush).toHaveBeenCalledWith('/')
   })
 })

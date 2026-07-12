@@ -47,6 +47,7 @@ let suppressInitialSceneFocus = !!props.initialView
 let expectedRowUpdate: { rowId: string; unitIds: string[] } | null = null
 let pendingDropToken: number | null = null
 let pendingSceneRecovery: { data: FamilyData; changedIds: string[] } | null = null
+let auxiliaryRefreshQueued = false
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 const animatePositions = ref(false)
 
@@ -96,6 +97,31 @@ async function updateLayout(options: {
   if (requestId !== layoutRequestId) return
   const viewpointId = props.viewpointId
   if (viewpointId && !shouldSuppressFocus) focusMember(viewpointId)
+  flushQueuedAuxiliaryRefresh(nextScene)
+}
+
+function requestAuxiliaryRefresh() {
+  if (
+    dragState.value !== null
+    || pendingDropToken !== null
+    || pendingSceneRecovery !== null
+  ) {
+    auxiliaryRefreshQueued = true
+    return
+  }
+  auxiliaryRefreshQueued = false
+  void updateLayout()
+}
+
+function flushQueuedAuxiliaryRefresh(previousScene: LayoutScene) {
+  if (
+    !auxiliaryRefreshQueued
+    || dragState.value !== null
+    || pendingDropToken !== null
+    || pendingSceneRecovery !== null
+  ) return
+  auxiliaryRefreshQueued = false
+  void updateLayout({ previousScene, changedIds: [] })
 }
 
 watch(
@@ -113,7 +139,7 @@ watch(
 
 watch(
   () => [props.showAuxiliaryRelations, props.selectedId] as const,
-  () => { void updateLayout() },
+  requestAuxiliaryRefresh,
 )
 
 const sceneOffset = computed(() => ({
@@ -276,7 +302,10 @@ function clearDrag(unitId: string) {
   dragCanDrop.value = false
   pendingDropToken = null
   const recovery = pendingSceneRecovery
-  if (!recovery) return
+  if (!recovery) {
+    flushQueuedAuxiliaryRefresh(scene.value)
+    return
+  }
   void updateLayout({
     data: recovery.data,
     previousScene: scene.value,

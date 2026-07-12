@@ -29,6 +29,15 @@ interface Candidate {
   order: number
 }
 
+type Edge = [Point, Point]
+
+interface Obstacle {
+  id: string
+  unitId: string
+  type: 'card' | 'unit'
+  rect: Rect
+}
+
 const GRAY = '#64748b'
 const PURPLE = '#8b5cf6'
 
@@ -76,6 +85,16 @@ function chooseCandidate(
   ]
   const sourceTerminals = sideTerminals(source, clearance, input.metrics.routeSubgrid)
   const targetTerminals = sideTerminals(target, clearance, input.metrics.routeSubgrid)
+  const primaryEdges = routeEdges(input.primaryRoutes)
+  const relatedUnitIds = relatedComponentUnitIds(
+    input.geometry,
+    input.primaryRoutes,
+    source.unitId,
+    target.unitId,
+  )
+  const componentObstacles = obstacles.filter(obstacle => (
+    relatedUnitIds.has(obstacle.unitId)
+  ))
   const minX = snapDown(
     Math.min(...obstacles.map(obstacle => obstacle.rect.x)),
     input.metrics.routeSubgrid,
@@ -85,11 +104,11 @@ function chooseCandidate(
     input.metrics.routeSubgrid,
   )
   const minY = snapDown(
-    Math.min(...obstacles.map(obstacle => obstacle.rect.y)),
+    Math.min(...componentObstacles.map(obstacle => obstacle.rect.y)),
     input.metrics.routeSubgrid,
   )
   const maxY = snapUp(
-    Math.max(...obstacles.map(obstacle => obstacle.rect.y + obstacle.rect.height)),
+    Math.max(...componentObstacles.map(obstacle => obstacle.rect.y + obstacle.rect.height)),
     input.metrics.routeSubgrid,
   )
   const candidates: Candidate[] = []
@@ -109,7 +128,7 @@ function chooseCandidate(
         const points = simplifyPoints(path)
         const candidate = { points, segments: toSegments(points), order: order++ }
         if (candidate.segments.length === 0) continue
-        if (!candidateIsValid(candidate, start, end, obstacles, input.primaryRoutes)) continue
+        if (!candidateIsValid(candidate, start, end, obstacles, primaryEdges)) continue
         candidates.push(candidate)
       }
     }
@@ -144,17 +163,12 @@ function candidateIsValid(
   candidate: Candidate,
   start: Terminal,
   end: Terminal,
-  obstacles: Array<{
-    id: string
-    unitId: string
-    type: 'card' | 'unit'
-    rect: Rect
-  }>,
-  primaryRoutes: RoutedFamilyEdge[],
+  obstacles: Obstacle[],
+  primaryEdges: Edge[],
 ): boolean {
-  if (candidate.segments.some(segment => primaryRoutes.some(route => (
-    route.segments.some(primary => positiveCollinearOverlap(segment, primary))
-  )))) return false
+  if (routeEdgesFromSegments(candidate.segments).some(auxiliary => (
+    primaryEdges.some(primary => segmentsIntersect(auxiliary, primary))
+  ))) return false
 
   const lastIndex = candidate.segments.length - 1
   return obstacles.every(obstacle => candidate.segments.every((segment, index) => {
@@ -238,20 +252,108 @@ function segmentIntersectsRect(segment: RouteSegment, rect: Rect): boolean {
     && Math.min(start.y, end.y) < rect.y + rect.height
 }
 
-function positiveCollinearOverlap(left: RouteSegment, right: RouteSegment): boolean {
-  if (left.orientation !== right.orientation) return false
-  if (left.orientation === 'bridge' || right.orientation === 'bridge') return false
-  const [a0, a1] = left.points
-  const [b0, b1] = right.points
-  if (left.orientation === 'horizontal') {
-    return a0.y === b0.y && positiveOverlap(a0.x, a1.x, b0.x, b1.x)
-  }
-  return a0.x === b0.x && positiveOverlap(a0.y, a1.y, b0.y, b1.y)
+function routeEdges(routes: RoutedFamilyEdge[]): Edge[] {
+  return routes.flatMap(route => routeEdgesFromSegments(route.segments))
 }
 
-function positiveOverlap(a0: number, a1: number, b0: number, b1: number): boolean {
-  return Math.max(Math.min(a0, a1), Math.min(b0, b1))
-    < Math.min(Math.max(a0, a1), Math.max(b0, b1))
+function relatedComponentUnitIds(
+  geometry: SceneGeometry,
+  primaryRoutes: RoutedFamilyEdge[],
+  sourceUnitId: string,
+  targetUnitId: string,
+): Set<string> {
+  const allUnitIds = new Set([
+    ...geometry.units.map(unit => unit.id),
+    ...geometry.cards.map(card => card.unitId),
+    ...geometry.hubs.map(hub => hub.unitId),
+  ])
+  const parentByUnitId = new Map([...allUnitIds].map(unitId => [unitId, unitId]))
+  const find = (unitId: string): string => {
+    const parent = parentByUnitId.get(unitId) ?? unitId
+    if (parent === unitId) return unitId
+    const root = find(parent)
+    parentByUnitId.set(unitId, root)
+    return root
+  }
+  const union = (leftId: string, rightId: string) => {
+    const leftRoot = find(leftId)
+    const rightRoot = find(rightId)
+    if (leftRoot === rightRoot) return
+    const [first, second] = [leftRoot, rightRoot].sort((left, right) => (
+      left.localeCompare(right)
+    ))
+    parentByUnitId.set(second, first)
+  }
+  const unitIdsByContact = new Map<string, string[]>()
+  for (const hub of geometry.hubs) {
+    registerContact(unitIdsByContact, hub.point, hub.unitId)
+  }
+  for (const card of geometry.cards) {
+    registerContact(unitIdsByContact, topPort(card.rect), card.unitId)
+  }
+  for (const route of primaryRoutes) {
+    const contactUnitIds = new Set(route.segments.flatMap(segment => {
+      const endpoints = [segment.points[0], segment.points.at(-1)!]
+      return endpoints.flatMap(point => unitIdsByContact.get(pointKey(point)) ?? [])
+    }))
+    const [firstUnitId, ...otherUnitIds] = [...contactUnitIds].sort((left, right) => (
+      left.localeCompare(right)
+    ))
+    if (!firstUnitId) continue
+    otherUnitIds.forEach(unitId => union(firstUnitId, unitId))
+  }
+  const relevantRoots = new Set([find(sourceUnitId), find(targetUnitId)])
+  return new Set([...allUnitIds].filter(unitId => relevantRoots.has(find(unitId))))
+}
+
+function registerContact(
+  unitIdsByContact: Map<string, string[]>,
+  point: Point,
+  unitId: string,
+) {
+  const key = pointKey(point)
+  const unitIds = unitIdsByContact.get(key) ?? []
+  if (!unitIds.includes(unitId)) unitIds.push(unitId)
+  unitIdsByContact.set(key, unitIds)
+}
+
+function topPort(rect: Rect): Point {
+  return { x: rect.x + rect.width / 2, y: rect.y }
+}
+
+function pointKey(point: Point): string {
+  return `${point.x},${point.y}`
+}
+
+function routeEdgesFromSegments(segments: RouteSegment[]): Edge[] {
+  return segments.flatMap(segment => segment.points.slice(1).map((point, index) => (
+    [segment.points[index], point] as Edge
+  )))
+}
+
+function segmentsIntersect([a, b]: Edge, [c, d]: Edge): boolean {
+  const abC = direction(a, b, c)
+  const abD = direction(a, b, d)
+  const cdA = direction(c, d, a)
+  const cdB = direction(c, d, b)
+  if (abC === 0 && pointOnSegment(a, b, c)) return true
+  if (abD === 0 && pointOnSegment(a, b, d)) return true
+  if (cdA === 0 && pointOnSegment(c, d, a)) return true
+  if (cdB === 0 && pointOnSegment(c, d, b)) return true
+  return (abC < 0) !== (abD < 0) && (cdA < 0) !== (cdB < 0)
+}
+
+function direction(start: Point, end: Point, point: Point): number {
+  return (end.x - start.x) * (point.y - start.y)
+    - (end.y - start.y) * (point.x - start.x)
+}
+
+function pointOnSegment(start: Point, end: Point, point: Point): boolean {
+  return direction(start, end, point) === 0
+    && point.x >= Math.min(start.x, end.x)
+    && point.x <= Math.max(start.x, end.x)
+    && point.y >= Math.min(start.y, end.y)
+    && point.y <= Math.max(start.y, end.y)
 }
 
 function expandRect(rect: Rect, clearance: number): Rect {

@@ -28,6 +28,7 @@ const rootId = computed(() => data.value.rootMemberId)
 function onBack() {
   ui.setViewpoint(null)
   ui.setSelected(null)
+  ui.setShowAuxiliaryRelations(false)
   ui.setCanvasView(null)
   family.closeProject()
   router.push('/')

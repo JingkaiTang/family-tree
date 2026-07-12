@@ -424,6 +424,108 @@ describe('FamilyCanvas', () => {
     })
   })
 
+  it('queues one auxiliary refresh until a pending drop scene is accepted', async () => {
+    const dropped = deferred<LayoutScene>()
+    const auxiliary = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockReturnValueOnce(dropped.promise)
+      .mockReturnValueOnce(auxiliary.promise)
+    const { wrapper } = mountStoreCanvas(
+      familyData([mk('A'), mk('B'), mk('C'), mk('D')]),
+    )
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 2, -500, 0)
+    await node.trigger('pointerup', { pointerId: 1, clientX: 100, clientY: 100 })
+    await nextTick()
+
+    await wrapper.setProps({ showAuxiliaryRelations: true, selectedId: 'A' })
+    await wrapper.setProps({ selectedId: 'B' })
+    await nextTick()
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(2)
+
+    const droppedScene = structuredClone(sortableScene)
+    droppedScene.rows[0].unitIds = [
+      'unit:person:C',
+      'unit:person:A',
+      'unit:person:B',
+    ]
+    droppedScene.units[0].rect.x = 240
+    droppedScene.units[1].rect.x = 480
+    droppedScene.units[2].rect.x = 0
+    droppedScene.cards[0].rect.x = 240
+    droppedScene.cards[1].rect.x = 480
+    droppedScene.cards[2].rect.x = 0
+    dropped.resolve(droppedScene)
+    await flushPromises()
+
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
+    expect(layoutFamilyTree.mock.calls[2][1]).toMatchObject({
+      previousScene: droppedScene,
+      changedIds: [],
+      auxiliaryFocusPersonId: 'B',
+      view: {
+        showHistoricalPartnerships: true,
+        showSecondaryParentage: true,
+        showGodparentRelations: true,
+      },
+    })
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+
+    const auxiliaryScene = structuredClone(droppedScene)
+    auxiliaryScene.routes.push({
+      id: 'route:aux:A+B',
+      routeOwnerId: 'aux:A+B',
+      kind: 'historical-partnership',
+      accent: '#64748b',
+      segments: [{
+        orientation: 'horizontal',
+        points: [{ x: 0, y: 104 }, { x: 48, y: 104 }],
+      }],
+    })
+    auxiliary.resolve(auxiliaryScene)
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="family-unit"]')
+      .map(unit => unit.attributes('style'))).toEqual([
+      expect.stringContaining('translate(240px, 0px)'),
+      expect.stringContaining('translate(480px, 0px)'),
+      expect.stringContaining('translate(0px, 0px)'),
+      expect.stringContaining('translate(0px, 360px)'),
+    ])
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('flushes one queued auxiliary refresh after an active drag is cancelled', async () => {
+    const auxiliary = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockReturnValueOnce(auxiliary.promise)
+    const { wrapper } = mountStoreCanvas(
+      familyData([mk('A'), mk('B'), mk('C'), mk('D')]),
+    )
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 2, -500, 0)
+    await wrapper.setProps({ showAuxiliaryRelations: true, selectedId: 'B' })
+    await nextTick()
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(1)
+
+    await node.trigger('pointercancel', { pointerId: 1 })
+    await nextTick()
+
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(2)
+    expect(layoutFamilyTree.mock.calls[1][1]).toMatchObject({
+      previousScene: sortableScene,
+      changedIds: [],
+      auxiliaryFocusPersonId: 'B',
+    })
+    auxiliary.resolve(structuredClone(sortableScene))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
   it('dashes only auxiliary routes with the specified pattern', async () => {
     const scene = structuredClone(coupleScene)
     scene.routes.push({

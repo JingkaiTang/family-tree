@@ -96,6 +96,37 @@ describe('routeAuxiliaryEdges', () => {
     ))).toBe(false)
   })
 
+  it('treats every polyline edge of a primary bridge as occupied', () => {
+    const geometry = rowGeometry(['a', 'b'])
+    const bridge: RoutedFamilyEdge = {
+      id: 'route:bridge',
+      routeOwnerId: 'parentage:bridge',
+      kind: 'primary',
+      accent: '#111111',
+      segments: [{
+        orientation: 'bridge',
+        points: [{ x: 200, y: 80 }, { x: 228, y: 104 }, { x: 256, y: 80 }],
+      }],
+    }
+
+    const routes = routeAuxiliaryEdges({
+      geometry,
+      auxiliaryRelations: [{
+        id: 'aux:a+b',
+        kind: 'historical-partnership',
+        sourceId: 'a',
+        targetId: 'b',
+      }],
+      primaryRoutes: [bridge],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(routes).toHaveLength(1)
+    expect(routeEdges(routes[0]).some(auxiliary => (
+      routeEdges(bridge).some(primary => segmentsIntersect(auxiliary, primary))
+    ))).toBe(false)
+  })
+
   it('chooses the same candidate route for equivalent input permutations', () => {
     const geometry = rowGeometry(['a', 'blocker', 'b'])
     const relations: AuxiliaryRelation[] = [{
@@ -128,6 +159,46 @@ describe('routeAuxiliaryEdges', () => {
     })
 
     expect(reversed).toEqual(forward)
+  })
+
+  it('keeps component corridors unchanged when a distant unrelated unit is added', () => {
+    const geometry = rowGeometry(['a', 'blocker', 'b'])
+    const relation: AuxiliaryRelation = {
+      id: 'aux:a+b',
+      kind: 'historical-partnership',
+      sourceId: 'a',
+      targetId: 'b',
+    }
+    const baseline = routeAuxiliaryEdges({
+      geometry,
+      auxiliaryRelations: [relation],
+      primaryRoutes: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+    const distantUnit = {
+      ...geometry.units[0],
+      id: 'unit:distant',
+      memberIds: ['distant'],
+      rect: { x: 2400, y: -1200, width: 168, height: 216 },
+      order: 3,
+    }
+    const withDistantComponent = routeAuxiliaryEdges({
+      geometry: {
+        ...geometry,
+        units: [...geometry.units, distantUnit],
+        cards: [...geometry.cards, {
+          id: 'distant',
+          unitId: distantUnit.id,
+          generation: 0,
+          rect: { ...distantUnit.rect },
+        }],
+      },
+      auxiliaryRelations: [relation],
+      primaryRoutes: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(withDistantComponent).toEqual(baseline)
   })
 
   it('keeps primary geometry byte-identical and filters routes by auxiliary focus', () => {
@@ -200,6 +271,37 @@ function sidePorts(geometry: SceneGeometry, id: string): Point[] {
     x: card.rect.x + card.rect.width,
     y: card.rect.y + card.rect.height / 2,
   }]
+}
+
+type Edge = [Point, Point]
+
+function routeEdges(route: RoutedFamilyEdge): Edge[] {
+  return route.segments.flatMap(segment => (
+    segment.points.slice(1).map((point, index) => [segment.points[index], point] as Edge)
+  ))
+}
+
+function segmentsIntersect([a, b]: Edge, [c, d]: Edge): boolean {
+  const direction = (start: Point, end: Point, point: Point) => (
+    (end.x - start.x) * (point.y - start.y)
+    - (end.y - start.y) * (point.x - start.x)
+  )
+  const onSegment = (start: Point, end: Point, point: Point) => (
+    direction(start, end, point) === 0
+    && point.x >= Math.min(start.x, end.x)
+    && point.x <= Math.max(start.x, end.x)
+    && point.y >= Math.min(start.y, end.y)
+    && point.y <= Math.max(start.y, end.y)
+  )
+  const abC = direction(a, b, c)
+  const abD = direction(a, b, d)
+  const cdA = direction(c, d, a)
+  const cdB = direction(c, d, b)
+  if (abC === 0 && onSegment(a, b, c)) return true
+  if (abD === 0 && onSegment(a, b, d)) return true
+  if (cdA === 0 && onSegment(c, d, a)) return true
+  if (cdB === 0 && onSegment(c, d, b)) return true
+  return (abC < 0) !== (abD < 0) && (cdA < 0) !== (cdB < 0)
 }
 
 function layoutRequest(
