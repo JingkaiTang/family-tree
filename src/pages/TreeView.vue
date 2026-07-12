@@ -227,13 +227,11 @@ function seedFixture() {
     <main class="flex-1">
       <FamilyCanvas
         :members="membersArray"
+        :data="family.data"
         :root-id="rootId"
         :selected-id="selectedId"
         :viewpoint-id="viewpointId"
         :get-kinship="kinshipResolver"
-        :manual-positions="family.data.manualPositions"
-        :child-layout-assignments="family.data.childLayoutAssignments"
-        :grid-layout-overrides="family.data.gridLayoutOverrides"
         :initial-view="ui.canvasView"
         @select="onSelect"
         @open="onOpen"

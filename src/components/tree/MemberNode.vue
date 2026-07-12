@@ -6,7 +6,7 @@ import { resolvePhotoUrl } from '@/services/tauriApi'
 
 const props = defineProps<{
   member: Member
-  /** 节点在画布上的绝对坐标（像素） */
+  /** 节点在父级 FamilyUnit 内的局部坐标（像素） */
   left: number
   top: number
   width: number
@@ -157,6 +157,7 @@ function onPointerCancel(e: PointerEvent) {
 
 <template>
   <div
+    data-testid="member-node"
     class="absolute flex cursor-grab flex-col overflow-hidden rounded-xl border-2 shadow-sm transition-shadow select-none hover:shadow-md active:cursor-grabbing"
     :class="[
       'bg-white',

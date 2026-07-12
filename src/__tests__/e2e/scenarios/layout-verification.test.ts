@@ -33,6 +33,18 @@ function nonOverlapping(nodes: Array<{ cx: number; top: number }>): boolean {
   return true
 }
 
+function nonOverlappingRects(
+  rects: Array<{ x: number; y: number; width: number; height: number }>,
+): boolean {
+  return rects.every((left, leftIndex) => rects.every((right, rightIndex) => (
+    leftIndex >= rightIndex
+    || left.x + left.width <= right.x
+    || right.x + right.width <= left.x
+    || left.y + left.height <= right.y
+    || right.y + right.height <= left.y
+  )))
+}
+
 // ===== 场景构造 =====
 
 /** 单人 */
@@ -253,9 +265,9 @@ describe('L3 布局验证 — generation 连续性', () => {
 describe('L3 布局验证 — 多 union 回归', () => {
   it('多组亲子 union 下，各组子女保持连续', async () => {
     const r = await layoutFamilyTree(Object.values(multiUnionFamily()))
-    const childIds = r.nodes
+    const childIds = r.cards
       .filter((n) => ['childAB1', 'childAB2', 'childAC'].includes(n.id))
-      .sort((a, b) => a.cx - b.cx)
+      .sort((a, b) => a.rect.x - b.rect.x)
       .map((n) => n.id)
     expect(childIds).toEqual(expect.arrayContaining(['childAB1', 'childAB2', 'childAC']))
     const indexAB1 = childIds.indexOf('childAB1')
@@ -265,8 +277,8 @@ describe('L3 布局验证 — 多 union 回归', () => {
 
   it('多组件成员不会和主家庭重叠', async () => {
     const r = await layoutFamilyTree(Object.values(multiUnionFamily()))
-    expect(r.nodes.some((n) => n.id === 'stranger')).toBe(true)
-    expect(nonOverlapping(r.nodes)).toBe(true)
+    expect(r.cards.some((n) => n.id === 'stranger')).toBe(true)
+    expect(nonOverlappingRects(r.cards.map(card => card.rect))).toBe(true)
   })
 })
 

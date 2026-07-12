@@ -1,26 +1,21 @@
 /**
  * @vitest-environment happy-dom
- *
- * FamilyCanvas 组件集成测试
- * 覆盖：空状态渲染、孤儿提示、SVG 连线、select/open 事件
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, nextTick } from 'vue'
 import FamilyCanvas from '@/components/tree/FamilyCanvas.vue'
+import { createEmptyFamily, type FamilyData, type Member } from '@/core/schema'
+import type { LayoutScene } from '@/core/family-layout/types'
 import { mk } from '@/__tests__/fixtures/families'
-import type { Member } from '@/core/schema'
-import { useFamilyStore } from '@/stores/family'
 
-// 模拟 layoutFamilyTree 返回预计算结果，避免依赖真实 ELK 布局
-const { layoutFamilyTree } = vi.hoisted(() => ({
+const { focusStagePoint, layoutFamilyTree } = vi.hoisted(() => ({
+  focusStagePoint: vi.fn(),
   layoutFamilyTree: vi.fn(),
 }))
 
-vi.mock('@/core/treeLayout', () => ({
-  layoutFamilyTree,
-}))
+vi.mock('@/core/treeLayout', () => ({ layoutFamilyTree }))
 
 const PanZoomStub = defineComponent({
   name: 'PanZoomWrapper',
@@ -28,183 +23,229 @@ const PanZoomStub = defineComponent({
   emits: ['view-change'],
   setup(_, { expose, slots }) {
     expose({
-      focusStagePoint: vi.fn(),
+      focusStagePoint,
       getScale: vi.fn(() => 1),
     })
     return () => h('div', slots.default?.())
   },
 })
 
-// 默认 mock：带孤儿节点
-const defaultLayout = {
-  nodes: [
-    { id: 'A', cx: 2, top: 0, generation: 0 },
-    { id: 'B', cx: 2, top: 4, generation: 1 },
-  ],
-  couples: [],
-  connectors: [
-    { kind: 'parent-child', points: [{ x: 2, y: 1 }, { x: 2, y: 4 }] },
-  ],
-  canvas: { width: 4, height: 6 },
-  orphanIds: ['orphan-1'],
-  offsetX: 0,
-  grid: {
-    memberSlotIds: { A: 'person:A', B: 'person:B' },
-    slotPositions: {
-      'person:A': { generation: 0, order: 0, cx: 2 },
-      'person:B': { generation: 1, order: 0, cx: 2 },
+const familyAccent = '#2f9d7e'
+const coupleScene: LayoutScene = {
+  units: [{
+    id: 'unit:parents',
+    kind: 'couple',
+    memberIds: ['A', 'B'],
+    generation: 0,
+    width: 360,
+    lineageAffinity: {},
+    accent: familyAccent,
+    rect: { x: 48, y: 24, width: 360, height: 216 },
+    order: 0,
+  }],
+  cards: [{
+    id: 'A',
+    unitId: 'unit:parents',
+    generation: 0,
+    rect: { x: 48, y: 24, width: 168, height: 216 },
+  }, {
+    id: 'B',
+    unitId: 'unit:parents',
+    generation: 0,
+    rect: { x: 240, y: 24, width: 168, height: 216 },
+  }],
+  hubs: [{
+    id: 'hub:unit:parents',
+    unitId: 'unit:parents',
+    point: { x: 228, y: 132 },
+  }],
+  rows: [{ id: 'row:0', generation: 0, unitIds: ['unit:parents'] }],
+  routes: [{
+    id: 'route:parents',
+    routeOwnerId: 'parentage:parents',
+    kind: 'primary',
+    accent: familyAccent,
+    segments: [
+      { orientation: 'vertical', points: [{ x: 228, y: 132 }, { x: 228, y: 300 }] },
+      { orientation: 'bridge', points: [
+        { x: 228, y: 300 },
+        { x: 240, y: 288 },
+        { x: 252, y: 300 },
+      ] },
+    ],
+  }, {
+    id: 'route:other',
+    routeOwnerId: 'parentage:other',
+    kind: 'primary',
+    accent: '#d6578b',
+    segments: [
+      { orientation: 'horizontal', points: [{ x: 0, y: 360 }, { x: 100, y: 360 }] },
+    ],
+  }],
+  bounds: { x: 0, y: 0, width: 408, height: 400 },
+  diagnostics: [],
+}
+
+const emptyScene: LayoutScene = {
+  units: [],
+  cards: [],
+  hubs: [],
+  rows: [],
+  routes: [],
+  bounds: { x: 0, y: 0, width: 0, height: 0 },
+  diagnostics: [],
+}
+
+function familyData(members: Member[]): FamilyData {
+  return {
+    ...createEmptyFamily(),
+    members: Object.fromEntries(members.map(member => [member.id, member])),
+  }
+}
+
+function mountCanvas(members: Member[], data = familyData(members), props = {}) {
+  return mount(FamilyCanvas, {
+    props: { members, data, ...props },
+    global: {
+      plugins: [createPinia()],
+      stubs: { PanZoomWrapper: PanZoomStub },
     },
-    columnWidth: 3.5,
-  },
+  })
 }
 
-const emptyLayout = {
-  nodes: [],
-  couples: [],
-  connectors: [],
-  canvas: { width: 0, height: 0 },
-  orphanIds: [],
-  offsetX: 0,
-}
-
-function makeFamily(ids: string[]): Member[] {
-  return ids.map((id) => mk(id, { gender: 'male' }))
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(next => { resolve = next })
+  return { promise, resolve }
 }
 
 describe('FamilyCanvas', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    focusStagePoint.mockReset()
     layoutFamilyTree.mockReset()
-    layoutFamilyTree.mockResolvedValue(structuredClone(defaultLayout))
+    layoutFamilyTree.mockResolvedValue(structuredClone(coupleScene))
   })
 
-  // ========== 空状态 ==========
-  it('无成员时显示空状态提示', async () => {
-    layoutFamilyTree.mockResolvedValueOnce(structuredClone(emptyLayout))
+  it('renders a couple as one family background with two local member cards and its hub', async () => {
+    const members = [mk('A'), mk('B')]
+    const wrapper = mountCanvas(members)
+    await flushPromises()
 
-    const wrapper = mount(FamilyCanvas, {
-      props: { members: [] },
-      global: {
-        plugins: [createPinia()],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
-    await nextTick()
-    await nextTick()
+    const units = wrapper.findAll('[data-testid="family-unit"]')
+    const nodes = wrapper.findAll('[data-testid="member-node"]')
+    const hub = wrapper.find('[data-testid="union-hub"]')
+
+    expect(units).toHaveLength(1)
+    expect(nodes).toHaveLength(2)
+    expect(hub.exists()).toBe(true)
+    expect(units[0].element.contains(nodes[0].element)).toBe(true)
+    expect(units[0].element.contains(nodes[1].element)).toBe(true)
+    expect(units[0].attributes('style')).toContain('translate(48px, 24px)')
+    expect(wrapper.find('[data-testid="spouse-axis"]').attributes('style')).toContain(familyAccent)
+  })
+
+  it('keeps every route owner in its own SVG group and preserves segment accents', async () => {
+    const wrapper = mountCanvas([mk('A'), mk('B')])
+    await flushPromises()
+
+    const owners = wrapper.findAll('g[data-route-owner]')
+    expect(owners).toHaveLength(2)
+    expect(owners.map(owner => owner.attributes('data-route-owner'))).toEqual([
+      'parentage:parents',
+      'parentage:other',
+    ])
+    expect(owners[0].findAll('path')).toHaveLength(2)
+    expect(owners[0].find('path').attributes('stroke')).toBe(familyAccent)
+    expect(owners[1].find('path').attributes('stroke')).toBe('#d6578b')
+    expect(owners[0].findAll('path')[1].attributes('d')).toBe(
+      'M 228 300 Q 240 288 252 300',
+    )
+  })
+
+  it('preserves select and open events from member cards', async () => {
+    const wrapper = mountCanvas([mk('A'), mk('B')])
+    await flushPromises()
+
+    const nodes = wrapper.findAll('[data-testid="member-node"]')
+    await nodes[0].trigger('click')
+    await nodes[1].trigger('dblclick')
+
+    expect(wrapper.emitted('select')).toEqual([['A']])
+    expect(wrapper.emitted('open')).toEqual([['B']])
+  })
+
+  it('shows the empty state for an empty scene', async () => {
+    layoutFamilyTree.mockResolvedValueOnce(structuredClone(emptyScene))
+    const wrapper = mountCanvas([])
+    await flushPromises()
+
     expect(wrapper.text()).toContain('暂无成员')
+    expect(wrapper.find('[data-testid="family-unit"]').exists()).toBe(false)
   })
 
-  // ========== 孤儿提示 ==========
-  it('有孤儿节点时显示提示并包含数量', async () => {
-    const wrapper = mount(FamilyCanvas, {
-      props: { members: makeFamily(['A', 'B']) },
-      global: {
-        plugins: [createPinia()],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
-    await nextTick()
-    await nextTick()
-    expect(wrapper.text()).toContain('1 位成员未显示')
+  it('passes complete family data to the facade', async () => {
+    const members = [mk('A')]
+    const data = familyData(members)
+    mountCanvas(members, data)
+    await flushPromises()
+
+    expect(layoutFamilyTree).toHaveBeenCalledWith(members, { data })
   })
 
-  // ========== SVG 连线 ==========
-  it('有连线时渲染 SVG polyline', async () => {
-    const wrapper = mount(FamilyCanvas, {
-      props: { members: makeFamily(['A', 'B']) },
-      global: {
-        plugins: [createPinia()],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
+  it('ignores stale async layout results', async () => {
+    const first = deferred<LayoutScene>()
+    const second = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    const firstMembers = [mk('A'), mk('B')]
+    const wrapper = mountCanvas(firstMembers)
     await nextTick()
-    await nextTick()
-    const polyline = wrapper.find('polyline')
-    expect(polyline.exists()).toBe(true)
+
+    const nextMembers = [mk('C')]
+    const nextData = familyData(nextMembers)
+    await wrapper.setProps({ members: nextMembers, data: nextData })
+    const nextScene = structuredClone(coupleScene)
+    nextScene.units[0].memberIds = ['C']
+    nextScene.units[0].kind = 'single'
+    nextScene.cards = [{
+      id: 'C',
+      unitId: nextScene.units[0].id,
+      generation: 0,
+      rect: { x: 48, y: 24, width: 168, height: 216 },
+    }]
+    second.resolve(nextScene)
+    await flushPromises()
+    first.resolve(structuredClone(coupleScene))
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="member-node"]')).toHaveLength(1)
+    expect(wrapper.text()).toContain('C')
+    expect(wrapper.text()).not.toContain('A')
   })
 
-  // ========== 无连线时无 polyline ==========
-  it('无布局时不渲染连线', async () => {
-    layoutFamilyTree.mockResolvedValueOnce(structuredClone(emptyLayout))
+  it('focuses a changed viewpoint at the pixel card center', async () => {
+    const wrapper = mountCanvas([mk('A'), mk('B')])
+    await flushPromises()
 
-    const wrapper = mount(FamilyCanvas, {
-      props: { members: [] },
-      global: {
-        plugins: [createPinia()],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
+    await wrapper.setProps({ viewpointId: 'B' })
     await nextTick()
-    await nextTick()
-    expect(wrapper.find('polyline').exists()).toBe(false)
+
+    expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
   })
 
-  // ========== 孤儿无提示 ==========
-  it('无孤儿时不显示孤儿提示', async () => {
-    layoutFamilyTree.mockResolvedValueOnce({
-      nodes: [{ id: 'A', cx: 2, top: 0, generation: 0 }],
-      couples: [],
-      connectors: [],
-      canvas: { width: 4, height: 2 },
-      orphanIds: [],
-      offsetX: 0,
+  it('preserves viewpoint kinship labels on member cards', async () => {
+    const getKinship = vi.fn((fromId: string, toId: string) => (
+      fromId === 'A' && toId === 'B' ? '配偶' : null
+    ))
+    const wrapper = mountCanvas([mk('A'), mk('B')], undefined, {
+      viewpointId: 'A',
+      getKinship,
     })
+    await flushPromises()
 
-    const wrapper = mount(FamilyCanvas, {
-      props: { members: makeFamily(['A']) },
-      global: {
-        plugins: [createPinia()],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
-    await nextTick()
-    await nextTick()
-    expect(wrapper.text()).not.toContain('位成员未显示')
-  })
-
-  it('persists grid slot order on node drop', async () => {
-    const members = makeFamily(['A'])
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    const family = useFamilyStore()
-    family.$patch((state) => {
-      state.data.members = { A: members[0] }
-    })
-
-    const wrapper = mount(FamilyCanvas, {
-      props: { members },
-      global: {
-        plugins: [pinia],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
-    await nextTick()
-    await nextTick()
-
-    const node = wrapper.findComponent({ name: 'MemberNode' })
-    await node.vm.$emit('drop', { id: 'A', dx: 220, dy: 55 })
-
-    expect(family.data.gridLayoutOverrides['person:A']).toEqual({ order: 1 })
-    expect(family.data.manualPositions.A).toBeUndefined()
-  })
-
-  it('ignores legacy centerLayoutId and always uses the default layout', async () => {
-    const members = makeFamily(['A'])
-
-    mount(FamilyCanvas, {
-      props: { members, centerLayoutId: 'A' },
-      global: {
-        plugins: [createPinia()],
-        stubs: { PanZoomWrapper: PanZoomStub },
-      },
-    })
-    await nextTick()
-    await nextTick()
-
-    expect(layoutFamilyTree).toHaveBeenCalledWith(members, {
-      manualPositions: undefined,
-      childLayoutAssignments: undefined,
-      gridLayoutOverrides: undefined,
-    })
+    expect(wrapper.text()).toContain('配偶')
+    expect(getKinship).toHaveBeenCalledWith('A', 'B')
   })
 })
