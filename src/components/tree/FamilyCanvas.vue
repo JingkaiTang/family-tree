@@ -56,7 +56,6 @@ async function updateLayout(options: {
 } = {}) {
   const requestId = ++layoutRequestId
   const pendingTokenAtRequest = pendingDropToken
-  const recoveryAtRequest = options.data ? pendingSceneRecovery : null
   const layoutData = options.data ?? props.data
   const nextScene = await layoutFamilyTree(Object.values(layoutData.members), {
     data: layoutData,
@@ -77,9 +76,7 @@ async function updateLayout(options: {
     }, 180)
   }
   scene.value = nextScene
-  if (recoveryAtRequest !== null && recoveryAtRequest === pendingSceneRecovery) {
-    pendingSceneRecovery = null
-  }
+  pendingSceneRecovery = null
   if (shouldSettleDrag) {
     dragState.value = null
     dragCanDrop.value = false
@@ -199,7 +196,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     || dragState.value.unitId !== payload.unitId
     || pendingDropToken !== null
   ) {
-    if (pendingDropToken !== null) layoutRequestId += 1
+    layoutRequestId += 1
     dragToken += 1
     pendingDropToken = null
   }
@@ -265,7 +262,6 @@ function clearDrag(unitId: string) {
   pendingDropToken = null
   const recovery = pendingSceneRecovery
   if (!recovery) return
-  pendingSceneRecovery = null
   void updateLayout({
     data: recovery.data,
     previousScene: scene.value,
