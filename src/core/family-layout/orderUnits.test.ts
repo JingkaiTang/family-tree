@@ -186,6 +186,39 @@ describe('orderUnits', () => {
     expect(new Set(orderedUnitIds).size).toBe(200)
   })
 
+  it('uses all six sweep refinements to repair a reversed parent-child affinity row', () => {
+    const unrelatedIds = Array.from({ length: 6 }, (_, index) => `unrelated-${index}`)
+    const units = [
+      single('parent'),
+      ...unrelatedIds.map(id => single(id)),
+      single('child'),
+    ]
+    const primaryParentages: ParentageFact[] = [{
+      id: 'parentage:parent',
+      parentIds: ['parent'],
+      childIds: ['child'],
+      typeByChildId: { child: 'blood' },
+    }]
+
+    const [row] = orderUnits(input(
+      units,
+      people([
+        ['parent', '1900-01-01'],
+        ...unrelatedIds.map((id, index) => (
+          [id, `${1910 + index}-01-01`] as [string, string]
+        )),
+        ['child', '2000-01-01'],
+      ]),
+      { primaryParentages },
+    ))
+
+    expect(row.unitIds).toEqual([
+      'unit:person:parent',
+      'unit:person:child',
+      ...unrelatedIds.map(id => `unit:person:${id}`),
+    ])
+  })
+
   it.each(['adopted', 'step'] as const)(
     'keeps blood cores stronger than %s affinity inside a supercomponent',
     type => {

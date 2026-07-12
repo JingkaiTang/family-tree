@@ -137,12 +137,166 @@ export function multiUnionFamily(): Record<string, Member> {
     stranger: mk('stranger', { gender: 'other' }),
   }
   addSpouse(m.parentA, m.parentB)
-  addSpouse(m.parentA, m.parentC)
+  m.parentA.spouses.push({ id: m.parentC.id, type: 'divorced' })
+  m.parentC.spouses.push({ id: m.parentA.id, type: 'divorced' })
   addParent(m.childAB1, m.parentA)
   addParent(m.childAB1, m.parentB)
   addParent(m.childAB2, m.parentA)
   addParent(m.childAB2, m.parentB)
-  addParent(m.childAC, m.parentA)
   addParent(m.childAC, m.parentC)
   return m
+}
+
+/** 两个血缘核心中的两对兄弟姐妹交叉结婚。 */
+export function crossMarriedSiblingsFamily(): Record<string, Member> {
+  const m = siblingCorePair(2)
+  addSpouse(m['a-child-1'], m['b-child-1'])
+  addSpouse(m['a-child-2'], m['b-child-2'])
+  return m
+}
+
+/** 两个血缘核心之间有三组婚姻桥，形成 dense supercomponent。 */
+export function denseBridgeFamily(): Record<string, Member> {
+  const m = siblingCorePair(3)
+  addSpouse(m['a-child-1'], m['b-child-1'])
+  addSpouse(m['a-child-2'], m['b-child-2'])
+  addSpouse(m['a-child-3'], m['b-child-3'])
+  return m
+}
+
+/** 同一祖先经两条合法血缘路径到达同一后代，但不存在亲子环。 */
+export function pedigreeCollapseFamily(): Record<string, Member> {
+  const m: Record<string, Member> = {
+    ancestor: mk('ancestor', { birthDate: '1930-01-01' }),
+    branchA: mk('branch-a', { birthDate: '1955-01-01' }),
+    branchB: mk('branch-b', { birthDate: '1957-01-01' }),
+    cousinA: mk('cousin-a', { birthDate: '1980-01-01' }),
+    cousinB: mk('cousin-b', { birthDate: '1982-01-01' }),
+    descendant: mk('descendant', { birthDate: '2005-01-01' }),
+  }
+  addParent(m.branchA, m.ancestor)
+  addParent(m.branchB, m.ancestor)
+  addParent(m.cousinA, m.branchA)
+  addParent(m.cousinB, m.branchB)
+  addSpouse(m.cousinA, m.cousinB)
+  addParent(m.descendant, m.cousinA)
+  addParent(m.descendant, m.cousinB)
+  return m
+}
+
+/** 最小亲子环：两人互为对方父母。 */
+export function parentageCycleFamily(): Record<string, Member> {
+  const m: Record<string, Member> = {
+    'cycle-a': mk('cycle-a'),
+    'cycle-b': mk('cycle-b'),
+  }
+  addParent(m['cycle-a'], m['cycle-b'])
+  addParent(m['cycle-b'], m['cycle-a'])
+  return m
+}
+
+/** 多个互不相连、处于相同两代的四口之家。 */
+export function manySameGenerationFamilies(count: number): Record<string, Member> {
+  const members: Record<string, Member> = {}
+  for (let index = 1; index <= Math.max(0, Math.floor(count)); index++) {
+    const prefix = `family-${String(index).padStart(4, '0')}`
+    const parentA = mk(`${prefix}-parent-a`, { birthDate: '1970-01-01' })
+    const parentB = mk(`${prefix}-parent-b`, { birthDate: '1972-01-01' })
+    const childA = mk(`${prefix}-child-a`, { birthDate: '2000-01-01' })
+    const childB = mk(`${prefix}-child-b`, { birthDate: '2002-01-01' })
+    addSpouse(parentA, parentB)
+    addParent(childA, parentA)
+    addParent(childA, parentB)
+    addParent(childB, parentA)
+    addParent(childB, parentB)
+    for (const member of [parentA, parentB, childA, childB]) {
+      members[member.id] = member
+    }
+  }
+  return members
+}
+
+/**
+ * 稳定的大型家族：本地 seeded LCG 决定支系规模与成员属性。
+ * 每个新成员只连接上一代父母；每组 parentage 最多四个孩子。
+ */
+export function largeFamily(seed: number, memberCount: number): Record<string, Member> {
+  const total = Math.max(0, Math.floor(memberCount))
+  const members: Record<string, Member> = {}
+  if (total === 0) return members
+
+  const random = seededRandom(seed)
+  let nextIndex = 1
+  const createPerson = (generation: number): Member => {
+    const id = `person-${String(nextIndex++).padStart(4, '0')}`
+    const year = 1720 + generation * 24 + Math.floor(random() * 5)
+    const month = String(1 + Math.floor(random() * 12)).padStart(2, '0')
+    const day = String(1 + Math.floor(random() * 28)).padStart(2, '0')
+    const person = mk(id, {
+      gender: random() < 0.5 ? 'female' : 'male',
+      birthDate: `${year}-${month}-${day}`,
+    })
+    members[id] = person
+    return person
+  }
+
+  while (nextIndex <= total) {
+    const remaining = () => total - nextIndex + 1
+    const grandparentA = createPerson(0)
+    if (remaining() === 0) break
+    const grandparentB = createPerson(0)
+    addSpouse(grandparentA, grandparentB)
+
+    const adultCount = Math.min(remaining(), 1 + Math.floor(random() * 2))
+    const adultFamilies: Array<{ adult: Member; spouse?: Member }> = []
+    for (let index = 0; index < adultCount; index++) {
+      const adult = createPerson(1)
+      addParent(adult, grandparentA)
+      addParent(adult, grandparentB)
+      adultFamilies.push({ adult })
+    }
+    for (const family of adultFamilies) {
+      if (remaining() === 0) break
+      family.spouse = createPerson(1)
+      addSpouse(family.adult, family.spouse)
+    }
+    for (const family of adultFamilies) {
+      if (remaining() === 0) break
+      const childCount = Math.min(remaining(), 1 + Math.floor(random() * 4))
+      for (let index = 0; index < childCount; index++) {
+        const child = createPerson(2)
+        addParent(child, family.adult)
+        if (family.spouse) addParent(child, family.spouse)
+      }
+    }
+  }
+  return members
+}
+
+function siblingCorePair(childCount: number): Record<string, Member> {
+  const members: Record<string, Member> = {}
+  for (const core of ['a', 'b']) {
+    const parentA = mk(`${core}-parent-a`, { birthDate: '1950-01-01' })
+    const parentB = mk(`${core}-parent-b`, { birthDate: '1952-01-01' })
+    addSpouse(parentA, parentB)
+    members[parentA.id] = parentA
+    members[parentB.id] = parentB
+    for (let index = 1; index <= childCount; index++) {
+      const child = mk(`${core}-child-${index}`, {
+        birthDate: `${1975 + index}-01-01`,
+      })
+      addParent(child, parentA)
+      addParent(child, parentB)
+      members[child.id] = child
+    }
+  }
+  return members
+}
+
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0
+    return state / 0x100000000
+  }
 }

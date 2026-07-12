@@ -1,10 +1,4 @@
 import type { FamilyData, PersistedLayoutPreferences } from '@/core/schema'
-import {
-  buildGridFamilyModel,
-  coupleSlotId,
-  personSlotId,
-  singleParentSlotId,
-} from '@/core/layout/gridFamilyModel'
 import { assignGenerations } from './assignGenerations'
 import { buildFamilyUnits } from './buildFamilyUnits'
 import { normalizeFacts } from './normalizeFacts'
@@ -39,19 +33,17 @@ export function withRowOrderPreference(
 
 export function convertLegacyGridPreferences(data: FamilyData): PersistedLayoutPreferences {
   const { built, generationByUnitId, unitIdsByGeneration } = buildCurrentLayoutState(data)
-  const memberIdsByLegacySlotId = new Map(
-    buildGridFamilyModel(data).slots.map(slot => [slot.id, slot.memberIds]),
-  )
+  const memberIdsByLegacySlotId = new Map<string, string[]>()
   const addAlias = (slotId: string, memberIds: string[]) => {
     if (!memberIdsByLegacySlotId.has(slotId)) memberIdsByLegacySlotId.set(slotId, memberIds)
   }
   for (const unit of built.units) {
     for (const memberId of unit.memberIds) {
-      addAlias(personSlotId(memberId), [memberId])
-      addAlias(singleParentSlotId(memberId), [memberId])
+      addAlias(`person:${memberId}`, [memberId])
+      addAlias(`single-parent:${memberId}`, [memberId])
     }
     if (unit.memberIds.length === 2) {
-      addAlias(coupleSlotId(unit.memberIds[0], unit.memberIds[1]), unit.memberIds)
+      addAlias(`couple:${[...unit.memberIds].sort().join('+')}`, unit.memberIds)
     }
   }
   const entriesByGeneration = new Map<number, Array<{

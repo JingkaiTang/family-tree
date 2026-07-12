@@ -191,40 +191,33 @@ function sweep(rows: Row[], direction: 'down' | 'up', context: OrderingContext) 
       acceptCandidate(rows, row, candidateBlocks.flat(), context)
     }
 
-    let improved = true
-    while (improved) {
-      improved = false
-      const currentBlocks = buildBlocks(
-        row.unitIds,
-        context.input.parentageGroups,
-        context.input.clusters,
-        context.unitIdByPersonId,
-      )
-      const currentScore = scoreRows(rows, context)
-      let bestIds = row.unitIds
-      let bestScore = currentScore
-      for (let index = 0; index < currentBlocks.length - 1; index++) {
-        const swapped = [...currentBlocks]
-        ;[swapped[index], swapped[index + 1]] = [swapped[index + 1], swapped[index]]
-        const candidateIds = swapped.flat()
-        const previousIds = row.unitIds
-        row.unitIds = candidateIds
-        const candidateScore = scoreRows(rows, context)
-        row.unitIds = previousIds
-        const comparison = compareScores(candidateScore, bestScore)
-        if (
-          comparison < 0
-          || (comparison === 0 && candidateIds.join('\0') < bestIds.join('\0'))
-        ) {
-          bestIds = candidateIds
-          bestScore = candidateScore
-        }
-      }
-      if (compareScores(bestScore, currentScore) < 0) {
-        row.unitIds = bestIds
-        improved = true
+    const currentBlocks = buildBlocks(
+      row.unitIds,
+      context.input.parentageGroups,
+      context.input.clusters,
+      context.unitIdByPersonId,
+    )
+    const currentScore = scoreRows(rows, context)
+    let bestIds = row.unitIds
+    let bestScore = currentScore
+    for (let index = 0; index < currentBlocks.length - 1; index++) {
+      const swapped = [...currentBlocks]
+      ;[swapped[index], swapped[index + 1]] = [swapped[index + 1], swapped[index]]
+      const candidateIds = swapped.flat()
+      const previousIds = row.unitIds
+      row.unitIds = candidateIds
+      const candidateScore = scoreRows(rows, context)
+      row.unitIds = previousIds
+      const comparison = compareScores(candidateScore, bestScore)
+      if (
+        comparison < 0
+        || (comparison === 0 && candidateIds.join('\0') < bestIds.join('\0'))
+      ) {
+        bestIds = candidateIds
+        bestScore = candidateScore
       }
     }
+    if (compareScores(bestScore, currentScore) < 0) row.unitIds = bestIds
   }
 }
 

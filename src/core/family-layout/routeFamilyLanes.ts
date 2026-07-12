@@ -297,6 +297,13 @@ function allocateVerticalX(
   connectionMinX: number,
   connectionMaxX: number,
 ): number {
+  const conflictsAt = (x: number) => occupancy.some(vertical => (
+    vertical.routeOwnerId !== routeOwnerId
+    && vertical.x === x
+    && positiveOverlap(minY, maxY, vertical.minY, vertical.maxY)
+  ))
+  if (!conflictsAt(desiredX)) return desiredX
+
   const offsets = [0]
   for (let step = 1; step <= occupancy.length + 1; step++) {
     offsets.push(step * routeSubgrid, -step * routeSubgrid)
@@ -308,11 +315,7 @@ function allocateVerticalX(
       || Math.abs(left) - Math.abs(right)
       || right - left
   })
-  return desiredX + offsets.find(offset => !occupancy.some(vertical => (
-    vertical.routeOwnerId !== routeOwnerId
-    && vertical.x === desiredX + offset
-    && positiveOverlap(minY, maxY, vertical.minY, vertical.maxY)
-  )))!
+  return desiredX + offsets.find(offset => !conflictsAt(desiredX + offset))!
 }
 
 function addCrossingBridges(

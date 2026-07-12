@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { routeFamilyLanes } from './routeFamilyLanes'
+import { materializeSceneGeometry } from './materializeSceneGeometry'
 import { positiveCollinearOverlap } from './testHelpers'
 import { validateScene } from './validateScene'
 import {
@@ -269,6 +270,48 @@ describe('routeFamilyLanes', () => {
       .toEqual([])
   })
 
+  it('keeps a free source stem exact when the child is behind an unrelated unit', () => {
+    const filler = overlappingFamilyFixture(40)
+    const targetBase = 200_000
+    const source = coupleUnit('source', targetBase, 0, 'source')
+    const obstacle = coupleUnit('obstacle', targetBase + 432, 0, 'obstacle')
+    const child = singleUnit('child', targetBase + 480, 576, '')
+    const units = [...filler.units, source, obstacle, child]
+    const parentageGroups: ParentageGroup[] = [...filler.parentageGroups, {
+      id: 'parentage:source',
+      sourceUnitId: source.id,
+      childPersonIds: child.memberIds,
+    }]
+    const geometry = materializeSceneGeometry({
+      placedUnits: units.map((unit, order) => ({ ...unit, order })),
+      rows: [{
+        generation: 0,
+        unitIds: units.filter(unit => unit.generation === 0).map(unit => unit.id),
+      }, {
+        generation: 1,
+        unitIds: units.filter(unit => unit.generation === 1).map(unit => unit.id),
+      }],
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    const result = routeFamilyLanes({
+      geometry,
+      units,
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(result.diagnostics).toEqual([])
+    const route = result.routes.find(value => value.routeOwnerId === 'parentage:source')!
+    expect(route.segments.some(segment => (
+      segment.orientation === 'vertical'
+      && segment.points.every(point => point.x === targetBase + 180)
+    ))).toBe(true)
+    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+      .toEqual([])
+  })
+
   it('emits a bridge when a crossing is closer than half a subgrid to a bus end', () => {
     const firstParent = singleUnit('first-parent', 720, 0, 'first')
     const secondParent = singleUnit('second-parent', 482, 0, 'second')
@@ -392,7 +435,7 @@ function overlappingFamilyFixture(
   familyCount: number,
   childY = DEFAULT_LAYOUT_METRICS.cardHeight + DEFAULT_LAYOUT_METRICS.generationGap,
 ): {
-  units: FamilyUnit[]
+  units: Array<FamilyUnit & { rect: Rect }>
   parentageGroups: ParentageGroup[]
   geometry: SceneGeometry
 } {
@@ -478,6 +521,24 @@ function singleUnit(id: string, x: number, y: number, accent: string): FamilyUni
       x,
       y,
       width: DEFAULT_LAYOUT_METRICS.cardWidth,
+      height: DEFAULT_LAYOUT_METRICS.cardHeight,
+    },
+  }
+}
+
+function coupleUnit(id: string, x: number, y: number, accent: string): FamilyUnit & { rect: Rect } {
+  return {
+    id: `unit:partnership:${id}`,
+    kind: 'couple',
+    memberIds: [`${id}-left`, `${id}-right`],
+    generation: y === 0 ? 0 : 1,
+    width: DEFAULT_LAYOUT_METRICS.cardWidth * 2 + DEFAULT_LAYOUT_METRICS.spouseGap,
+    lineageAffinity: {},
+    accent,
+    rect: {
+      x,
+      y,
+      width: DEFAULT_LAYOUT_METRICS.cardWidth * 2 + DEFAULT_LAYOUT_METRICS.spouseGap,
       height: DEFAULT_LAYOUT_METRICS.cardHeight,
     },
   }
