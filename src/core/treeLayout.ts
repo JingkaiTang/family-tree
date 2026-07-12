@@ -16,6 +16,7 @@ export interface LayoutFamilyTreeOptions {
   view?: Partial<FamilyViewPolicy>
   previousScene?: LayoutScene
   changedIds?: string[]
+  auxiliaryFocusPersonId?: string
 }
 
 export async function layoutFamilyTree(
@@ -33,6 +34,7 @@ export async function layoutFamilyTree(
     inputDiagnostics: normalized.diagnostics,
     previousScene: options.previousScene,
     changedIds: options.changedIds,
+    auxiliaryFocusPersonId: options.auxiliaryFocusPersonId,
   })
 }
 

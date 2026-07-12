@@ -371,7 +371,80 @@ describe('FamilyCanvas', () => {
     mountCanvas(data)
     await flushPromises()
 
-    expect(layoutFamilyTree).toHaveBeenCalledWith(members, { data })
+    expect(layoutFamilyTree).toHaveBeenCalledWith(members, {
+      data,
+      view: {
+        showHistoricalPartnerships: false,
+        showSecondaryParentage: false,
+        showGodparentRelations: false,
+      },
+    })
+  })
+
+  it('recomputes only auxiliary routing when its toggle or selected focus changes', async () => {
+    const data = familyData([mk('A'), mk('B')])
+    const wrapper = mountCanvas(data, {
+      selectedId: 'A',
+      viewpointId: 'B',
+      showAuxiliaryRelations: false,
+    })
+    await flushPromises()
+
+    expect(layoutFamilyTree).toHaveBeenLastCalledWith(Object.values(data.members), {
+      data,
+      view: {
+        showHistoricalPartnerships: false,
+        showSecondaryParentage: false,
+        showGodparentRelations: false,
+      },
+    })
+
+    await wrapper.setProps({ showAuxiliaryRelations: true })
+    await flushPromises()
+    expect(layoutFamilyTree).toHaveBeenLastCalledWith(Object.values(data.members), {
+      data,
+      view: {
+        showHistoricalPartnerships: true,
+        showSecondaryParentage: true,
+        showGodparentRelations: true,
+      },
+      auxiliaryFocusPersonId: 'A',
+    })
+
+    await wrapper.setProps({ selectedId: 'B' })
+    await flushPromises()
+    expect(layoutFamilyTree).toHaveBeenLastCalledWith(Object.values(data.members), {
+      data,
+      view: {
+        showHistoricalPartnerships: true,
+        showSecondaryParentage: true,
+        showGodparentRelations: true,
+      },
+      auxiliaryFocusPersonId: 'B',
+    })
+  })
+
+  it('dashes only auxiliary routes with the specified pattern', async () => {
+    const scene = structuredClone(coupleScene)
+    scene.routes.push({
+      id: 'route:aux:A+B',
+      routeOwnerId: 'aux:A+B',
+      kind: 'historical-partnership',
+      accent: '#64748b',
+      segments: [{
+        orientation: 'horizontal',
+        points: [{ x: 0, y: 108 }, { x: 48, y: 108 }],
+      }],
+    })
+    layoutFamilyTree.mockResolvedValueOnce(scene)
+
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]))
+    await flushPromises()
+
+    expect(wrapper.get('[data-route-id="route:aux:A+B"]').attributes('stroke-dasharray'))
+      .toBe('8 6')
+    expect(wrapper.get('[data-route-id="route:parents"]').attributes('stroke-dasharray'))
+      .toBeUndefined()
   })
 
   it('renders every member from the single data source', async () => {
@@ -610,6 +683,11 @@ describe('FamilyCanvas', () => {
     expect(layoutFamilyTree).toHaveBeenCalledTimes(2)
     expect(layoutFamilyTree).toHaveBeenLastCalledWith(Object.values(family.data.members), {
       data: family.data,
+      view: {
+        showHistoricalPartnerships: false,
+        showSecondaryParentage: false,
+        showGodparentRelations: false,
+      },
       previousScene,
       changedIds: ['C', 'E', 'K', 'P', 'Q'].sort((left, right) => left.localeCompare(right)),
     })

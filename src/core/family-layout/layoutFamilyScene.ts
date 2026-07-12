@@ -6,6 +6,7 @@ import { compactGrid } from './compactGrid'
 import { orderUnits } from './orderUnits'
 import { projectView } from './projectView'
 import { routeFamilyLanes } from './routeFamilyLanes'
+import { routeAuxiliaryEdges } from './routeAuxiliaryEdges'
 import type {
   FamilyUnit,
   LayoutDiagnostic,
@@ -14,6 +15,7 @@ import type {
   LayoutScene,
   OrderedGeneration,
   ParentageGroup,
+  AuxiliaryRelation,
 } from './types'
 import { validateScene } from './validateScene'
 
@@ -54,6 +56,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
     request.metrics,
     retainedDiagnostics,
     request,
+    projected.auxiliaryRelations,
   )
 
   if (!first.routingDiagnostics.some(value => (
@@ -80,6 +83,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
     retryMetrics,
     retainedDiagnostics,
     request,
+    projected.auxiliaryRelations,
   )
   return hasUnsafeDiagnostic(retry.scene)
     ? buildSafeFallbackScene(
@@ -103,6 +107,7 @@ function buildAttempt(
   metrics: LayoutMetrics,
   retainedDiagnostics: LayoutDiagnostic[],
   request: LayoutRequest,
+  auxiliaryRelations: AuxiliaryRelation[],
 ): LayoutAttempt {
   const geometry = compactGrid({
     units,
@@ -125,6 +130,17 @@ function buildAttempt(
   }
   scene.diagnostics.push(...validateScene(scene, metrics))
   scene.diagnostics.sort(compareDiagnostics)
+  const focusId = request.auxiliaryFocusPersonId
+  if (focusId) {
+    scene.routes.push(...routeAuxiliaryEdges({
+      geometry,
+      auxiliaryRelations: auxiliaryRelations.filter(relation => (
+        relation.sourceId === focusId || relation.targetId === focusId
+      )),
+      primaryRoutes: routing.routes,
+      metrics,
+    }))
+  }
   return { scene, routingDiagnostics: routing.diagnostics }
 }
 

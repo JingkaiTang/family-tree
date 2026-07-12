@@ -7,6 +7,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import TreeView from '@/pages/TreeView.vue'
 import { useFamilyStore } from '@/stores/family'
+import { useUiStore } from '@/stores/ui'
+import { mk } from '@/__tests__/fixtures/families'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -17,6 +19,7 @@ vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
 
 const FamilyCanvasStub = defineComponent({
   name: 'FamilyCanvas',
+  props: ['selectedId', 'viewpointId', 'showAuxiliaryRelations'],
   emits: ['row-order-change'],
   setup(_, { emit }) {
     return () => h('button', {
@@ -50,5 +53,41 @@ describe('TreeView row order integration', () => {
       id: 'row:0',
       unitIds: ['unit:person:b', 'unit:person:a'],
     }])
+  })
+
+  it('toggles auxiliary relations without using selection as viewpoint', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const ui = useUiStore()
+    const family = useFamilyStore()
+    family.$patch(state => {
+      state.data.members = {
+        selected: mk('selected'),
+        viewpoint: mk('viewpoint'),
+      }
+    })
+    ui.setSelected('selected')
+    ui.setViewpoint('viewpoint')
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          FamilyCanvas: FamilyCanvasStub,
+          SearchBar: true,
+        },
+      },
+    })
+
+    const toggle = wrapper.get('[data-testid="auxiliary-relations-toggle"]')
+    expect((toggle.element as HTMLInputElement).checked).toBe(false)
+    await toggle.setValue(true)
+
+    expect(ui.showAuxiliaryRelations).toBe(true)
+    const canvas = wrapper.getComponent(FamilyCanvasStub)
+    expect(canvas.props()).toMatchObject({
+      selectedId: 'selected',
+      viewpointId: 'viewpoint',
+      showAuxiliaryRelations: true,
+    })
   })
 })

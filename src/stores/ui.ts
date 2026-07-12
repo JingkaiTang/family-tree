@@ -8,6 +8,7 @@ export const useUiStore = defineStore('ui', () => {
   const viewpointId = ref<string | null>(null) // 当前以谁为视角查看称呼
   const selectedId = ref<string | null>(null)
   const searchQuery = ref('')
+  const showAuxiliaryRelations = ref(false)
   /** 错误/成功 toast */
   const toast = ref<{ type: 'info' | 'error' | 'success'; text: string } | null>(null)
   /**
@@ -24,6 +25,9 @@ export const useUiStore = defineStore('ui', () => {
   }
   function setSearch(q: string) {
     searchQuery.value = q
+  }
+  function setShowAuxiliaryRelations(value: boolean) {
+    showAuxiliaryRelations.value = value
   }
   function setCanvasView(v: { x: number; y: number; scale: number } | null) {
     canvasView.value = v
@@ -44,11 +48,13 @@ export const useUiStore = defineStore('ui', () => {
     viewpointId,
     selectedId,
     searchQuery,
+    showAuxiliaryRelations,
     toast,
     canvasView,
     setViewpoint,
     setSelected,
     setSearch,
+    setShowAuxiliaryRelations,
     setCanvasView,
     showToast,
     clearToast,

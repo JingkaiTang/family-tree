@@ -76,7 +76,7 @@ function pointValue(point: Point): string {
           :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
           :d="pathData(segment)"
           :stroke="route.accent"
-          :stroke-dasharray="route.kind === 'primary' ? undefined : '6 4'"
+          :stroke-dasharray="route.kind === 'primary' ? undefined : '8 6'"
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"

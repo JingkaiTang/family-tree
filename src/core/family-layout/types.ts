@@ -97,6 +97,7 @@ export interface LayoutRequest {
   inputDiagnostics: LayoutDiagnostic[]
   previousScene?: LayoutScene
   changedIds?: string[]
+  auxiliaryFocusPersonId?: string
 }
 
 export interface FamilyUnit {
@@ -154,7 +155,7 @@ export interface RouteSegment {
 export interface RoutedFamilyEdge {
   id: string
   routeOwnerId: string
-  kind: 'primary' | 'historical-partnership' | 'secondary-parentage' | 'godparent'
+  kind: 'primary' | 'historical-partnership' | 'secondary-partnership' | 'secondary-parentage' | 'godparent'
   accent: string
   segments: RouteSegment[]
 }

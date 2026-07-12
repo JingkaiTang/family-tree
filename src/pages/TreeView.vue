@@ -15,7 +15,7 @@ const router = useRouter()
 const family = useFamilyStore()
 const ui = useUiStore()
 const { projectMeta, projectPath, memberCount, isDirty, membersArray, data } = storeToRefs(family)
-const { viewpointId, selectedId } = storeToRefs(ui)
+const { viewpointId, selectedId, showAuxiliaryRelations } = storeToRefs(ui)
 
 const saveStatus = computed(() => {
   if (!family.projectPath) return ''
@@ -175,6 +175,15 @@ function seedFixture() {
       </div>
       <div class="flex items-center gap-4">
         <SearchBar :on-jump="onSelect" />
+        <label class="flex items-center gap-1 text-sm text-slate-600">
+          <input
+            data-testid="auxiliary-relations-toggle"
+            type="checkbox"
+            :checked="showAuxiliaryRelations"
+            @change="ui.setShowAuxiliaryRelations(($event.target as HTMLInputElement).checked)"
+          >
+          辅助关系
+        </label>
         <span class="text-xs text-slate-500">成员：{{ memberCount }}</span>
         <button
           class="rounded bg-slate-900 px-3 py-1 text-sm text-white hover:bg-slate-700"
@@ -232,6 +241,7 @@ function seedFixture() {
         :viewpoint-id="viewpointId"
         :get-kinship="kinshipResolver"
         :initial-view="ui.canvasView"
+        :show-auxiliary-relations="showAuxiliaryRelations"
         @select="onSelect"
         @open="onOpen"
         @view-change="ui.setCanvasView"

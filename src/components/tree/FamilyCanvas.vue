@@ -16,6 +16,7 @@ const props = defineProps<{
   viewpointId?: string | null
   getKinship?: (fromId: string, toId: string) => string | null
   initialView?: PanzoomView | null
+  showAuxiliaryRelations?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -57,8 +58,17 @@ async function updateLayout(options: {
   const requestId = ++layoutRequestId
   const pendingTokenAtRequest = pendingDropToken
   const layoutData = options.data ?? props.data
+  const showAuxiliaryRelations = props.showAuxiliaryRelations === true
   const nextScene = await layoutFamilyTree(Object.values(layoutData.members), {
     data: layoutData,
+    view: {
+      showHistoricalPartnerships: showAuxiliaryRelations,
+      showSecondaryParentage: showAuxiliaryRelations,
+      showGodparentRelations: showAuxiliaryRelations,
+    },
+    ...(showAuxiliaryRelations && props.selectedId
+      ? { auxiliaryFocusPersonId: props.selectedId }
+      : {}),
     ...(options.previousScene ? { previousScene: options.previousScene } : {}),
     ...(options.changedIds ? { changedIds: options.changedIds } : {}),
   })
@@ -99,6 +109,11 @@ watch(
     void updateLayout()
   },
   { immediate: true, deep: true },
+)
+
+watch(
+  () => [props.showAuxiliaryRelations, props.selectedId] as const,
+  () => { void updateLayout() },
 )
 
 const sceneOffset = computed(() => ({
