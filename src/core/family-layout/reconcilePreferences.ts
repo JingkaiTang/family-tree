@@ -15,6 +15,28 @@ import {
   EMPTY_LAYOUT_PREFERENCES,
 } from './types'
 
+export function withRowOrderPreference(
+  data: FamilyData,
+  id: string,
+  unitIds: string[],
+): FamilyData {
+  const nextRow = { id, unitIds: [...new Set(unitIds)] }
+  const index = data.layoutPreferences.rowOrders.findIndex(row => row.id === id)
+  const rowOrders = data.layoutPreferences.rowOrders.map(row => ({
+    id: row.id,
+    unitIds: [...row.unitIds],
+  }))
+  if (index >= 0) rowOrders[index] = nextRow
+  else rowOrders.push(nextRow)
+  return {
+    ...data,
+    layoutPreferences: {
+      ...data.layoutPreferences,
+      rowOrders,
+    },
+  }
+}
+
 export function convertLegacyGridPreferences(data: FamilyData): PersistedLayoutPreferences {
   const { built, generationByUnitId, unitIdsByGeneration } = buildCurrentLayoutState(data)
   const memberIdsByLegacySlotId = new Map(

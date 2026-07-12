@@ -3,6 +3,7 @@ import { createEmptyFamily, type Member } from '@/core/schema'
 import {
   convertLegacyGridPreferences,
   reconcileLayoutPreferences,
+  withRowOrderPreference,
 } from './reconcilePreferences'
 
 function member(id: string, patch: Partial<Member> = {}): Member {
@@ -238,5 +239,27 @@ describe('reconcileLayoutPreferences', () => {
       rowOrders: [],
       familyAccentAssignments: {},
     })
+  })
+})
+
+describe('withRowOrderPreference', () => {
+  it('upserts a unique row order without mutating the input or legacy fields', () => {
+    const data = createEmptyFamily()
+    data.layoutPreferences.rowOrders = [{ id: 'row:other', unitIds: ['unit:person:x'] }]
+    const before = structuredClone(data)
+
+    const next = withRowOrderPreference(data, 'row:0', [
+      'unit:person:b',
+      'unit:person:a',
+      'unit:person:b',
+    ])
+
+    expect(data).toEqual(before)
+    expect(next.layoutPreferences.rowOrders).toEqual([
+      { id: 'row:other', unitIds: ['unit:person:x'] },
+      { id: 'row:0', unitIds: ['unit:person:b', 'unit:person:a'] },
+    ])
+    expect(next.manualPositions).toEqual({})
+    expect(next.gridLayoutOverrides).toEqual({})
   })
 })

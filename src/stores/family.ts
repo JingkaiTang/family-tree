@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { reconcileLayoutPreferences } from '@/core/family-layout/reconcilePreferences'
+import {
+  reconcileLayoutPreferences,
+  withRowOrderPreference,
+} from '@/core/family-layout/reconcilePreferences'
 import type { ChildLayoutAssignment, FamilyData, GridLayoutOverride, Member, ProjectMeta } from '@/core/schema'
 import { createEmptyFamily } from '@/core/schema'
 import { setLastProjectPath } from '@/services/prefs'
@@ -288,11 +291,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setRowOrderPreference(id: string, unitIds: string[]) {
-    const uniqueIds = [...new Set(unitIds)]
-    const index = data.value.layoutPreferences.rowOrders.findIndex(row => row.id === id)
-    const next = { id, unitIds: uniqueIds }
-    if (index >= 0) data.value.layoutPreferences.rowOrders[index] = next
-    else data.value.layoutPreferences.rowOrders.push(next)
+    data.value = withRowOrderPreference(data.value, id, unitIds)
     markDirty()
   }
 

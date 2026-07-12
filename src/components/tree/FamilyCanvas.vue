@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import type { LayoutScene, Point } from '@/core/family-layout/types'
+import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type Point } from '@/core/family-layout/types'
 import type { FamilyData } from '@/core/schema'
+import { withRowOrderPreference } from '@/core/family-layout/reconcilePreferences'
 import { layoutFamilyTree } from '@/core/treeLayout'
-import { useFamilyStore } from '@/stores/family'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import FamilyUnit, { type FamilyUnitDragPayload } from './FamilyUnit.vue'
 import GridBackground from './GridBackground.vue'
@@ -22,6 +22,7 @@ const emit = defineEmits<{
   (event: 'select', id: string): void
   (event: 'open', id: string): void
   (event: 'view-change', value: PanzoomView): void
+  (event: 'row-order-change', rowId: string, unitIds: string[]): void
 }>()
 
 const PADDING = 40
@@ -38,24 +39,25 @@ const EMPTY_SCENE: LayoutScene = {
 void props.rootId
 
 const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
-const family = useFamilyStore()
 const scene = ref<LayoutScene>(EMPTY_SCENE)
 const members = computed(() => Object.values(props.data.members))
 let layoutRequestId = 0
 let suppressInitialSceneFocus = !!props.initialView
-let skipNextDataLayout = false
+let expectedRowUpdate: { rowId: string; unitIds: string[] } | null = null
 let pendingDropToken: number | null = null
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 const animatePositions = ref(false)
 
 async function updateLayout(options: {
+  data?: FamilyData
   previousScene?: LayoutScene
   changedIds?: string[]
 } = {}) {
   const requestId = ++layoutRequestId
   const pendingTokenAtRequest = pendingDropToken
-  const nextScene = await layoutFamilyTree(members.value, {
-    data: props.data,
+  const layoutData = options.data ?? props.data
+  const nextScene = await layoutFamilyTree(Object.values(layoutData.members), {
+    data: layoutData,
     ...(options.previousScene ? { previousScene: options.previousScene } : {}),
     ...(options.changedIds ? { changedIds: options.changedIds } : {}),
   })
@@ -87,10 +89,11 @@ async function updateLayout(options: {
 watch(
   () => props.data,
   () => {
-    if (skipNextDataLayout) {
-      skipNextDataLayout = false
+    if (expectedRowUpdate && hasExpectedRowOrder(props.data, expectedRowUpdate)) {
+      expectedRowUpdate = null
       return
     }
+    expectedRowUpdate = null
     void updateLayout()
   },
   { immediate: true, deep: true },
@@ -191,6 +194,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     || dragState.value.unitId !== payload.unitId
     || pendingDropToken !== null
   ) {
+    if (pendingDropToken !== null) layoutRequestId += 1
     dragToken += 1
     pendingDropToken = null
   }
@@ -219,15 +223,28 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
   }
 
   const previousScene = scene.value
+  const nextData = withRowOrderPreference(props.data, state.rowId, rowOrder)
   pendingDropToken = dragToken
-  skipNextDataLayout = true
-  family.setRowOrderPreference(state.rowId, rowOrder)
-  await nextTick()
-  skipNextDataLayout = false
+  const expectation = { rowId: state.rowId, unitIds: [...rowOrder] }
+  expectedRowUpdate = expectation
+  emit('row-order-change', state.rowId, [...rowOrder])
+  void nextTick(() => {
+    if (expectedRowUpdate === expectation) expectedRowUpdate = null
+  })
   await updateLayout({
+    data: nextData,
     previousScene,
     changedIds: affectedMemberIds(payload.memberIds),
   })
+}
+
+function hasExpectedRowOrder(
+  data: FamilyData,
+  expected: { rowId: string; unitIds: string[] },
+): boolean {
+  const row = data.layoutPreferences.rowOrders.find(value => value.id === expected.rowId)
+  return row?.unitIds.length === expected.unitIds.length
+    && row.unitIds.every((unitId, index) => unitId === expected.unitIds[index])
 }
 
 function onUnitCancel(payload: FamilyUnitDragPayload) {
@@ -286,13 +303,30 @@ const previewOffsetByUnitId = computed<Record<string, Point>>(() => {
   if (!state || !order) return {}
   const row = scene.value.rows.find(value => value.id === state.rowId)
   if (!row) return {}
-  const slotX = row.unitIds.map(unitId => (
-    scene.value.units.find(unit => unit.id === unitId)?.rect.x
-  ))
-  return Object.fromEntries(order.flatMap((unitId, index) => {
-    if (unitId === state.unitId || slotX[index] === undefined) return []
+  const rowUnits = row.unitIds
+    .map(unitId => scene.value.units.find(unit => unit.id === unitId))
+    .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
+  const rowGap = rowUnits.slice(1).reduce<number | null>((minimum, unit, index) => {
+    const previous = rowUnits[index]
+    const gap = unit.rect.x - previous.rect.x - previous.rect.width
+    if (gap < 0) return minimum
+    return minimum === null ? gap : Math.min(minimum, gap)
+  }, null) ?? DEFAULT_LAYOUT_METRICS.familyGap
+  let nextX = Math.min(...rowUnits.map(unit => unit.rect.x))
+  const previewXByUnitId = new Map<string, number>()
+  for (const unitId of order) {
     const unit = scene.value.units.find(value => value.id === unitId)
-    return unit ? [[unitId, { x: slotX[index]! - unit.rect.x, y: 0 }]] : []
+    if (!unit) continue
+    previewXByUnitId.set(unitId, nextX)
+    nextX += unit.rect.width + rowGap
+  }
+  return Object.fromEntries(order.flatMap(unitId => {
+    if (unitId === state.unitId) return []
+    const unit = scene.value.units.find(value => value.id === unitId)
+    const previewX = previewXByUnitId.get(unitId)
+    return unit && previewX !== undefined
+      ? [[unitId, { x: previewX - unit.rect.x, y: 0 }]]
+      : []
   }))
 })
 
@@ -327,13 +361,22 @@ const fadedRouteIds = computed(() => {
 
 function affectedMemberIds(memberIds: string[]): string[] {
   const ids = new Set(memberIds)
+  const unitMemberIds = new Set(memberIds)
   for (const memberId of memberIds) {
     const member = props.data.members[memberId]
     if (!member) continue
     for (const parent of member.parents) ids.add(parent.id)
     for (const child of member.children) ids.add(child.id)
   }
-  return [...ids]
+  for (const member of Object.values(props.data.members)) {
+    if (
+      member.parents.some(parent => unitMemberIds.has(parent.id))
+      || member.children.some(child => unitMemberIds.has(child.id))
+    ) {
+      ids.add(member.id)
+    }
+  }
+  return [...ids].sort((left, right) => left.localeCompare(right))
 }
 
 onBeforeUnmount(() => {
