@@ -68,11 +68,13 @@ export function materializeSceneGeometry(
     }))
   ))
   const cardById = new Map(cards.map(card => [card.id, card]))
-  const parentageOwnerIds = new Set(
-    input.parentageGroups.map(group => group.sourceUnitId),
+  const defaultParentageOwnerIds = new Set(
+    input.parentageGroups
+      .filter(group => group.sourceAnchorPersonId === undefined)
+      .map(group => group.sourceUnitId),
   )
   const hubs: PlacedUnionHub[] = units
-    .filter(unit => unit.kind === 'couple' || parentageOwnerIds.has(unit.id))
+    .filter(unit => unit.kind === 'couple' || defaultParentageOwnerIds.has(unit.id))
     .map(unit => ({
       id: `hub:${unit.id}`,
       unitId: unit.id,

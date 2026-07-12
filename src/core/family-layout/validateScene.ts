@@ -61,19 +61,28 @@ function validateRouteTerminals(
   const cardPorts = scene.cards.map(card => topPort(card.rect))
   const hubLeaves = leaves.filter(point => hubPoints.some(hub => samePoint(point, hub)))
   const cardLeaves = leaves.filter(point => cardPorts.some(port => samePoint(point, port)))
+  const auxiliaryCardLeaves = leaves.filter(point => scene.cards.some(card => (
+    pointOnCardSide(point, card.rect)
+  )))
+  const auxiliaryTerminalCardIds = new Set(scene.cards.filter(card => leaves.some(point => (
+    pointOnCardSide(point, card.rect)
+  ))).map(card => card.id))
   if (!graphIsConnected) diagnostics.push({
     code: 'UNROUTABLE_PRIMARY_EDGE',
     ids: [route.routeOwnerId],
     message: `Route ${route.routeOwnerId} is disconnected`,
   })
-  if (
-    hubLeaves.length !== 1
-    || cardLeaves.length === 0
-    || leaves.some(point => (
-      !hubPoints.some(hub => samePoint(point, hub))
-      && !cardPorts.some(port => samePoint(point, port))
-    ))
-  ) diagnostics.push({
+  const hasMismatchedTerminals = route.kind === 'primary'
+    ? hubLeaves.length !== 1
+      || cardLeaves.length === 0
+      || leaves.some(point => (
+        !hubPoints.some(hub => samePoint(point, hub))
+        && !cardPorts.some(port => samePoint(point, port))
+      ))
+    : leaves.length !== 2
+      || auxiliaryCardLeaves.length !== 2
+      || auxiliaryTerminalCardIds.size !== 2
+  if (hasMismatchedTerminals) diagnostics.push({
     code: 'UNROUTABLE_PRIMARY_EDGE',
     ids: [route.routeOwnerId],
     message: `Route ${route.routeOwnerId} has dangling or mismatched endpoints`,
@@ -88,21 +97,34 @@ function validateRouteObstacles(
   diagnostics: LayoutDiagnostic[],
 ) {
   const leaves = routeLeaves(route)
-  const sourceUnitIds = new Set(scene.hubs
-    .filter(hub => leaves.some(point => samePoint(point, hub.point)))
-    .map(hub => hub.unitId))
-  const targetCardIds = new Set(scene.cards
-    .filter(card => leaves.some(point => samePoint(point, topPort(card.rect))))
-    .map(card => card.id))
-  const targetUnitIds = new Set(scene.cards
-    .filter(card => targetCardIds.has(card.id))
-    .map(card => card.unitId))
-  const sourceCardIds = new Set(scene.cards
-    .filter(card => sourceUnitIds.has(card.unitId))
-    .map(card => card.id))
+  const terminalCardIds = new Set<string>()
+  const terminalUnitIds = new Set<string>()
+  if (route.kind === 'primary') {
+    const sourceUnitIds = new Set(scene.hubs
+      .filter(hub => leaves.some(point => samePoint(point, hub.point)))
+      .map(hub => hub.unitId))
+    const targetCards = scene.cards.filter(card => leaves.some(point => (
+      samePoint(point, topPort(card.rect))
+    )))
+    targetCards.forEach(card => {
+      terminalCardIds.add(card.id)
+      terminalUnitIds.add(card.unitId)
+    })
+    scene.cards.filter(card => sourceUnitIds.has(card.unitId)).forEach(card => (
+      terminalCardIds.add(card.id)
+    ))
+    sourceUnitIds.forEach(unitId => terminalUnitIds.add(unitId))
+  } else {
+    scene.cards.filter(card => leaves.some(point => (
+      pointOnCardSide(point, card.rect)
+    ))).forEach(card => {
+      terminalCardIds.add(card.id)
+      terminalUnitIds.add(card.unitId)
+    })
+  }
 
   for (const card of scene.cards) {
-    if (targetCardIds.has(card.id) || sourceCardIds.has(card.id)) continue
+    if (terminalCardIds.has(card.id)) continue
     const obstacle = expandRect(card.rect, metrics.cardClearance)
     if (!rectsOverlap(routeBounds, obstacle)) continue
     if (!route.segments.some(segment => segmentIntersectsRect(segment, obstacle))) continue
@@ -113,7 +135,7 @@ function validateRouteObstacles(
     })
   }
   for (const unit of scene.units) {
-    if (sourceUnitIds.has(unit.id) || targetUnitIds.has(unit.id)) continue
+    if (terminalUnitIds.has(unit.id)) continue
     const obstacle = expandRect(unit.rect, metrics.cardClearance)
     if (!rectsOverlap(routeBounds, obstacle)) continue
     if (!route.segments.some(segment => segmentIntersectsRect(segment, obstacle))) continue
@@ -161,8 +183,14 @@ function validateRoutePair(
       const leftSegment = left.segments[leftIndex]
       const rightSegment = right.segments[rightIndex]
       sharesCollinearSegment ||= positiveCollinearOverlap(leftSegment, rightSegment)
-      formsFalseT ||= falseTJunction(leftSegment, rightSegment)
-      crossesWithoutBridge ||= perpendicularInteriorCross(leftSegment, rightSegment)
+      formsFalseT ||= falseTJunction(
+        leftSegment,
+        rightSegment,
+        left.kind === 'primary' && right.kind === 'primary',
+      )
+      crossesWithoutBridge ||= left.kind === 'primary'
+        && right.kind === 'primary'
+        && perpendicularInteriorCross(leftSegment, rightSegment)
     }
   }
   if (sharesCollinearSegment) diagnostics.push({
@@ -276,13 +304,17 @@ function positiveCollinearOverlap(left: RouteSegment, right: RouteSegment): bool
   return a0.x === b0.x && positiveOverlap(a0.y, a1.y, b0.y, b1.y)
 }
 
-function falseTJunction(left: RouteSegment, right: RouteSegment): boolean {
+function falseTJunction(
+  left: RouteSegment,
+  right: RouteSegment,
+  coincidentEndpointsAreFalseT = true,
+): boolean {
   if (left.orientation === 'bridge' || right.orientation === 'bridge') return false
   const leftEndpoints = [left.points[0], left.points.at(-1)!]
   const rightEndpoints = [right.points[0], right.points.at(-1)!]
-  return leftEndpoints.some(leftPoint => rightEndpoints.some(rightPoint => (
-    samePoint(leftPoint, rightPoint)
-  ))) || leftEndpoints.some(point => (
+  return coincidentEndpointsAreFalseT && leftEndpoints.some(leftPoint => (
+    rightEndpoints.some(rightPoint => samePoint(leftPoint, rightPoint))
+  )) || leftEndpoints.some(point => (
     pointStrictlyInside(point, right)
   )) || rightEndpoints.some(point => (
     pointStrictlyInside(point, left)
@@ -348,6 +380,12 @@ function expandRect(rect: Rect, clearance: number): Rect {
 
 function topPort(rect: Rect): Point {
   return { x: rect.x + rect.width / 2, y: rect.y }
+}
+
+function pointOnCardSide(point: Point, rect: Rect): boolean {
+  return (point.x === rect.x || point.x === rect.x + rect.width)
+    && point.y > rect.y
+    && point.y < rect.y + rect.height
 }
 
 function samePoint(left: Point, right: Point): boolean {

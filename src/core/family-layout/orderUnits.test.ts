@@ -41,6 +41,98 @@ describe('orderUnits', () => {
     }])
   })
 
+  it('applies a saved single position to the couple that now contains the person', () => {
+    const units = [
+      single('left'),
+      couple('current:a+b', ['a', 'b']),
+      single('right'),
+    ]
+    const preferences: LayoutPreferences = {
+      rowOrders: [{
+        id: 'row:0',
+        unitIds: [
+          'unit:person:left',
+          'unit:person:a',
+          'unit:person:b',
+          'unit:person:right',
+        ],
+      }],
+      familyAccentAssignments: {},
+    }
+
+    expect(orderUnits(input(units, people([
+      ['left', '1990-01-01'],
+      ['a', '1970-01-01'],
+      ['b', '1971-01-01'],
+      ['right', '1980-01-01'],
+    ]), { preferences }))[0].unitIds).toEqual([
+      'unit:person:left',
+      'unit:partnership:current:a+b',
+      'unit:person:right',
+    ])
+  })
+
+  it('applies a saved couple position to both people after they become singles', () => {
+    const units = [single('left'), single('a'), single('b'), single('right')]
+    const preferences: LayoutPreferences = {
+      rowOrders: [{
+        id: 'row:0',
+        unitIds: [
+          'unit:person:left',
+          'unit:partnership:current:a+b',
+          'unit:person:right',
+        ],
+      }],
+      familyAccentAssignments: {},
+    }
+
+    expect(orderUnits(input(units, people([
+      ['left', '1990-01-01'],
+      ['a', '1970-01-01'],
+      ['b', '1971-01-01'],
+      ['right', '1980-01-01'],
+    ]), { preferences }))[0].unitIds).toEqual([
+      'unit:person:left',
+      'unit:person:a',
+      'unit:person:b',
+      'unit:person:right',
+    ])
+  })
+
+  it('inherits saved member positions when the primary spouse changes', () => {
+    const units = [
+      single('left'),
+      couple('current:a+c', ['a', 'c']),
+      single('b'),
+      single('right'),
+    ]
+    const preferences: LayoutPreferences = {
+      rowOrders: [{
+        id: 'row:0',
+        unitIds: [
+          'unit:person:left',
+          'unit:partnership:current:a+b',
+          'unit:person:c',
+          'unit:person:right',
+        ],
+      }],
+      familyAccentAssignments: {},
+    }
+
+    expect(orderUnits(input(units, people([
+      ['left', '1990-01-01'],
+      ['a', '1970-01-01'],
+      ['b', '1971-01-01'],
+      ['c', '1972-01-01'],
+      ['right', '1980-01-01'],
+    ]), { preferences }))[0].unitIds).toEqual([
+      'unit:person:left',
+      'unit:partnership:current:a+c',
+      'unit:person:b',
+      'unit:person:right',
+    ])
+  })
+
   it('keeps a couple unit indivisible while sorting by birth date', () => {
     const units = [
       single('a'),
@@ -417,6 +509,72 @@ describe('orderUnits', () => {
       'unit:person:b',
       'unit:person:a',
       'unit:person:changed',
+    ])
+  })
+
+  it('preserves a remote descendant row inside the changed connected tree', () => {
+    const units = [
+      single('grandparent', 0),
+      single('parent', 1),
+      single('target', 2),
+      single('child', 3),
+      single('remote-a', 4),
+      single('remote-b', 4),
+    ]
+    const parentageGroups: ParentageGroup[] = [{
+      id: 'parentage:grandparent',
+      sourceUnitId: 'unit:person:grandparent',
+      childPersonIds: ['parent'],
+    }, {
+      id: 'parentage:parent',
+      sourceUnitId: 'unit:person:parent',
+      childPersonIds: ['target'],
+    }, {
+      id: 'parentage:target',
+      sourceUnitId: 'unit:person:target',
+      childPersonIds: ['child'],
+    }, {
+      id: 'parentage:child',
+      sourceUnitId: 'unit:person:child',
+      childPersonIds: ['remote-a', 'remote-b'],
+    }]
+    const primaryParentages: ParentageFact[] = parentageGroups.map(group => ({
+      id: group.id,
+      parentIds: [group.sourceUnitId.slice('unit:person:'.length)],
+      childIds: [...group.childPersonIds],
+      typeByChildId: Object.fromEntries(
+        group.childPersonIds.map(childId => [childId, 'blood' as const]),
+      ),
+    }))
+    const previousScene = sceneWithRows([
+      { id: 'row:0', generation: 0, unitIds: ['unit:person:grandparent'] },
+      { id: 'row:1', generation: 1, unitIds: ['unit:person:parent'] },
+      { id: 'row:2', generation: 2, unitIds: ['unit:person:target'] },
+      { id: 'row:3', generation: 3, unitIds: ['unit:person:child'] },
+      {
+        id: 'row:4',
+        generation: 4,
+        unitIds: ['unit:person:remote-b', 'unit:person:remote-a'],
+      },
+    ])
+
+    const rows = orderUnits(input(units, people([
+      ['grandparent'],
+      ['parent'],
+      ['target'],
+      ['child'],
+      ['remote-a', '2000-01-01'],
+      ['remote-b', '2001-01-01'],
+    ]), {
+      parentageGroups,
+      primaryParentages,
+      previousScene,
+      changedIds: ['parent', 'target', 'child'],
+    }))
+
+    expect(rows.find(row => row.generation === 4)?.unitIds).toEqual([
+      'unit:person:remote-b',
+      'unit:person:remote-a',
     ])
   })
 })

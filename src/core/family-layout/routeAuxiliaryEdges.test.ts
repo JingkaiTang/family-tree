@@ -53,8 +53,8 @@ describe('routeAuxiliaryEdges', () => {
     }])
     for (const [index, relation] of relations.entries()) {
       const endpoints = routeEndpoints(routes[index])
-      expect(sidePorts(geometry, relation.sourceId)).toContainEqual(endpoints[0])
-      expect(sidePorts(geometry, relation.targetId)).toContainEqual(endpoints[1])
+      expect(isSafeSidePort(geometry, relation.sourceId, endpoints[0])).toBe(true)
+      expect(isSafeSidePort(geometry, relation.targetId, endpoints[1])).toBe(true)
       const corridorPoints = routes[index].segments.slice(2, -2)
         .flatMap(segment => segment.points)
       expect(corridorPoints.length).toBeGreaterThan(0)
@@ -63,6 +63,7 @@ describe('routeAuxiliaryEdges', () => {
         && point.y % DEFAULT_LAYOUT_METRICS.routeSubgrid === 0
       ))).toBe(true)
     }
+    expect(new Set(routes.map(route => pointKey(routeEndpoints(route)[0]))).size).toBe(2)
   })
 
   it('never shares a positive-length segment with a primary route', () => {
@@ -125,6 +126,39 @@ describe('routeAuxiliaryEdges', () => {
     expect(routeEdges(routes[0]).some(auxiliary => (
       routeEdges(bridge).some(primary => segmentsIntersect(auxiliary, primary))
     ))).toBe(false)
+  })
+
+  it('allows an occupied primary edge to meet an auxiliary route at one exact endpoint', () => {
+    const geometry = rowGeometry(['a', 'b'])
+    const relation: AuxiliaryRelation = {
+      id: 'aux:a+b',
+      kind: 'historical-partnership',
+      sourceId: 'a',
+      targetId: 'b',
+    }
+    const baseline = routeAuxiliaryEdges({
+      geometry,
+      auxiliaryRelations: [relation],
+      primaryRoutes: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+    const exactEndpoint: RoutedFamilyEdge = {
+      id: 'route:primary-endpoint',
+      routeOwnerId: 'parentage:primary-endpoint',
+      kind: 'primary',
+      accent: '#111111',
+      segments: [{
+        orientation: 'vertical',
+        points: [{ x: 184, y: 80 }, { x: 184, y: 104 }],
+      }],
+    }
+
+    expect(routeAuxiliaryEdges({
+      geometry,
+      auxiliaryRelations: [relation],
+      primaryRoutes: [exactEndpoint],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })).toEqual(baseline)
   })
 
   it('chooses the same candidate route for equivalent input permutations', () => {
@@ -265,12 +299,15 @@ function routeEndpoints(route: RoutedFamilyEdge): [Point, Point] {
   return [route.segments[0].points[0], route.segments.at(-1)!.points.at(-1)!]
 }
 
-function sidePorts(geometry: SceneGeometry, id: string): Point[] {
+function isSafeSidePort(geometry: SceneGeometry, id: string, point: Point): boolean {
   const card = geometry.cards.find(value => value.id === id)!
-  return [{ x: card.rect.x, y: card.rect.y + card.rect.height / 2 }, {
-    x: card.rect.x + card.rect.width,
-    y: card.rect.y + card.rect.height / 2,
-  }]
+  return (point.x === card.rect.x || point.x === card.rect.x + card.rect.width)
+    && point.y >= card.rect.y + DEFAULT_LAYOUT_METRICS.cardClearance
+    && point.y <= card.rect.y + card.rect.height - DEFAULT_LAYOUT_METRICS.cardClearance
+}
+
+function pointKey(point: Point): string {
+  return `${point.x},${point.y}`
 }
 
 type Edge = [Point, Point]

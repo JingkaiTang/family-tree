@@ -196,6 +196,78 @@ describe('compactGrid', () => {
     expect(stableChildX - stableParentX).toBe(240)
   })
 
+  it('preserves absolute x outside the reordered row and its direct relatives', () => {
+    const grandparent = single('grandparent', 0)
+    const parent = single('parent', 1)
+    const target = single('target', 2)
+    const rowPeer = single('row-peer', 2)
+    const child = single('child', 3)
+    const grandchild = single('grandchild', 4)
+    const independent = single('independent', 0)
+    const units = [
+      grandparent,
+      parent,
+      target,
+      rowPeer,
+      child,
+      grandchild,
+      independent,
+    ]
+    const rows = [
+      { generation: 0, unitIds: [grandparent.id, independent.id] },
+      { generation: 1, unitIds: [parent.id] },
+      { generation: 2, unitIds: [rowPeer.id, target.id] },
+      { generation: 3, unitIds: [child.id] },
+      { generation: 4, unitIds: [grandchild.id] },
+    ]
+    const parentageGroups = [{
+      id: 'parentage:grandparent',
+      sourceUnitId: grandparent.id,
+      childPersonIds: ['parent'],
+    }, {
+      id: 'parentage:parent',
+      sourceUnitId: parent.id,
+      childPersonIds: ['target', 'row-peer'],
+    }, {
+      id: 'parentage:target',
+      sourceUnitId: target.id,
+      childPersonIds: ['child'],
+    }, {
+      id: 'parentage:child',
+      sourceUnitId: child.id,
+      childPersonIds: ['grandchild'],
+    }]
+    const previousScene = sceneAt(units, [
+      rows[0],
+      rows[1],
+      { generation: 2, unitIds: [target.id, rowPeer.id] },
+      rows[3],
+      rows[4],
+    ], {
+      [grandparent.id]: 480,
+      [parent.id]: 480,
+      [target.id]: 240,
+      [rowPeer.id]: 720,
+      [child.id]: 480,
+      [grandchild.id]: 480,
+      [independent.id]: 1440,
+    })
+
+    const scene = compactGrid({
+      units,
+      rows,
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+      previousScene,
+      changedIds: ['target', 'parent', 'child'],
+    })
+    const x = (unitId: string) => scene.units.find(unit => unit.id === unitId)!.rect.x
+
+    expect(x(grandparent.id)).toBe(480)
+    expect(x(grandchild.id)).toBe(480)
+    expect(x(independent.id)).toBe(1440)
+  })
+
   it('re-applies row spacing after multiple parents align to one child block', () => {
     const firstParent = single('first-parent', 0)
     const secondParent = single('second-parent', 0)

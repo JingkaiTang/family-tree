@@ -80,8 +80,7 @@ export function buildFamilyUnits(
       const sourceParentIds = sourceUnit?.memberIds.filter(memberId => (
         parentage.parentIds.includes(memberId)
       )) ?? []
-      const sourceAnchorPersonId = sourceUnit?.memberIds.length === 2
-        && sourceParentIds.length === 1
+      const sourceAnchorPersonId = sourceParentIds.length === 1
         ? sourceParentIds[0]
         : undefined
 

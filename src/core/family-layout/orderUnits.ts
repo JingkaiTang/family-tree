@@ -8,6 +8,7 @@ import type {
   ParentageGroup,
   PersonFact,
 } from './types'
+import { inheritedUnitPositions } from './reconcilePreferences'
 
 export interface OrderUnitsInput {
   units: FamilyUnit[]
@@ -47,7 +48,6 @@ export function orderUnits(input: OrderUnitsInput): OrderedGeneration[] {
   const constraintsByGeneration = buildOrderConstraints(
     rows,
     input,
-    unitIdByPersonId,
   )
   const lineageAffinity = buildLineageAffinity(input, unitIdByPersonId)
   const edges = parentageEdges(input.parentageGroups, unitIdByPersonId)
@@ -465,50 +465,43 @@ function buildLineageAffinity(
 function buildOrderConstraints(
   rows: Row[],
   input: OrderUnitsInput,
-  unitIdByPersonId: Map<string, string>,
 ): Map<number, OrderConstraint[]> {
   const constraints = new Map<number, OrderConstraint[]>()
   for (const row of rows) {
     const rowIds = new Set(row.unitIds)
     const saved = [...input.preferences.rowOrders]
-      .map(preference => ({
-        preference,
-        overlap: preference.unitIds.filter(unitId => rowIds.has(unitId)).length,
-      }))
+      .map(preference => {
+        const positionByUnitId = inheritedUnitPositions(preference.unitIds, input.units)
+        return {
+          preference,
+          positionByUnitId,
+          overlap: row.unitIds.filter(unitId => positionByUnitId.has(unitId)).length,
+        }
+      })
       .filter(value => value.overlap > 0)
       .sort((left, right) => (
         right.overlap - left.overlap || left.preference.id.localeCompare(right.preference.id)
-      ))[0]?.preference
+      ))[0]
     if (saved !== undefined) {
       addSequenceConstraints(
         constraints,
         row.generation,
-        saved.unitIds.filter(unitId => rowIds.has(unitId)),
+        [...rowIds]
+          .filter(unitId => saved.positionByUnitId.has(unitId))
+          .sort((left, right) => (
+            saved.positionByUnitId.get(left)! - saved.positionByUnitId.get(right)!
+            || left.localeCompare(right)
+          )),
       )
     }
   }
 
   if (input.previousScene === undefined || input.changedIds === undefined) return constraints
   const affectedPersonIds = new Set(input.changedIds)
-  for (const parentage of input.primaryParentages) {
-    if (
-      affectedPersonIds.has(parentage.id)
-      || parentage.parentIds.some(id => affectedPersonIds.has(id))
-      || parentage.childIds.some(id => affectedPersonIds.has(id))
-    ) {
-      parentage.parentIds.forEach(id => affectedPersonIds.add(id))
-      parentage.childIds.forEach(id => affectedPersonIds.add(id))
-    }
-  }
-  const components = unitComponents(input.units, input.parentageGroups, unitIdByPersonId)
   const frozenUnitIds = new Set(
-    components
-      .filter(component => component.every(unitId => (
-        input.units
-          .find(unit => unit.id === unitId)
-          ?.memberIds.every(personId => !affectedPersonIds.has(personId)) ?? true
-      )))
-      .flat(),
+    input.units
+      .filter(unit => unit.memberIds.every(personId => !affectedPersonIds.has(personId)))
+      .map(unit => unit.id),
   )
   for (const previousRow of input.previousScene.rows) {
     addSequenceConstraints(
@@ -675,25 +668,6 @@ function parentageEdges(
       ? []
       : [{ sourceId: group.sourceUnitId, childId }]
   }))
-}
-
-function unitComponents(
-  units: FamilyUnit[],
-  parentageGroups: ParentageGroup[],
-  unitIdByPersonId: Map<string, string>,
-): string[][] {
-  const disjointSet = new StableDisjointSet(units.map(unit => unit.id))
-  for (const edge of parentageEdges(parentageGroups, unitIdByPersonId)) {
-    disjointSet.union(edge.sourceId, edge.childId)
-  }
-  const components = new Map<string, string[]>()
-  for (const unit of units) {
-    const rootId = disjointSet.find(unit.id)
-    const component = components.get(rootId) ?? []
-    component.push(unit.id)
-    components.set(rootId, component)
-  }
-  return [...components.values()]
 }
 
 class StableDisjointSet {

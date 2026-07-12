@@ -182,6 +182,104 @@ describe('validateScene', () => {
     expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
       .toEqual([])
   })
+
+  it('accepts auxiliary side ports and exact cross-owner endpoint contact', () => {
+    const scene = emptyScene()
+    scene.units = [
+      placedUnit('unit:a', 'a', 0, 0),
+      placedUnit('unit:b', 'b', 200, 0),
+      placedUnit('unit:c', 'c', 200, 120),
+    ]
+    scene.cards = [
+      placedCard('a', 'unit:a', 0, 0),
+      placedCard('b', 'unit:b', 200, 0),
+      placedCard('c', 'unit:c', 200, 120),
+    ]
+    scene.routes = [route('aux:a+b', [horizontal(100, 200, 40)], 'historical-partnership'),
+      route('aux:b+c', [vertical(200, 40, 160)], 'secondary-partnership')]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toEqual([])
+  })
+
+  it('allows auxiliary owners to cross at one interior point without sharing a segment', () => {
+    const scene = emptyScene()
+    scene.units = [
+      placedUnit('unit:left', 'left', 0, 50),
+      placedUnit('unit:right', 'right', 300, 50),
+      placedUnit('unit:top', 'top', 50, -100),
+      placedUnit('unit:bottom', 'bottom', 150, 200),
+    ]
+    scene.cards = [
+      placedCard('left', 'unit:left', 0, 50),
+      placedCard('right', 'unit:right', 300, 50),
+      placedCard('top', 'unit:top', 50, -100),
+      placedCard('bottom', 'unit:bottom', 150, 200),
+    ]
+    scene.routes = [
+      route('aux:left+right', [horizontal(100, 300, 100)], 'historical-partnership'),
+      route('aux:top+bottom', [vertical(150, -50, 250)], 'secondary-partnership'),
+    ]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toEqual([])
+  })
+
+  it('reports auxiliary-to-auxiliary and auxiliary-to-primary route conflicts', () => {
+    const scene = emptyScene()
+    scene.routes = [
+      route('aux:a', [horizontal(0, 40, 20)], 'historical-partnership'),
+      route('aux:b', [horizontal(20, 60, 20)], 'secondary-partnership'),
+      route('parentage:c', [vertical(10, 20, 60)]),
+    ]
+
+    const diagnostics = validateScene(scene, DEFAULT_LAYOUT_METRICS)
+
+    expect(diagnostics).toContainEqual({
+      code: 'CROSS_FAMILY_SEGMENT_OVERLAP',
+      ids: ['aux:a', 'aux:b'],
+      message: 'Routes aux:a and aux:b share a collinear segment',
+    })
+    expect(diagnostics).toContainEqual({
+      code: 'CROSS_FAMILY_SEGMENT_OVERLAP',
+      ids: ['aux:a', 'parentage:c'],
+      message: 'Routes aux:a and parentage:c form a false T-junction',
+    })
+  })
+
+  it('reports an auxiliary route with one dangling side endpoint', () => {
+    const scene = emptyScene()
+    scene.cards = [placedCard('a', 'unit:a', 0, 0)]
+    scene.routes = [route(
+      'aux:dangling',
+      [horizontal(100, 160, 50)],
+      'historical-partnership',
+    )]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toEqual([{
+        code: 'UNROUTABLE_PRIMARY_EDGE',
+        ids: ['aux:dangling'],
+        message: 'Route aux:dangling has dangling or mismatched endpoints',
+      }])
+  })
+
+  it('reports an auxiliary route whose two side endpoints belong to the same card', () => {
+    const scene = emptyScene()
+    scene.cards = [placedCard('a', 'unit:a', 0, 0)]
+    scene.routes = [route('aux:same-card', [
+      horizontal(0, -20, 40),
+      vertical(-20, 40, 60),
+      horizontal(-20, 100, 60),
+    ], 'historical-partnership')]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toContainEqual({
+        code: 'UNROUTABLE_PRIMARY_EDGE',
+        ids: ['aux:same-card'],
+        message: 'Route aux:same-card has dangling or mismatched endpoints',
+      })
+  })
 })
 
 function baseScene(): LayoutScene {
@@ -227,11 +325,15 @@ function placedCard(id: string, unitId: string, x: number, y: number, size = 100
   }
 }
 
-function route(routeOwnerId: string, segments: RoutedFamilyEdge['segments']): RoutedFamilyEdge {
+function route(
+  routeOwnerId: string,
+  segments: RoutedFamilyEdge['segments'],
+  kind: RoutedFamilyEdge['kind'] = 'primary',
+): RoutedFamilyEdge {
   return {
     id: `route:${routeOwnerId}`,
     routeOwnerId,
-    kind: 'primary',
+    kind,
     accent: '',
     segments,
   }

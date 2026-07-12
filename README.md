@@ -116,7 +116,10 @@ npm run tauri:build
 
 ```bash
 npm test
+npm run test:layout-perf
 ```
+
+`test:layout-perf` 使用确定性的 500 人连通家谱，并在受控机器上执行 1000ms CI 预算门禁；普通 `npm test` 只验证正确性，避免共享机器负载造成偶发失败。
 
 ### 类型检查
 

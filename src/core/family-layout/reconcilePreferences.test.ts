@@ -27,6 +27,11 @@ function linkParent(child: Member, parent: Member) {
   parent.children.push({ id: child.id, type: 'blood' })
 }
 
+function linkCurrentSpouses(left: Member, right: Member) {
+  left.spouses.push({ id: right.id, type: 'married' })
+  right.spouses.push({ id: left.id, type: 'married' })
+}
+
 describe('convertLegacyGridPreferences', () => {
   it('expands one valid override into the complete current generation row', () => {
     const data = createEmptyFamily()
@@ -225,6 +230,92 @@ describe('reconcileLayoutPreferences', () => {
     expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
       id: 'row:0',
       unitIds: ['unit:person:parent-b', 'unit:person:parent-a'],
+    }])
+  })
+
+  it('inherits the neighboring position when two singles become a couple', () => {
+    const left = member('left')
+    const a = member('a')
+    const b = member('b')
+    const right = member('right')
+    linkCurrentSpouses(a, b)
+    const data = createEmptyFamily()
+    data.members = { left, a, b, right }
+    data.layoutPreferences.rowOrders = [{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:left',
+        'unit:person:a',
+        'unit:person:b',
+        'unit:person:right',
+      ],
+    }]
+
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:left',
+        'unit:partnership:current:a+b',
+        'unit:person:right',
+      ],
+    }])
+  })
+
+  it('keeps former spouses beside the old couple position when they become singles', () => {
+    const data = createEmptyFamily()
+    data.members = {
+      left: member('left'),
+      a: member('a'),
+      b: member('b'),
+      right: member('right'),
+    }
+    data.layoutPreferences.rowOrders = [{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:left',
+        'unit:partnership:current:a+b',
+        'unit:person:right',
+      ],
+    }]
+
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:left',
+        'unit:person:a',
+        'unit:person:b',
+        'unit:person:right',
+      ],
+    }])
+  })
+
+  it('inherits member positions when the primary spouse changes', () => {
+    const left = member('left')
+    const a = member('a')
+    const b = member('b')
+    const c = member('c')
+    const right = member('right')
+    linkCurrentSpouses(a, c)
+    const data = createEmptyFamily()
+    data.members = { left, a, b, c, right }
+    data.layoutPreferences.rowOrders = [{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:left',
+        'unit:partnership:current:a+b',
+        'unit:person:c',
+        'unit:person:right',
+      ],
+    }]
+
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:left',
+        'unit:partnership:current:a+c',
+        'unit:person:b',
+        'unit:person:right',
+      ],
     }])
   })
 

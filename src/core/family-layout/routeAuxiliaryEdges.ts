@@ -23,6 +23,11 @@ interface Terminal {
   card: PlacedPersonCard
 }
 
+interface PortAllocation {
+  y: number
+  channelOffset: number
+}
+
 interface Candidate {
   points: Point[]
   segments: RouteSegment[]
@@ -41,15 +46,66 @@ interface Obstacle {
 const GRAY = '#64748b'
 const PURPLE = '#8b5cf6'
 
+function allocatePorts(
+  cards: PlacedPersonCard[],
+  relations: AuxiliaryRelation[],
+  metrics: LayoutMetrics,
+): Map<string, PortAllocation> {
+  const ownerIdsByPersonId = new Map<string, Set<string>>()
+  for (const relation of relations) {
+    for (const personId of new Set([relation.sourceId, relation.targetId])) {
+      const ownerIds = ownerIdsByPersonId.get(personId) ?? new Set<string>()
+      ownerIds.add(relation.id)
+      ownerIdsByPersonId.set(personId, ownerIds)
+    }
+  }
+
+  const result = new Map<string, PortAllocation>()
+  for (const card of [...cards].sort((left, right) => left.id.localeCompare(right.id))) {
+    const ownerIds = [...(ownerIdsByPersonId.get(card.id) ?? [])]
+      .sort((left, right) => left.localeCompare(right))
+    if (ownerIds.length === 0) continue
+    const centerY = card.rect.y + card.rect.height / 2
+    const minY = card.rect.y + metrics.cardClearance
+    const maxY = card.rect.y + card.rect.height - metrics.cardClearance
+    const spacing = ownerIds.length === 1
+      ? 0
+      : Math.min(metrics.routeSubgrid * 2, (maxY - minY) / (ownerIds.length - 1))
+    ownerIds.forEach((ownerId, index) => result.set(portKey(ownerId, card.id), {
+      y: centerY + (index - (ownerIds.length - 1) / 2) * spacing,
+      channelOffset: index * metrics.routeSubgrid,
+    }))
+  }
+  return result
+}
+
+function portKey(ownerId: string, personId: string): string {
+  return `${ownerId}\u0000${personId}`
+}
+
 export function routeAuxiliaryEdges(input: RouteAuxiliaryEdgesInput): RoutedFamilyEdge[] {
   const cardsById = new Map(input.geometry.cards.map(card => [card.id, card]))
   const routes: RoutedFamilyEdge[] = []
+  const sortedRelations = [...input.auxiliaryRelations].sort(compareById)
+  const portByOwnerAndPerson = allocatePorts(
+    input.geometry.cards,
+    sortedRelations,
+    input.metrics,
+  )
+  const occupiedEdges = routeEdges(input.primaryRoutes)
 
-  for (const relation of [...input.auxiliaryRelations].sort(compareById)) {
+  for (const relation of sortedRelations) {
     const source = cardsById.get(relation.sourceId)
     const target = cardsById.get(relation.targetId)
     if (!source || !target || source.id === target.id) continue
-    const candidate = chooseCandidate(input, source, target)
+    const candidate = chooseCandidate(
+      input,
+      source,
+      target,
+      portByOwnerAndPerson.get(portKey(relation.id, source.id)),
+      portByOwnerAndPerson.get(portKey(relation.id, target.id)),
+      occupiedEdges,
+    )
     if (!candidate) continue
     routes.push({
       id: `route:${relation.id}`,
@@ -58,6 +114,7 @@ export function routeAuxiliaryEdges(input: RouteAuxiliaryEdgesInput): RoutedFami
       accent: relation.kind === 'godparent' ? PURPLE : GRAY,
       segments: candidate.segments,
     })
+    occupiedEdges.push(...routeEdgesFromSegments(candidate.segments))
   }
 
   return routes
@@ -67,6 +124,9 @@ function chooseCandidate(
   input: RouteAuxiliaryEdgesInput,
   source: PlacedPersonCard,
   target: PlacedPersonCard,
+  sourcePort: PortAllocation | undefined,
+  targetPort: PortAllocation | undefined,
+  occupiedEdges: Edge[],
 ): Candidate | undefined {
   const clearance = snapUp(input.metrics.cardClearance, input.metrics.routeSubgrid)
   const obstacles = [
@@ -83,9 +143,20 @@ function chooseCandidate(
       rect: expandRect(unit.rect, input.metrics.cardClearance),
     })),
   ]
-  const sourceTerminals = sideTerminals(source, clearance, input.metrics.routeSubgrid)
-  const targetTerminals = sideTerminals(target, clearance, input.metrics.routeSubgrid)
-  const primaryEdges = routeEdges(input.primaryRoutes)
+  const sourceTerminals = sideTerminals(
+    source,
+    clearance,
+    input.metrics.routeSubgrid,
+    sourcePort?.y,
+    sourcePort?.channelOffset,
+  )
+  const targetTerminals = sideTerminals(
+    target,
+    clearance,
+    input.metrics.routeSubgrid,
+    targetPort?.y,
+    targetPort?.channelOffset,
+  )
   const relatedUnitIds = relatedComponentUnitIds(
     input.geometry,
     input.primaryRoutes,
@@ -128,7 +199,7 @@ function chooseCandidate(
         const points = simplifyPoints(path)
         const candidate = { points, segments: toSegments(points), order: order++ }
         if (candidate.segments.length === 0) continue
-        if (!candidateIsValid(candidate, start, end, obstacles, primaryEdges)) continue
+        if (!candidateIsValid(candidate, start, end, obstacles, occupiedEdges)) continue
         candidates.push(candidate)
       }
     }
@@ -141,19 +212,20 @@ function sideTerminals(
   card: PlacedPersonCard,
   clearance: number,
   routeSubgrid: number,
+  portY = card.rect.y + card.rect.height / 2,
+  channelOffset = 0,
 ): Terminal[] {
-  const centerY = card.rect.y + card.rect.height / 2
-  const gridY = snapNearest(centerY, routeSubgrid)
-  const leftX = snapDown(card.rect.x - clearance, routeSubgrid)
-  const rightX = snapUp(card.rect.x + card.rect.width + clearance, routeSubgrid)
+  const gridY = snapNearest(portY, routeSubgrid)
+  const leftX = snapDown(card.rect.x - clearance - channelOffset, routeSubgrid)
+  const rightX = snapUp(card.rect.x + card.rect.width + clearance + channelOffset, routeSubgrid)
   return [{
-    port: { x: card.rect.x, y: centerY },
-    outside: { x: leftX, y: centerY },
+    port: { x: card.rect.x, y: portY },
+    outside: { x: leftX, y: portY },
     grid: { x: leftX, y: gridY },
     card,
   }, {
-    port: { x: card.rect.x + card.rect.width, y: centerY },
-    outside: { x: rightX, y: centerY },
+    port: { x: card.rect.x + card.rect.width, y: portY },
+    outside: { x: rightX, y: portY },
     grid: { x: rightX, y: gridY },
     card,
   }]
@@ -164,10 +236,10 @@ function candidateIsValid(
   start: Terminal,
   end: Terminal,
   obstacles: Obstacle[],
-  primaryEdges: Edge[],
+  occupiedEdges: Edge[],
 ): boolean {
   if (routeEdgesFromSegments(candidate.segments).some(auxiliary => (
-    primaryEdges.some(primary => segmentsIntersect(auxiliary, primary))
+    occupiedEdges.some(occupied => edgesConflict(auxiliary, occupied))
   ))) return false
 
   const lastIndex = candidate.segments.length - 1
@@ -331,16 +403,18 @@ function routeEdgesFromSegments(segments: RouteSegment[]): Edge[] {
   )))
 }
 
-function segmentsIntersect([a, b]: Edge, [c, d]: Edge): boolean {
+function edgesConflict([a, b]: Edge, [c, d]: Edge): boolean {
   const abC = direction(a, b, c)
   const abD = direction(a, b, d)
-  const cdA = direction(c, d, a)
-  const cdB = direction(c, d, b)
-  if (abC === 0 && pointOnSegment(a, b, c)) return true
-  if (abD === 0 && pointOnSegment(a, b, d)) return true
-  if (cdA === 0 && pointOnSegment(c, d, a)) return true
-  if (cdB === 0 && pointOnSegment(c, d, b)) return true
-  return (abC < 0) !== (abD < 0) && (cdA < 0) !== (cdB < 0)
+  if (abC === 0 && abD === 0) {
+    return Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
+      ? positiveOverlap(a.x, b.x, c.x, d.x)
+      : positiveOverlap(a.y, b.y, c.y, d.y)
+  }
+  if (pointStrictlyOnEdge(c, a, b) || pointStrictlyOnEdge(d, a, b)) return true
+  if (pointStrictlyOnEdge(a, c, d) || pointStrictlyOnEdge(b, c, d)) return true
+  // 不同 owner 可以在单点正交交叉；只禁止共线重合和假 T 形接触。
+  return false
 }
 
 function direction(start: Point, end: Point, point: Point): number {
@@ -354,6 +428,17 @@ function pointOnSegment(start: Point, end: Point, point: Point): boolean {
     && point.x <= Math.max(start.x, end.x)
     && point.y >= Math.min(start.y, end.y)
     && point.y <= Math.max(start.y, end.y)
+}
+
+function pointStrictlyOnEdge(point: Point, start: Point, end: Point): boolean {
+  return pointOnSegment(start, end, point)
+    && !samePoint(point, start)
+    && !samePoint(point, end)
+}
+
+function positiveOverlap(a0: number, a1: number, b0: number, b1: number): boolean {
+  return Math.max(Math.min(a0, a1), Math.min(b0, b1))
+    < Math.min(Math.max(a0, a1), Math.max(b0, b1))
 }
 
 function expandRect(rect: Rect, clearance: number): Rect {

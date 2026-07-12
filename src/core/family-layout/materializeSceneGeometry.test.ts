@@ -3,6 +3,39 @@ import { materializeSceneGeometry } from './materializeSceneGeometry'
 import { DEFAULT_LAYOUT_METRICS, type ParentageGroup, type PlacedFamilyUnit } from './types'
 
 describe('materializeSceneGeometry', () => {
+  it('does not add an unused generic hub beside explicit single-parentage ports', () => {
+    const source: PlacedFamilyUnit = {
+      id: 'unit:person:a',
+      kind: 'single',
+      memberIds: ['a'],
+      generation: 0,
+      width: 168,
+      lineageAffinity: {},
+      accent: '',
+      rect: { x: 48, y: 0, width: 168, height: 216 },
+      order: 0,
+    }
+    const parentageGroups: ParentageGroup[] = ['a+c', 'a+d'].map(id => ({
+      id: `parentage:${id}`,
+      sourceUnitId: source.id,
+      sourceHubId: `hub:parentage:${id}`,
+      sourceAnchorPersonId: 'a',
+      childPersonIds: [`child:${id}`],
+    }))
+
+    const scene = materializeSceneGeometry({
+      placedUnits: [source],
+      rows: [{ generation: 0, unitIds: [source.id] }],
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(scene.hubs.map(hub => hub.id)).toEqual([
+      'hub:parentage:a+c',
+      'hub:parentage:a+d',
+    ])
+  })
+
   it('allocates stable distinct bottom ports for repeated parentage anchors', () => {
     const source: PlacedFamilyUnit = {
       id: 'unit:partnership:current:a+b',

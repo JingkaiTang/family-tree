@@ -92,17 +92,14 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
   const fixedUnitIds = new Set<string>()
   if (input.previousScene !== undefined && input.changedIds !== undefined) {
     const changedIds = new Set(input.changedIds)
-    for (const component of components) {
-      const componentUnits = component.map(unitId => placedUnitById.get(unitId)!)
-      const unchanged = componentUnits.every(unit => (
-        unit.memberIds.every(personId => !changedIds.has(personId))
-      ))
-      const hasCompleteHistory = component.every(unitId => previousXByUnitId.has(unitId))
-      if (!unchanged || !hasCompleteHistory) continue
-      for (const unit of componentUnits) {
-        unit.rect.x = previousXByUnitId.get(unit.id)!
-        fixedUnitIds.add(unit.id)
-      }
+    const reorderedUnitIds = changedRowUnitIds(input.rows, input.previousScene)
+    for (const unit of units) {
+      const unchanged = unit.memberIds.every(personId => !changedIds.has(personId))
+        && !reorderedUnitIds.has(unit.id)
+      const previousX = previousXByUnitId.get(unit.id)
+      if (!unchanged || previousX === undefined) continue
+      unit.rect.x = previousX
+      fixedUnitIds.add(unit.id)
     }
   }
   for (let pass = 0; pass < 4; pass++) {
@@ -135,6 +132,7 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
       addDesiredCenter(desiredCenters, source.id, childBlockCenter)
       const childBlockShift = sourceCenter - childBlockCenter
       for (const child of children) {
+        if (fixedUnitIds.has(child.id)) continue
         addDesiredCenter(
           desiredCenters,
           child.id,
@@ -143,6 +141,7 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
       }
     }
     for (const [unitId, centers] of desiredCenters) {
+      if (fixedUnitIds.has(unitId)) continue
       const unit = placedUnitById.get(unitId)!
       const desiredCenter = centers.reduce((sum, center) => sum + center, 0)
         / centers.length
@@ -150,10 +149,13 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
         (desiredCenter - unit.rect.width / 2) / input.metrics.gridSize,
       ) * input.metrics.gridSize
     }
-    for (const [componentIndex, component] of components.entries()) {
-      if (component.some(unitId => fixedUnitIds.has(unitId))) continue
+    for (const componentIndex of components.keys()) {
       for (const rowUnits of rowUnitsByComponent[componentIndex]) {
-        scanRow(rowUnits, input.metrics)
+        if (rowUnits.some(unit => fixedUnitIds.has(unit.id))) {
+          scanRowPreservingFixed(rowUnits, fixedUnitIds, input.metrics)
+        } else {
+          scanRow(rowUnits, input.metrics)
+        }
       }
     }
   }
@@ -176,13 +178,13 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
   for (const component of components) {
     const componentUnits = component.map(unitId => placedUnitById.get(unitId)!)
     const localLeft = Math.min(...componentUnits.map(unit => unit.rect.x))
-    const localRight = Math.max(...componentUnits.map(unit => (
-      unit.rect.x + unit.rect.width
-    )))
-    const offset = componentLeft - localLeft
-    componentUnits.forEach(unit => { unit.rect.x += offset })
+    if (!component.some(unitId => fixedUnitIds.has(unitId))) {
+      const offset = componentLeft - localLeft
+      componentUnits.forEach(unit => { unit.rect.x += offset })
+    }
+    const packedRight = Math.max(...componentUnits.map(unit => unit.rect.x + unit.rect.width))
     componentLeft = snapUp(
-      componentLeft + localRight - localLeft + input.metrics.familyGap * 2,
+      Math.max(componentLeft, packedRight) + input.metrics.familyGap * 2,
       input.metrics.gridSize,
     )
   }
@@ -192,6 +194,24 @@ export function compactGrid(input: CompactGridInput): SceneGeometry {
     parentageGroups: input.parentageGroups,
     metrics: input.metrics,
   })
+}
+
+function changedRowUnitIds(
+  rows: OrderedGeneration[],
+  previousScene: LayoutScene,
+): Set<string> {
+  const changed = new Set<string>()
+  for (const row of rows) {
+    const previous = previousScene.rows.find(value => value.generation === row.generation)
+    if (
+      previous === undefined
+      || previous.unitIds.length !== row.unitIds.length
+      || previous.unitIds.some((unitId, index) => unitId !== row.unitIds[index])
+    ) {
+      row.unitIds.forEach(unitId => changed.add(unitId))
+    }
+  }
+  return changed
 }
 
 function connectedComponents(
@@ -269,6 +289,31 @@ function scanRow(units: PlacedFamilyUnit[], metrics: LayoutMetrics) {
       metrics.gridSize,
     )
     units[index].rect.x = Math.max(units[index].rect.x, minimumLeft)
+  }
+}
+
+function scanRowPreservingFixed(
+  units: PlacedFamilyUnit[],
+  fixedUnitIds: Set<string>,
+  metrics: LayoutMetrics,
+) {
+  for (let index = 1; index < units.length; index++) {
+    const unit = units[index]
+    if (fixedUnitIds.has(unit.id)) continue
+    const previous = units[index - 1]
+    unit.rect.x = Math.max(
+      unit.rect.x,
+      snapUp(previous.rect.x + previous.rect.width + metrics.familyGap, metrics.gridSize),
+    )
+  }
+  for (let index = units.length - 2; index >= 0; index--) {
+    const unit = units[index]
+    if (fixedUnitIds.has(unit.id)) continue
+    const next = units[index + 1]
+    unit.rect.x = Math.min(
+      unit.rect.x,
+      snapDown(next.rect.x - metrics.familyGap - unit.rect.width, metrics.gridSize),
+    )
   }
 }
 

@@ -7,6 +7,7 @@ import {
   DEFAULT_FAMILY_VIEW_POLICY,
   DEFAULT_LAYOUT_METRICS,
   EMPTY_LAYOUT_PREFERENCES,
+  type FamilyUnit,
 } from './types'
 
 export function withRowOrderPreference(
@@ -106,21 +107,22 @@ export function reconcileLayoutPreferences(data: FamilyData): PersistedLayoutPre
   const { built, unitIdsByGeneration } = buildCurrentLayoutState(data)
   const candidatesByGeneration = new Map<number, Array<{
     preference: PersistedLayoutPreferences['rowOrders'][number]
+    positionByUnitId: Map<string, number>
     overlap: number
   }>>()
 
   for (const preference of data.layoutPreferences.rowOrders) {
-    const uniquePreferenceUnitIds = new Set(preference.unitIds)
+    const positionByUnitId = inheritedUnitPositions(preference.unitIds, built.units)
     const bestGeneration = [...unitIdsByGeneration]
       .map(([generation, unitIds]) => ({
         generation,
-        overlap: unitIds.filter(unitId => uniquePreferenceUnitIds.has(unitId)).length,
+        overlap: unitIds.filter(unitId => positionByUnitId.has(unitId)).length,
       }))
       .filter(candidate => candidate.overlap > 0)
       .sort((left, right) => right.overlap - left.overlap || left.generation - right.generation)[0]
     if (!bestGeneration) continue
     const candidates = candidatesByGeneration.get(bestGeneration.generation) ?? []
-    candidates.push({ preference, overlap: bestGeneration.overlap })
+    candidates.push({ preference, positionByUnitId, overlap: bestGeneration.overlap })
     candidatesByGeneration.set(bestGeneration.generation, candidates)
   }
 
@@ -133,17 +135,13 @@ export function reconcileLayoutPreferences(data: FamilyData): PersistedLayoutPre
       ))[0]
       if (!selected) return []
       const currentUnitIds = unitIdsByGeneration.get(generation) ?? []
-      const currentUnitIdSet = new Set(currentUnitIds)
-      const savedUnitIds = [...new Set(
-        selected.preference.unitIds.filter(unitId => currentUnitIdSet.has(unitId)),
-      )]
-      const savedUnitIdSet = new Set(savedUnitIds)
       return [{
         id: selected.preference.id,
-        unitIds: [
-          ...savedUnitIds,
-          ...currentUnitIds.filter(unitId => !savedUnitIdSet.has(unitId)),
-        ],
+        unitIds: [...currentUnitIds].sort((left, right) => (
+          (selected.positionByUnitId.get(left) ?? Number.POSITIVE_INFINITY)
+          - (selected.positionByUnitId.get(right) ?? Number.POSITIVE_INFINITY)
+          || left.localeCompare(right)
+        )),
       }]
     })
   const currentUnitIdSet = new Set(built.units.map(unit => unit.id))
@@ -154,6 +152,38 @@ export function reconcileLayoutPreferences(data: FamilyData): PersistedLayoutPre
   )
 
   return { rowOrders, familyAccentAssignments }
+}
+
+export function inheritedUnitPositions(
+  persistedUnitIds: string[],
+  currentUnits: FamilyUnit[],
+): Map<string, number> {
+  const directPositions = new Map<string, number>()
+  const memberPositions = new Map<string, number>()
+  persistedUnitIds.forEach((unitId, position) => {
+    if (!directPositions.has(unitId)) directPositions.set(unitId, position)
+    for (const memberId of persistedUnitMemberIds(unitId)) {
+      if (!memberPositions.has(memberId)) memberPositions.set(memberId, position)
+    }
+  })
+  return new Map(currentUnits.flatMap(unit => {
+    const direct = directPositions.get(unit.id)
+    if (direct !== undefined) return [[unit.id, direct]]
+    const inherited = unit.memberIds
+      .map(memberId => memberPositions.get(memberId))
+      .filter((position): position is number => position !== undefined)
+    return inherited.length === 0 ? [] : [[unit.id, Math.min(...inherited)]]
+  }))
+}
+
+function persistedUnitMemberIds(unitId: string): string[] {
+  const personPrefix = 'unit:person:'
+  if (unitId.startsWith(personPrefix)) return [unitId.slice(personPrefix.length)]
+  const currentPartnershipPrefix = 'unit:partnership:current:'
+  if (unitId.startsWith(currentPartnershipPrefix)) {
+    return unitId.slice(currentPartnershipPrefix.length).split('+')
+  }
+  return []
 }
 
 function buildCurrentLayoutState(data: FamilyData) {

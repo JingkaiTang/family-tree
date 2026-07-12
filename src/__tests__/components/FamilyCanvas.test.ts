@@ -365,6 +365,27 @@ describe('FamilyCanvas', () => {
     expect(wrapper.find('[data-testid="family-unit"]').exists()).toBe(false)
   })
 
+  it('shows dismissible layout diagnostics instead of silently hiding failed routes', async () => {
+    const scene = structuredClone(coupleScene)
+    scene.routes = []
+    scene.diagnostics = [{
+      code: 'UNROUTABLE_PRIMARY_EDGE',
+      ids: ['parentage:A+B'],
+      message: 'Unable to route parentage:A+B without crossing a card',
+    }]
+    layoutFamilyTree.mockResolvedValueOnce(scene)
+
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]))
+    await flushPromises()
+
+    const banner = wrapper.get('[data-testid="layout-diagnostics"]')
+    expect(banner.text()).toContain('连线路由已降级')
+    expect(banner.text()).toContain('Unable to route parentage:A+B without crossing a card')
+
+    await banner.get('button').trigger('click')
+    expect(wrapper.find('[data-testid="layout-diagnostics"]').exists()).toBe(false)
+  })
+
   it('passes complete family data to the facade', async () => {
     const members = [mk('A')]
     const data = familyData(members)

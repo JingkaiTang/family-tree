@@ -128,8 +128,6 @@ function buildAttempt(
     routes: routing.routes,
     diagnostics: [...retainedDiagnostics, ...routing.diagnostics],
   }
-  scene.diagnostics.push(...validateScene(scene, metrics))
-  scene.diagnostics.sort(compareDiagnostics)
   const focusId = request.auxiliaryFocusPersonId
   if (focusId) {
     scene.routes.push(...routeAuxiliaryEdges({
@@ -141,6 +139,8 @@ function buildAttempt(
       metrics,
     }))
   }
+  scene.diagnostics.push(...validateScene(scene, metrics))
+  scene.diagnostics.sort(compareDiagnostics)
   return { scene, routingDiagnostics: routing.diagnostics }
 }
 

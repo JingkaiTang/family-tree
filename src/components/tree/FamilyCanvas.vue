@@ -50,6 +50,25 @@ let pendingSceneRecovery: { data: FamilyData; changedIds: string[] } | null = nu
 let auxiliaryRefreshQueued = false
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 const animatePositions = ref(false)
+const dismissedDiagnosticKey = ref<string | null>(null)
+
+const diagnosticKey = computed(() => scene.value.diagnostics
+  .map(value => `${value.code}:${value.ids.join(',')}:${value.message}`)
+  .join('|'))
+const visibleDiagnostics = computed(() => (
+  diagnosticKey.value !== '' && diagnosticKey.value !== dismissedDiagnosticKey.value
+    ? scene.value.diagnostics
+    : []
+))
+const diagnosticTitle = computed(() => (
+  visibleDiagnostics.value.every(value => (
+    value.code === 'UNROUTABLE_PRIMARY_EDGE'
+    || value.code === 'CROSS_FAMILY_SEGMENT_OVERLAP'
+    || value.code === 'NODE_OVERLAP'
+  ))
+    ? '连线路由已降级'
+    : '家谱数据需要检查'
+))
 
 async function updateLayout(options: {
   data?: FamilyData
@@ -437,6 +456,10 @@ function affectedMemberIds(memberIds: string[]): string[] {
 onBeforeUnmount(() => {
   if (settleTimer !== null) clearTimeout(settleTimer)
 })
+
+function dismissDiagnostics() {
+  dismissedDiagnosticKey.value = diagnosticKey.value
+}
 </script>
 
 <template>
@@ -513,5 +536,31 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </PanZoomWrapper>
+
+    <div
+      v-if="visibleDiagnostics.length > 0"
+      data-testid="layout-diagnostics"
+      class="absolute left-1/2 top-3 z-50 w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50/95 px-4 py-3 text-sm text-amber-950 shadow-lg backdrop-blur"
+      role="status"
+    >
+      <div class="flex items-start gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold">{{ diagnosticTitle }}</div>
+          <ul class="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+            <li v-for="diagnostic in visibleDiagnostics" :key="`${diagnostic.code}:${diagnostic.ids.join(',')}`">
+              {{ diagnostic.message }}
+            </li>
+          </ul>
+        </div>
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-xs hover:bg-amber-100"
+          aria-label="关闭布局诊断"
+          @click="dismissDiagnostics"
+        >
+          关闭
+        </button>
+      </div>
+    </div>
   </div>
 </template>

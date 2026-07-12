@@ -1,7 +1,7 @@
 import type { FamilyData } from '@/core/schema'
 import type { NormalizedFactsResult, ParentageFact, PartnershipFact } from './types'
 
-const TYPE_PRIORITY = { blood: 0, adopted: 1, step: 2 } as const
+const PARENT_TYPES = ['blood', 'adopted', 'step'] as const
 
 export function normalizeFacts(data: FamilyData): NormalizedFactsResult {
   const diagnostics: NormalizedFactsResult['diagnostics'] = []
@@ -42,19 +42,22 @@ export function normalizeFacts(data: FamilyData): NormalizedFactsResult {
         return false
       })
       .sort((a, b) => a.id.localeCompare(b.id))
-    const parentIds = [...new Set(validParents.map(parent => parent.id))]
-    if (parentIds.length === 0) continue
-    const id = `parentage:${parentIds.join('+')}`
-    const existing = parentageById.get(id) ?? {
-      id,
-      parentIds,
-      childIds: [],
-      typeByChildId: {},
+    for (const type of PARENT_TYPES) {
+      const parentIds = [...new Set(validParents
+        .filter(parent => parent.type === type)
+        .map(parent => parent.id))]
+      if (parentIds.length === 0) continue
+      const id = `parentage:${parentIds.join('+')}`
+      const existing = parentageById.get(id) ?? {
+        id,
+        parentIds,
+        childIds: [],
+        typeByChildId: {},
+      }
+      existing.childIds.push(child.id)
+      existing.typeByChildId[child.id] = type
+      parentageById.set(id, existing)
     }
-    existing.childIds.push(child.id)
-    existing.typeByChildId[child.id] = [...validParents]
-      .sort((a, b) => TYPE_PRIORITY[a.type] - TYPE_PRIORITY[b.type])[0].type
-    parentageById.set(id, existing)
   }
 
   const parentages = [...parentageById.values()].map(parentage => ({

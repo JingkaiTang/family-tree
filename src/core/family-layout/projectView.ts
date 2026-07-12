@@ -7,6 +7,8 @@ import type {
   ProjectedFamily,
 } from './types'
 
+const PARENTAGE_TYPE_PRIORITY = { blood: 0, adopted: 1, step: 2 } as const
+
 export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): ProjectedFamily {
   const diagnostics: LayoutDiagnostic[] = []
   const selectedPartnershipIds = new Set<string>()
@@ -55,7 +57,7 @@ export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): Project
 
   const selectedParentageIdByChild = new Map<string, string>()
   for (const [childId, parentages] of parentagesByChildId) {
-    parentages.sort((a, b) => a.id.localeCompare(b.id))
+    parentages.sort((a, b) => compareParentagesForChild(childId, a, b))
     const explicit = view.primaryParentageByChild[childId]
     const selected = parentages.find(value => value.id === explicit) ?? parentages[0]
     selectedParentageIdByChild.set(childId, selected.id)
@@ -140,4 +142,15 @@ export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): Project
     ].sort((a, b) => a.id.localeCompare(b.id)),
     diagnostics: diagnostics.sort((a, b) => a.message.localeCompare(b.message)),
   }
+}
+
+function compareParentagesForChild(
+  childId: string,
+  left: ParentageFact,
+  right: ParentageFact,
+): number {
+  return PARENTAGE_TYPE_PRIORITY[left.typeByChildId[childId]]
+    - PARENTAGE_TYPE_PRIORITY[right.typeByChildId[childId]]
+    || right.parentIds.length - left.parentIds.length
+    || left.id.localeCompare(right.id)
 }

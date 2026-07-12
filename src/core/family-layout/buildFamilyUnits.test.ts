@@ -57,6 +57,8 @@ describe('buildFamilyUnits', () => {
     expect(built.parentageGroups).toEqual([{
       id: 'parentage:parent',
       sourceUnitId: 'unit:person:parent',
+      sourceHubId: 'hub:parentage:parent',
+      sourceAnchorPersonId: 'parent',
       childPersonIds: ['a-same', 'b-same', 'a-later'],
     }])
   })
