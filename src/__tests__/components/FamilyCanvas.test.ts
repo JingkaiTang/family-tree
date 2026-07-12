@@ -321,7 +321,7 @@ describe('FamilyCanvas', () => {
   it('does not override a restored initial pan and zoom when the first scene arrives', async () => {
     const pending = deferred<LayoutScene>()
     layoutFamilyTree.mockReturnValueOnce(pending.promise)
-    mountCanvas(familyData([mk('A'), mk('B')]), {
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]), {
       viewpointId: 'A',
       initialView: { x: 10, y: 20, scale: 1.5 },
     })
@@ -331,6 +331,32 @@ describe('FamilyCanvas', () => {
     await flushPromises()
 
     expect(focusStagePoint).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ viewpointId: 'B' })
+    await nextTick()
+
+    expect(focusStagePoint).toHaveBeenCalledTimes(1)
+    expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
+  })
+
+  it('focuses the first viewpoint chosen after restoring with no initial viewpoint', async () => {
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree.mockReturnValueOnce(pending.promise)
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]), {
+      viewpointId: null,
+      initialView: { x: 10, y: 20, scale: 1.5 },
+    })
+    await nextTick()
+
+    pending.resolve(structuredClone(coupleScene))
+    await flushPromises()
+    expect(focusStagePoint).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ viewpointId: 'B' })
+    await nextTick()
+
+    expect(focusStagePoint).toHaveBeenCalledTimes(1)
+    expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
   })
 
   it('preserves viewpoint kinship labels on member cards', async () => {

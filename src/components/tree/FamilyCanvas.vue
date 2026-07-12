@@ -39,21 +39,20 @@ void props.rootId
 const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
 const scene = ref<LayoutScene>(EMPTY_SCENE)
 const members = computed(() => Object.values(props.data.members))
-const hasRestoredInitialView = !!props.initialView
 let layoutRequestId = 0
-let hasAcceptedScene = false
+let suppressInitialSceneFocus = !!props.initialView
 
 async function updateLayout() {
   const requestId = ++layoutRequestId
   const nextScene = await layoutFamilyTree(members.value, { data: props.data })
   if (requestId !== layoutRequestId) return
-  const suppressFocusForInitialView = hasRestoredInitialView && !hasAcceptedScene
+  const shouldSuppressFocus = suppressInitialSceneFocus
+  suppressInitialSceneFocus = false
   scene.value = nextScene
-  hasAcceptedScene = true
   await nextTick()
   if (requestId !== layoutRequestId) return
   const viewpointId = props.viewpointId
-  if (viewpointId && !suppressFocusForInitialView) focusMember(viewpointId)
+  if (viewpointId && !shouldSuppressFocus) focusMember(viewpointId)
 }
 
 watch(
@@ -111,15 +110,10 @@ function focusMember(id: string) {
   )
 }
 
-let suppressNextFocus = hasRestoredInitialView
 watch(
   () => props.viewpointId,
   (id, previousId) => {
     if (!id || id === previousId) return
-    if (suppressNextFocus) {
-      suppressNextFocus = false
-      return
-    }
     nextTick(() => focusMember(id))
   },
 )
