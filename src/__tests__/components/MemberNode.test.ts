@@ -169,4 +169,27 @@ describe('MemberNode', () => {
     expect(style).toContain('left: 150px')
     expect(style).toContain('top: 300px')
   })
+
+  it('默认卡片为姓名、称呼和生卒信息保留至少 64px 文本区', () => {
+    const wrapper = mountNode({
+      width: 168,
+      height: 216,
+      kinship: '父亲',
+      member: {
+        ...mk('test', { firstName: '靖凯', lastName: '唐', birthDate: '1960-01-01' }),
+        deathDate: '2020-01-01',
+      },
+    })
+    const photo = wrapper.get('[data-testid="member-photo"]')
+    const details = wrapper.get('[data-testid="member-details"]')
+    const photoHeightMatch = (photo.attributes('style') ?? '').match(/height:\s*([\d.]+)px/)
+    expect(photoHeightMatch).not.toBeNull()
+    const photoHeight = Number.parseFloat(photoHeightMatch?.[1] ?? 'NaN')
+
+    expect(photoHeight).toBeLessThanOrEqual(152)
+    expect(216 - photoHeight).toBeGreaterThanOrEqual(64)
+    expect(details.get('[data-testid="member-name"]').text()).toBe('唐靖凯')
+    expect(details.get('[data-testid="member-kinship"]').text()).toBe('父亲')
+    expect(details.get('[data-testid="member-lifespan"]').text()).toBe('1960 – 2020')
+  })
 })

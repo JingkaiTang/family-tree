@@ -74,6 +74,12 @@ const lifeSpan = computed(() => {
   return ''
 })
 
+const photoHeight = computed(() => Math.min(
+  props.width * 4 / 3,
+  Math.max(0, props.height - 64),
+  Math.round(props.height * 0.68),
+))
+
 function onClick() {
   emit('click', props.member.id)
 }
@@ -178,8 +184,12 @@ function onPointerCancel(e: PointerEvent) {
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
   >
-    <!-- 上半：3:4 竖向照片（固定比例，不挤占文字栏） -->
-    <div class="relative w-full flex-shrink-0 bg-slate-100" :style="{ aspectRatio: '3 / 4' }">
+    <!-- 照片优先保持竖幅，但必须为姓名、称呼和生卒信息留出文本区。 -->
+    <div
+      data-testid="member-photo"
+      class="relative w-full flex-shrink-0 bg-slate-100"
+      :style="{ height: `${photoHeight}px` }"
+    >
       <img
         v-if="photoUrl"
         :src="photoUrl"
@@ -195,14 +205,26 @@ function onPointerCancel(e: PointerEvent) {
       </div>
     </div>
     <!-- 下半：姓名/称呼/生卒，flex-1 占满剩余，内容垂直居中 -->
-    <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1">
-      <div class="max-w-full truncate text-center text-sm font-semibold leading-tight">
+    <div
+      data-testid="member-details"
+      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1"
+    >
+      <div
+        data-testid="member-name"
+        class="max-w-full truncate text-center text-sm font-semibold leading-tight"
+      >
         {{ fullName }}
       </div>
-      <div v-if="kinship" class="max-w-full truncate text-[11px] font-medium text-emerald-600">
+      <div
+        v-if="kinship"
+        data-testid="member-kinship"
+        class="max-w-full truncate text-[11px] font-medium text-emerald-600"
+      >
         {{ kinship }}
       </div>
-      <div v-if="lifeSpan" class="text-[10px] text-slate-400">{{ lifeSpan }}</div>
+      <div v-if="lifeSpan" data-testid="member-lifespan" class="text-[10px] text-slate-400">
+        {{ lifeSpan }}
+      </div>
     </div>
   </div>
 </template>

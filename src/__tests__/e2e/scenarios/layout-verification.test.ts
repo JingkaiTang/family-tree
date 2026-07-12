@@ -4,6 +4,7 @@ import {
   denseBridgeFamily,
   largeFamily,
   manySameGenerationFamilies,
+  multiHistoricalUnionFamily,
   multiUnionFamily,
   parentageCycleFamily,
   pedigreeCollapseFamily,
@@ -112,6 +113,44 @@ describe('public family layout invariants', () => {
       Math.max(...boundaryPositions) + 1,
     )
     expect(between.every(unitId => relatedUnitIds.has(unitId))).toBe(true)
+  })
+
+  it('separates repeated historical parentage source ports for one current spouse', async () => {
+    const family = multiHistoricalUnionFamily()
+    const members = Object.values(family)
+    const scene = await layoutFamilyTree(members, {
+      view: { showHistoricalPartnerships: true },
+      auxiliaryFocusPersonId: 'parentA',
+    })
+
+    expect(scene.cards).toHaveLength(members.length)
+    expect(new Set(scene.cards.map(card => card.id)).size).toBe(members.length)
+    expect(scene.diagnostics.filter(diagnostic => (
+      UNSAFE_DIAGNOSTIC_CODES.has(diagnostic.code)
+    ))).toEqual([])
+
+    const historicalOwnerIds = [
+      'parentage:parentA+parentC',
+      'parentage:parentA+parentD',
+    ]
+    const historicalHubs = historicalOwnerIds.map(ownerId => (
+      scene.hubs.find(hub => hub.id === `hub:${ownerId}`)!
+    ))
+    expect(historicalHubs.map(hub => hub.id)).toEqual([
+      'hub:parentage:parentA+parentC',
+      'hub:parentage:parentA+parentD',
+    ])
+    expect(new Set(historicalHubs.map(hub => `${hub.point.x},${hub.point.y}`)).size).toBe(2)
+
+    const historicalRoutes = historicalOwnerIds.map((ownerId, index) => {
+      const route = scene.routes.find(value => value.routeOwnerId === ownerId)!
+      expect(routeHasEndpoint(route, historicalHubs[index].point)).toBe(true)
+      return route
+    })
+    expect(historicalRoutes[0].segments.some(left => (
+      historicalRoutes[1].segments.some(right => positiveCollinearOverlap(left, right))
+    ))).toBe(false)
+    expect(scene.routes.filter(route => route.kind === 'historical-partnership')).toHaveLength(2)
   })
 
   it('wires cross-married siblings into a bridge cluster through the real pipeline', () => {

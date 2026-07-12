@@ -67,6 +67,7 @@ export function materializeSceneGeometry(
       },
     }))
   ))
+  const cardById = new Map(cards.map(card => [card.id, card]))
   const parentageOwnerIds = new Set(
     input.parentageGroups.map(group => group.sourceUnitId),
   )
@@ -84,18 +85,27 @@ export function materializeSceneGeometry(
           : unit.rect.y + input.metrics.cardHeight,
       },
     }))
+  const anchoredGroupsByPersonId = new Map<string, ParentageGroup[]>()
   for (const group of input.parentageGroups) {
     if (group.sourceAnchorPersonId === undefined) continue
-    const card = cards.find(value => value.id === group.sourceAnchorPersonId)
+    const anchoredGroups = anchoredGroupsByPersonId.get(group.sourceAnchorPersonId) ?? []
+    anchoredGroups.push(group)
+    anchoredGroupsByPersonId.set(group.sourceAnchorPersonId, anchoredGroups)
+  }
+  for (const [personId, anchoredGroups] of [...anchoredGroupsByPersonId.entries()]
+    .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))) {
+    const card = cardById.get(personId)
     if (card === undefined) continue
-    hubs.push({
-      id: `hub:${group.id}`,
+    const sortedGroups = anchoredGroups.sort((left, right) => left.id.localeCompare(right.id))
+    const portXs = anchoredPortXs(card, sortedGroups.length, input.metrics.routeSubgrid)
+    sortedGroups.forEach((group, index) => hubs.push({
+      id: group.sourceHubId ?? `hub:${group.id}`,
       unitId: group.sourceUnitId,
       point: {
-        x: card.rect.x + card.rect.width / 2,
+        x: portXs[index],
         y: card.rect.y + card.rect.height,
       },
-    })
+    }))
   }
   const right = Math.max(...units.map(unit => unit.rect.x + unit.rect.width))
   const bottom = Math.max(...units.map(unit => unit.rect.y + unit.rect.height))
@@ -107,4 +117,19 @@ export function materializeSceneGeometry(
     rows,
     bounds: { x: 0, y: 0, width: right, height: bottom },
   }
+}
+
+function anchoredPortXs(
+  card: PlacedPersonCard,
+  count: number,
+  routeSubgrid: number,
+): number[] {
+  const centerX = card.rect.x + card.rect.width / 2
+  if (count === 1) return [centerX]
+  const minX = card.rect.x + 12
+  const maxX = card.rect.x + card.rect.width - 12
+  const spacing = Math.min(routeSubgrid * 2, (maxX - minX) / (count - 1))
+  return Array.from({ length: count }, (_, index) => (
+    centerX + (index - (count - 1) / 2) * spacing
+  ))
 }

@@ -153,6 +153,35 @@ describe('validateScene', () => {
       || diagnostic.message.startsWith('Routes ')
     ))).toEqual([])
   })
+
+  it('accepts adjacent distinct source ports on the same card bottom', () => {
+    const scene = emptyScene()
+    scene.hubs = [{
+      id: 'hub:parentage:a+c',
+      unitId: 'unit:source',
+      point: { x: 40, y: 100 },
+    }, {
+      id: 'hub:parentage:a+d',
+      unitId: 'unit:source',
+      point: { x: 56, y: 100 },
+    }]
+    scene.cards = [
+      placedCard('child:c', 'unit:child:c', 20, 200, 8),
+      placedCard('child:d', 'unit:child:d', 68, 200, 8),
+    ]
+    scene.routes = [route('parentage:a+c', [
+      vertical(40, 100, 140),
+      horizontal(24, 40, 140),
+      vertical(24, 140, 200),
+    ]), route('parentage:a+d', [
+      vertical(56, 100, 148),
+      horizontal(56, 72, 148),
+      vertical(72, 148, 200),
+    ])]
+
+    expect(validateScene(scene, { ...DEFAULT_LAYOUT_METRICS, cardClearance: 0 }))
+      .toEqual([])
+  })
 })
 
 function baseScene(): LayoutScene {

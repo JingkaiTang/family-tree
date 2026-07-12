@@ -148,6 +148,30 @@ export function multiUnionFamily(): Record<string, Member> {
   return m
 }
 
+export function multiHistoricalUnionFamily(): Record<string, Member> {
+  const m: Record<string, Member> = {
+    parentA: mk('parentA', { gender: 'male' }),
+    parentB: mk('parentB', { gender: 'female' }),
+    parentC: mk('parentC', { gender: 'female' }),
+    parentD: mk('parentD', { gender: 'female' }),
+    childAB: mk('childAB', { birthDate: '2000-01-01' }),
+    childAC: mk('childAC', { birthDate: '2005-01-01' }),
+    childAD: mk('childAD', { birthDate: '2010-01-01' }),
+  }
+  addSpouse(m.parentA, m.parentB)
+  for (const historicalPartner of [m.parentC, m.parentD]) {
+    m.parentA.spouses.push({ id: historicalPartner.id, type: 'divorced' })
+    historicalPartner.spouses.push({ id: m.parentA.id, type: 'divorced' })
+  }
+  addParent(m.childAB, m.parentA)
+  addParent(m.childAB, m.parentB)
+  addParent(m.childAC, m.parentA)
+  addParent(m.childAC, m.parentC)
+  addParent(m.childAD, m.parentA)
+  addParent(m.childAD, m.parentD)
+  return m
+}
+
 /** 两个血缘核心中的两对兄弟姐妹交叉结婚。 */
 export function crossMarriedSiblingsFamily(): Record<string, Member> {
   const m = siblingCorePair(2)

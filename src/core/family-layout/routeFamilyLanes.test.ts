@@ -312,6 +312,45 @@ describe('routeFamilyLanes', () => {
       .toEqual([])
   })
 
+  it('routes repeated parentage anchors from distinct exact source ports', () => {
+    const source = coupleUnit('source', 240, 0, 'source')
+    const firstChild = singleUnit('child-c', 0, 576, '')
+    const secondChild = singleUnit('child-d', 480, 576, '')
+    const units = [source, firstChild, secondChild]
+    const parentageGroups: ParentageGroup[] = ['c', 'd'].map(suffix => ({
+      id: `parentage:source-left+${suffix}`,
+      sourceUnitId: source.id,
+      sourceHubId: `hub:parentage:source-left+${suffix}`,
+      sourceAnchorPersonId: 'source-left',
+      childPersonIds: [`child-${suffix}`],
+    }))
+    const geometry = materializeSceneGeometry({
+      placedUnits: units.map((unit, order) => ({ ...unit, order })),
+      rows: [{ generation: 0, unitIds: [source.id] }, {
+        generation: 1,
+        unitIds: [firstChild.id, secondChild.id],
+      }],
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    const result = routeFamilyLanes({
+      geometry,
+      units,
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(result.diagnostics).toEqual([])
+    for (const group of parentageGroups) {
+      const hub = geometry.hubs.find(value => value.id === group.sourceHubId)!
+      const route = result.routes.find(value => value.routeOwnerId === group.id)!
+      expect(route.segments[0].points[0]).toEqual(hub.point)
+    }
+    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+      .toEqual([])
+  })
+
   it('emits a bridge when a crossing is closer than half a subgrid to a bus end', () => {
     const firstParent = singleUnit('first-parent', 720, 0, 'first')
     const secondParent = singleUnit('second-parent', 482, 0, 'second')
