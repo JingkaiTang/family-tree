@@ -143,6 +143,7 @@ export function multiUnionFamily(): Record<string, Member> {
   addParent(m.childAB1, m.parentB)
   addParent(m.childAB2, m.parentA)
   addParent(m.childAB2, m.parentB)
+  addParent(m.childAC, m.parentA)
   addParent(m.childAC, m.parentC)
   return m
 }
@@ -217,7 +218,7 @@ export function manySameGenerationFamilies(count: number): Record<string, Member
 }
 
 /**
- * 稳定的大型家族：本地 seeded LCG 决定支系规模与成员属性。
+ * 稳定的大型谱系：本地 seeded LCG 决定配对顺序与成员属性。
  * 每个新成员只连接上一代父母；每组 parentage 最多四个孩子。
  */
 export function largeFamily(seed: number, memberCount: number): Record<string, Member> {
@@ -240,35 +241,28 @@ export function largeFamily(seed: number, memberCount: number): Record<string, M
     return person
   }
 
-  while (nextIndex <= total) {
-    const remaining = () => total - nextIndex + 1
-    const grandparentA = createPerson(0)
-    if (remaining() === 0) break
-    const grandparentB = createPerson(0)
-    addSpouse(grandparentA, grandparentB)
+  const founderLimit = Math.min(total, 24)
+  const founderCount = founderLimit === 1 ? 1 : founderLimit - founderLimit % 2
+  const founders = Array.from({ length: founderCount }, () => createPerson(0))
+  let currentCouples = pairFounders(founders, random)
+  let generation = 1
 
-    const adultCount = Math.min(remaining(), 1 + Math.floor(random() * 2))
-    const adultFamilies: Array<{ adult: Member; spouse?: Member }> = []
-    for (let index = 0; index < adultCount; index++) {
-      const adult = createPerson(1)
-      addParent(adult, grandparentA)
-      addParent(adult, grandparentB)
-      adultFamilies.push({ adult })
-    }
-    for (const family of adultFamilies) {
-      if (remaining() === 0) break
-      family.spouse = createPerson(1)
-      addSpouse(family.adult, family.spouse)
-    }
-    for (const family of adultFamilies) {
-      if (remaining() === 0) break
-      const childCount = Math.min(remaining(), 1 + Math.floor(random() * 4))
-      for (let index = 0; index < childCount; index++) {
-        const child = createPerson(2)
-        addParent(child, family.adult)
-        if (family.spouse) addParent(child, family.spouse)
-      }
-    }
+  while (nextIndex <= total && currentCouples.length > 0) {
+    const targetSize = Math.min(48, total - nextIndex + 1)
+    const childCounts = allocateChildCounts(currentCouples.length, targetSize, random)
+    const childGroups = currentCouples.flatMap((parents, parentageIndex) => {
+      const children = Array.from({ length: childCounts[parentageIndex] }, () => {
+        const child = createPerson(generation)
+        addParent(child, parents[0])
+        addParent(child, parents[1])
+        return child
+      })
+      return children.length === 0
+        ? []
+        : [{ id: parentageKey(parents), children }]
+    })
+    currentCouples = pairAcrossParentages(childGroups, random)
+    generation++
   }
   return members
 }
@@ -299,4 +293,95 @@ function seededRandom(seed: number): () => number {
     state = (Math.imul(1664525, state) + 1013904223) >>> 0
     return state / 0x100000000
   }
+}
+
+function pairFounders(founders: Member[], random: () => number): Array<[Member, Member]> {
+  const shuffled = seededShuffle(founders, random)
+  const couples: Array<[Member, Member]> = []
+  for (let index = 0; index + 1 < shuffled.length; index += 2) {
+    addSpouse(shuffled[index], shuffled[index + 1])
+    couples.push([shuffled[index], shuffled[index + 1]])
+  }
+  return couples
+}
+
+function allocateChildCounts(
+  parentageCount: number,
+  childCount: number,
+  random: () => number,
+): number[] {
+  const counts = Array(parentageCount).fill(0) as number[]
+  const order = seededShuffle(
+    Array.from({ length: parentageCount }, (_, index) => index),
+    random,
+  )
+  if (childCount === parentageCount * 4) {
+    order.forEach(index => { counts[index] = 4 })
+    return counts
+  }
+  if (childCount % 2 === 0 && childCount / 2 <= parentageCount) {
+    order.slice(0, childCount / 2).forEach(index => { counts[index] = 2 })
+    return counts
+  }
+  for (let index = 0; index < childCount; index++) {
+    counts[order[index % order.length]]++
+  }
+  return counts
+}
+
+function pairAcrossParentages(
+  groups: Array<{ id: string; children: Member[] }>,
+  random: () => number,
+): Array<[Member, Member]> {
+  if (groups.length < 2) return []
+  const ordered = seededShuffle(groups, random).map(group => ({
+    ...group,
+    children: seededShuffle(group.children, random),
+  }))
+  const uniformSize = ordered[0].children.length
+  if (
+    uniformSize % 2 === 0
+    && ordered.every(group => group.children.length === uniformSize)
+  ) {
+    const half = uniformSize / 2
+    const couples: Array<[Member, Member]> = []
+    for (let groupIndex = 0; groupIndex < ordered.length; groupIndex++) {
+      const nextGroup = ordered[(groupIndex + 1) % ordered.length]
+      for (let childIndex = 0; childIndex < half; childIndex++) {
+        const left = ordered[groupIndex].children[childIndex]
+        const right = nextGroup.children[half + childIndex]
+        addSpouse(left, right)
+        couples.push([left, right])
+      }
+    }
+    return couples
+  }
+
+  const pending = seededShuffle(
+    ordered.flatMap(group => group.children.map(child => ({ child, groupId: group.id }))),
+    random,
+  )
+  const couples: Array<[Member, Member]> = []
+  while (pending.length > 1) {
+    const left = pending.shift()!
+    const rightIndex = pending.findIndex(value => value.groupId !== left.groupId)
+    if (rightIndex < 0) break
+    const [right] = pending.splice(rightIndex, 1)
+    addSpouse(left.child, right.child)
+    couples.push([left.child, right.child])
+  }
+  return couples
+}
+
+function parentageKey(parents: [Member, Member]): string {
+  return parents.map(parent => parent.id).sort().join('+')
+}
+
+function seededShuffle<T>(values: T[], random: () => number): T[] {
+  const shuffled = [...values]
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(random() * (index + 1))
+    ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
+  }
+  return shuffled
 }

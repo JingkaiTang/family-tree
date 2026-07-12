@@ -112,6 +112,8 @@ export interface FamilyUnit {
 export interface ParentageGroup {
   id: string
   sourceUnitId: string
+  sourceHubId?: string
+  sourceAnchorPersonId?: string
   childPersonIds: string[]
 }
 export interface LineageCluster {

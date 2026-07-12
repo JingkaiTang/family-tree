@@ -76,10 +76,22 @@ export function buildFamilyUnits(
       const sourceUnitId = [...parentCountByUnitId]
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0]
       if (sourceUnitId === undefined) return []
+      const sourceUnit = units.find(unit => unit.id === sourceUnitId)
+      const sourceParentIds = sourceUnit?.memberIds.filter(memberId => (
+        parentage.parentIds.includes(memberId)
+      )) ?? []
+      const sourceAnchorPersonId = sourceUnit?.memberIds.length === 2
+        && sourceParentIds.length === 1
+        ? sourceParentIds[0]
+        : undefined
 
       return [{
         id: parentage.id,
         sourceUnitId,
+        ...(sourceAnchorPersonId ? {
+          sourceHubId: `hub:${parentage.id}`,
+          sourceAnchorPersonId,
+        } : {}),
         childPersonIds: [...parentage.childIds].sort((a, b) => {
           const aBirthDate = memberById.get(a)?.birthDate
           const bBirthDate = memberById.get(b)?.birthDate

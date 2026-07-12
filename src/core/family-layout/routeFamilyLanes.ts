@@ -31,6 +31,8 @@ interface RouteRequest {
   children: PlacedPersonCard[]
   childPorts: Point[]
   parentBottom: number
+  sourceMinX: number
+  sourceMaxX: number
   childClearanceTop: number
   minX: number
   maxX: number
@@ -47,14 +49,14 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
   const diagnostics: LayoutDiagnostic[] = []
   const unitsById = new Map(input.units.map(unit => [unit.id, unit]))
   const placedUnitsById = new Map(input.geometry.units.map(unit => [unit.id, unit]))
-  const hubsByUnitId = new Map(input.geometry.hubs.map(hub => [hub.unitId, hub]))
+  const hubsById = new Map(input.geometry.hubs.map(hub => [hub.id, hub]))
   const cardsById = new Map(input.geometry.cards.map(card => [card.id, card]))
   const requests: RouteRequest[] = []
 
   for (const group of [...input.parentageGroups].sort(compareById)) {
     const sourceUnit = unitsById.get(group.sourceUnitId)
     const placedSource = placedUnitsById.get(group.sourceUnitId)
-    const sourceHub = hubsByUnitId.get(group.sourceUnitId)
+    const sourceHub = hubsById.get(group.sourceHubId ?? `hub:${group.sourceUnitId}`)
     const children = group.childPersonIds
       .map(childId => cardsById.get(childId))
       .filter((card): card is PlacedPersonCard => card !== undefined)
@@ -77,6 +79,8 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       children,
       childPorts,
       parentBottom: placedSource.rect.y + placedSource.rect.height,
+      sourceMinX: placedSource.rect.x,
+      sourceMaxX: placedSource.rect.x + placedSource.rect.width,
       childClearanceTop: Math.min(...children.map(child => (
         child.rect.y - input.metrics.cardClearance
       ))),
@@ -113,13 +117,47 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       break
     }
     if (acceptedRoute === undefined) diagnostics.push(unroutable(request.group.id))
-    else rawRoutes.push(acceptedRoute)
+    else rawRoutes.push({
+      ...acceptedRoute,
+      segments: coalesceHorizontalSegments(acceptedRoute.segments),
+    })
   }
 
   const routes = addCrossingBridges(rawRoutes, input.metrics.routeSubgrid)
     .sort((left, right) => left.routeOwnerId.localeCompare(right.routeOwnerId))
   diagnostics.sort((left, right) => left.ids.join('+').localeCompare(right.ids.join('+')))
   return { routes, diagnostics }
+}
+
+function coalesceHorizontalSegments(segments: RouteSegment[]): RouteSegment[] {
+  const grouped = new Map<number, Array<[number, number]>>()
+  for (const segment of segments) {
+    if (segment.orientation !== 'horizontal') continue
+    const [start, end] = segment.points
+    const intervals = grouped.get(start.y) ?? []
+    intervals.push([Math.min(start.x, end.x), Math.max(start.x, end.x)])
+    grouped.set(start.y, intervals)
+  }
+
+  const mergedByY = new Map<number, RouteSegment[]>()
+  for (const [y, intervals] of grouped) {
+    const merged: Array<[number, number]> = []
+    for (const interval of intervals.sort((left, right) => left[0] - right[0])) {
+      const previous = merged.at(-1)
+      if (previous === undefined || interval[0] > previous[1]) merged.push([...interval])
+      else previous[1] = Math.max(previous[1], interval[1])
+    }
+    mergedByY.set(y, merged.map(([start, end]) => horizontal(start, end, y)))
+  }
+
+  const emittedYs = new Set<number>()
+  return segments.flatMap(segment => {
+    if (segment.orientation !== 'horizontal') return [segment]
+    const y = segment.points[0].y
+    if (emittedYs.has(y)) return []
+    emittedYs.add(y)
+    return mergedByY.get(y) ?? []
+  })
 }
 
 function maximumLaneIndex(
@@ -209,8 +247,8 @@ function buildRoute(
     request.group.id,
     occupancy,
     metrics.routeSubgrid,
-    request.minX,
-    request.maxX,
+    request.sourceMinX,
+    request.sourceMaxX,
     true,
     false,
   )
@@ -227,19 +265,13 @@ function buildRoute(
     true,
   ))
   if (request.childPorts.length > 1) {
-    segments.push(horizontal(request.minX, request.maxX, laneY))
-    if (sourceVertical.x < request.minX || sourceVertical.x > request.maxX) {
+    const busMinX = Math.min(...childVerticals.map(value => value.x))
+    const busMaxX = Math.max(...childVerticals.map(value => value.x))
+    segments.push(horizontal(busMinX, busMaxX, laneY))
+    if (sourceVertical.x < busMinX || sourceVertical.x > busMaxX) {
       segments.push(horizontal(
         sourceVertical.x,
-        Math.max(request.minX, Math.min(request.maxX, sourceVertical.x)),
-        laneY,
-      ))
-    }
-    for (const childVertical of childVerticals) {
-      if (childVertical.x >= request.minX && childVertical.x <= request.maxX) continue
-      segments.push(horizontal(
-        childVertical.x,
-        Math.max(request.minX, Math.min(request.maxX, childVertical.x)),
+        Math.max(busMinX, Math.min(busMaxX, sourceVertical.x)),
         laneY,
       ))
     }

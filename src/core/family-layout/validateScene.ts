@@ -20,15 +20,27 @@ export function validateScene(scene: LayoutScene, metrics: LayoutMetrics): Layou
     ids: sortedIds(left.id, right.id),
     message: `Family units ${sortedIds(left.id, right.id).join(' and ')} overlap`,
   }))
+  const routeGeometry = scene.routes.map(route => ({
+    bounds: routeBounds(route),
+    segmentBounds: route.segments.map(segment => pointsBounds(segment.points)),
+  }))
 
   for (let leftIndex = 0; leftIndex < scene.routes.length; leftIndex++) {
     const left = scene.routes[leftIndex]
     validateRouteTerminals(left, scene, diagnostics)
-    validateRouteObstacles(left, scene, metrics, diagnostics)
+    const leftBounds = routeGeometry[leftIndex].bounds
+    validateRouteObstacles(left, leftBounds, scene, metrics, diagnostics)
     for (let rightIndex = leftIndex + 1; rightIndex < scene.routes.length; rightIndex++) {
       const right = scene.routes[rightIndex]
       if (left.routeOwnerId === right.routeOwnerId) continue
-      validateRoutePair(left, right, diagnostics)
+      if (!rectsOverlapOrTouch(leftBounds, routeGeometry[rightIndex].bounds)) continue
+      validateRoutePair(
+        left,
+        right,
+        routeGeometry[leftIndex].segmentBounds,
+        routeGeometry[rightIndex].segmentBounds,
+        diagnostics,
+      )
     }
   }
   return deduplicate(diagnostics).sort((left, right) => (
@@ -70,6 +82,7 @@ function validateRouteTerminals(
 
 function validateRouteObstacles(
   route: RoutedFamilyEdge,
+  routeBounds: Rect,
   scene: LayoutScene,
   metrics: LayoutMetrics,
   diagnostics: LayoutDiagnostic[],
@@ -91,6 +104,7 @@ function validateRouteObstacles(
   for (const card of scene.cards) {
     if (targetCardIds.has(card.id) || sourceCardIds.has(card.id)) continue
     const obstacle = expandRect(card.rect, metrics.cardClearance)
+    if (!rectsOverlap(routeBounds, obstacle)) continue
     if (!route.segments.some(segment => segmentIntersectsRect(segment, obstacle))) continue
     diagnostics.push({
       code: 'UNROUTABLE_PRIMARY_EDGE',
@@ -101,6 +115,7 @@ function validateRouteObstacles(
   for (const unit of scene.units) {
     if (sourceUnitIds.has(unit.id) || targetUnitIds.has(unit.id)) continue
     const obstacle = expandRect(unit.rect, metrics.cardClearance)
+    if (!rectsOverlap(routeBounds, obstacle)) continue
     if (!route.segments.some(segment => segmentIntersectsRect(segment, obstacle))) continue
     diagnostics.push({
       code: 'UNROUTABLE_PRIMARY_EDGE',
@@ -110,29 +125,57 @@ function validateRouteObstacles(
   }
 }
 
+function routeBounds(route: RoutedFamilyEdge): Rect {
+  return pointsBounds(route.segments.flatMap(segment => segment.points))
+}
+
+function pointsBounds(points: Point[]): Rect {
+  const minX = Math.min(...points.map(point => point.x))
+  const maxX = Math.max(...points.map(point => point.x))
+  const minY = Math.min(...points.map(point => point.y))
+  const maxY = Math.max(...points.map(point => point.y))
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+}
+
+function rectsOverlapOrTouch(left: Rect, right: Rect): boolean {
+  return left.x <= right.x + right.width
+    && right.x <= left.x + left.width
+    && left.y <= right.y + right.height
+    && right.y <= left.y + left.height
+}
+
 function validateRoutePair(
   left: RoutedFamilyEdge,
   right: RoutedFamilyEdge,
+  leftBounds: Rect[],
+  rightBounds: Rect[],
   diagnostics: LayoutDiagnostic[],
 ) {
   const ids = sortedIds(left.routeOwnerId, right.routeOwnerId)
-  if (left.segments.some(leftSegment => right.segments.some(rightSegment => (
-    positiveCollinearOverlap(leftSegment, rightSegment)
-  )))) diagnostics.push({
+  let sharesCollinearSegment = false
+  let formsFalseT = false
+  let crossesWithoutBridge = false
+  for (let leftIndex = 0; leftIndex < left.segments.length; leftIndex++) {
+    for (let rightIndex = 0; rightIndex < right.segments.length; rightIndex++) {
+      if (!rectsOverlapOrTouch(leftBounds[leftIndex], rightBounds[rightIndex])) continue
+      const leftSegment = left.segments[leftIndex]
+      const rightSegment = right.segments[rightIndex]
+      sharesCollinearSegment ||= positiveCollinearOverlap(leftSegment, rightSegment)
+      formsFalseT ||= falseTJunction(leftSegment, rightSegment)
+      crossesWithoutBridge ||= perpendicularInteriorCross(leftSegment, rightSegment)
+    }
+  }
+  if (sharesCollinearSegment) diagnostics.push({
     code: 'CROSS_FAMILY_SEGMENT_OVERLAP',
     ids,
     message: `Routes ${ids.join(' and ')} share a collinear segment`,
   })
-  if (left.segments.some(leftSegment => right.segments.some(rightSegment => (
-    falseTJunction(leftSegment, rightSegment)
-  )))) diagnostics.push({
+  if (formsFalseT) diagnostics.push({
     code: 'CROSS_FAMILY_SEGMENT_OVERLAP',
     ids,
     message: `Routes ${ids.join(' and ')} form a false T-junction`,
   })
-  if (left.segments.some(leftSegment => right.segments.some(rightSegment => (
-    perpendicularInteriorCross(leftSegment, rightSegment)
-  )))) diagnostics.push({
+  if (crossesWithoutBridge) diagnostics.push({
     code: 'UNROUTABLE_PRIMARY_EDGE',
     ids,
     message: `Routes ${ids.join(' and ')} cross without a bridge`,

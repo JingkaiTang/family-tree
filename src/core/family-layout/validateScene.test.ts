@@ -140,6 +140,19 @@ describe('validateScene', () => {
       message: 'Route parentage:dangling has dangling or mismatched endpoints',
     }])
   })
+
+  it('does not report cross-owner geometry for many routes in distant generations', () => {
+    const scene = emptyScene()
+    scene.routes = Array.from({ length: 200 }, (_, index) => route(
+      `owner:${index}`,
+      [horizontal(0, 40, index * 1_000)],
+    ))
+
+    expect(validateScene(scene, DEFAULT_LAYOUT_METRICS).filter(diagnostic => (
+      diagnostic.code === 'CROSS_FAMILY_SEGMENT_OVERLAP'
+      || diagnostic.message.startsWith('Routes ')
+    ))).toEqual([])
+  })
 })
 
 function baseScene(): LayoutScene {

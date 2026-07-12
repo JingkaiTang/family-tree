@@ -84,6 +84,19 @@ export function materializeSceneGeometry(
           : unit.rect.y + input.metrics.cardHeight,
       },
     }))
+  for (const group of input.parentageGroups) {
+    if (group.sourceAnchorPersonId === undefined) continue
+    const card = cards.find(value => value.id === group.sourceAnchorPersonId)
+    if (card === undefined) continue
+    hubs.push({
+      id: `hub:${group.id}`,
+      unitId: group.sourceUnitId,
+      point: {
+        x: card.rect.x + card.rect.width / 2,
+        y: card.rect.y + card.rect.height,
+      },
+    })
+  }
   const right = Math.max(...units.map(unit => unit.rect.x + unit.rect.width))
   const bottom = Math.max(...units.map(unit => unit.rect.y + unit.rect.height))
 

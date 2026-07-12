@@ -92,6 +92,45 @@ describe('buildFamilyUnits', () => {
     ])
   })
 
+  it('anchors a historical co-parent group to the participating current-couple member', () => {
+    const parentA = member('a')
+    const parentB = member('b')
+    const parentC = member('c')
+    const childAB = member('child-ab')
+    const childAC = member('child-ac')
+    linkSpouse(parentA, parentB)
+    linkSpouse(parentA, parentC, 'divorced')
+    linkParent(childAB, parentA)
+    linkParent(childAB, parentB)
+    linkParent(childAC, parentA)
+    linkParent(childAC, parentC)
+    const { facts } = normalizeFacts(familyData([
+      childAC,
+      parentC,
+      childAB,
+      parentB,
+      parentA,
+    ]))
+
+    const built = buildFamilyUnits(
+      projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
+      { rowOrders: [], familyAccentAssignments: {} },
+      DEFAULT_LAYOUT_METRICS,
+    )
+
+    expect(built.parentageGroups).toEqual([{
+      id: 'parentage:a+b',
+      sourceUnitId: 'unit:partnership:current:a+b',
+      childPersonIds: ['child-ab'],
+    }, {
+      id: 'parentage:a+c',
+      sourceUnitId: 'unit:partnership:current:a+b',
+      sourceHubId: 'hub:parentage:a+c',
+      sourceAnchorPersonId: 'a',
+      childPersonIds: ['child-ac'],
+    }])
+  })
+
   it('uses unit geometry, persisted accents, and deterministic collision avoidance', () => {
     const dad = member('dad')
     const child = member('c')
