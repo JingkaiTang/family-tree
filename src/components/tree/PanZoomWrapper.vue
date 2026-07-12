@@ -116,6 +116,7 @@ onMounted(() => {
     minScale: props.minScale ?? 0.2,
     maxScale: props.maxScale ?? 3,
     canvas: true,
+    origin: '0 0',
     startScale: init?.scale ?? 1,
     startX: init?.x ?? 0,
     startY: init?.y ?? 0,
