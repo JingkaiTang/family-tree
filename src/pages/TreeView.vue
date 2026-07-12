@@ -226,7 +226,6 @@ function seedFixture() {
 
     <main class="flex-1">
       <FamilyCanvas
-        :members="membersArray"
         :data="family.data"
         :root-id="rootId"
         :selected-id="selectedId"

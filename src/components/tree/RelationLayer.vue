@@ -1,11 +1,27 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Point, RoutedFamilyEdge, RouteSegment } from '@/core/family-layout/types'
 
-defineProps<{
+const props = defineProps<{
   routes: RoutedFamilyEdge[]
   width: number
   height: number
 }>()
+
+const routeOwnerGroups = computed(() => {
+  const routesByOwnerId = new Map<string, RoutedFamilyEdge[]>()
+  for (const route of props.routes) {
+    const routes = routesByOwnerId.get(route.routeOwnerId) ?? []
+    routes.push(route)
+    routesByOwnerId.set(route.routeOwnerId, routes)
+  }
+  return [...routesByOwnerId]
+    .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))
+    .map(([routeOwnerId, routes]) => ({
+      routeOwnerId,
+      routes: [...routes].sort((left, right) => left.id.localeCompare(right.id)),
+    }))
+})
 
 function pathData(segment: RouteSegment): string {
   if (segment.points.length === 0) return ''
@@ -45,21 +61,23 @@ function pointValue(point: Point): string {
     aria-hidden="true"
   >
     <g
-      v-for="route in routes"
-      :key="route.id"
-      :data-route-owner="route.routeOwnerId"
+      v-for="group in routeOwnerGroups"
+      :key="group.routeOwnerId"
+      :data-route-owner="group.routeOwnerId"
     >
-      <path
-        v-for="(segment, index) in route.segments"
-        :key="`${route.id}:${index}`"
-        :d="pathData(segment)"
-        :stroke="route.accent"
-        :stroke-dasharray="route.kind === 'primary' ? undefined : '6 4'"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        fill="none"
-      />
+      <template v-for="route in group.routes" :key="route.id">
+        <path
+          v-for="(segment, index) in route.segments"
+          :key="`${route.id}:${index}`"
+          :d="pathData(segment)"
+          :stroke="route.accent"
+          :stroke-dasharray="route.kind === 'primary' ? undefined : '6 4'"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
+      </template>
     </g>
   </svg>
 </template>

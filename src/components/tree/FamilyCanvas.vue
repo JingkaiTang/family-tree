@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { LayoutScene, Point } from '@/core/family-layout/types'
-import type { FamilyData, Member } from '@/core/schema'
+import type { FamilyData } from '@/core/schema'
 import { layoutFamilyTree } from '@/core/treeLayout'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import FamilyUnit, { type FamilyUnitDragPayload } from './FamilyUnit.vue'
@@ -9,7 +9,6 @@ import GridBackground from './GridBackground.vue'
 import RelationLayer from './RelationLayer.vue'
 
 const props = defineProps<{
-  members: Member[]
   data: FamilyData
   rootId?: string
   selectedId?: string | null
@@ -39,17 +38,26 @@ void props.rootId
 
 const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
 const scene = ref<LayoutScene>(EMPTY_SCENE)
+const members = computed(() => Object.values(props.data.members))
+const hasRestoredInitialView = !!props.initialView
 let layoutRequestId = 0
+let hasAcceptedScene = false
 
 async function updateLayout() {
   const requestId = ++layoutRequestId
-  const nextScene = await layoutFamilyTree(props.members, { data: props.data })
+  const nextScene = await layoutFamilyTree(members.value, { data: props.data })
   if (requestId !== layoutRequestId) return
+  const suppressFocusForInitialView = hasRestoredInitialView && !hasAcceptedScene
   scene.value = nextScene
+  hasAcceptedScene = true
+  await nextTick()
+  if (requestId !== layoutRequestId) return
+  const viewpointId = props.viewpointId
+  if (viewpointId && !suppressFocusForInitialView) focusMember(viewpointId)
 }
 
 watch(
-  () => [props.members, props.data],
+  () => props.data,
   updateLayout,
   { immediate: true, deep: true },
 )
@@ -88,7 +96,7 @@ const kinshipByMemberId = computed<Record<string, string>>(() => {
   const viewpointId = props.viewpointId
   const resolveKinship = props.getKinship
   if (!viewpointId || !resolveKinship) return {}
-  return Object.fromEntries(props.members.flatMap(member => {
+  return Object.fromEntries(members.value.flatMap(member => {
     const kinship = resolveKinship(viewpointId, member.id)
     return kinship ? [[member.id, kinship]] : []
   }))
@@ -103,7 +111,6 @@ function focusMember(id: string) {
   )
 }
 
-const hasRestoredInitialView = !!props.initialView
 let suppressNextFocus = hasRestoredInitialView
 watch(
   () => props.viewpointId,
@@ -186,7 +193,7 @@ function onUnitDrop(payload: FamilyUnitDragPayload) {
         </div>
 
         <div
-          v-if="scene.cards.length === 0"
+          v-if="members.length === 0"
           class="absolute inset-0 flex items-center justify-center text-slate-400"
         >
           暂无成员 — 点击上方"添加成员"开始

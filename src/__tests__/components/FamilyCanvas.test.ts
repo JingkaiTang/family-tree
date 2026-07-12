@@ -103,9 +103,9 @@ function familyData(members: Member[]): FamilyData {
   }
 }
 
-function mountCanvas(members: Member[], data = familyData(members), props = {}) {
+function mountCanvas(data: FamilyData, props = {}) {
   return mount(FamilyCanvas, {
-    props: { members, data, ...props },
+    props: { data, ...props },
     global: {
       plugins: [createPinia()],
       stubs: { PanZoomWrapper: PanZoomStub },
@@ -129,7 +129,7 @@ describe('FamilyCanvas', () => {
 
   it('renders a couple as one family background with two local member cards and its hub', async () => {
     const members = [mk('A'), mk('B')]
-    const wrapper = mountCanvas(members)
+    const wrapper = mountCanvas(familyData(members))
     await flushPromises()
 
     const units = wrapper.findAll('[data-testid="family-unit"]')
@@ -146,25 +146,65 @@ describe('FamilyCanvas', () => {
   })
 
   it('keeps every route owner in its own SVG group and preserves segment accents', async () => {
-    const wrapper = mountCanvas([mk('A'), mk('B')])
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]))
     await flushPromises()
 
     const owners = wrapper.findAll('g[data-route-owner]')
     expect(owners).toHaveLength(2)
     expect(owners.map(owner => owner.attributes('data-route-owner'))).toEqual([
-      'parentage:parents',
       'parentage:other',
+      'parentage:parents',
     ])
-    expect(owners[0].findAll('path')).toHaveLength(2)
-    expect(owners[0].find('path').attributes('stroke')).toBe(familyAccent)
-    expect(owners[1].find('path').attributes('stroke')).toBe('#d6578b')
-    expect(owners[0].findAll('path')[1].attributes('d')).toBe(
+    const parentRoute = wrapper.find('g[data-route-owner="parentage:parents"]')
+    expect(parentRoute.findAll('path')).toHaveLength(2)
+    expect(parentRoute.find('path').attributes('stroke')).toBe(familyAccent)
+    expect(wrapper.find('g[data-route-owner="parentage:other"] path').attributes('stroke'))
+      .toBe('#d6578b')
+    expect(parentRoute.findAll('path')[1].attributes('d')).toBe(
       'M 228 300 Q 240 288 252 300',
     )
   })
 
+  it('groups multiple routes for one owner into one stable SVG group', async () => {
+    const scene = structuredClone(coupleScene)
+    scene.routes = [{
+      id: 'route:z',
+      routeOwnerId: 'owner:z',
+      kind: 'primary',
+      accent: '#999999',
+      segments: [{ orientation: 'horizontal', points: [{ x: 0, y: 30 }, { x: 10, y: 30 }] }],
+    }, {
+      id: 'route:a-2',
+      routeOwnerId: 'owner:a',
+      kind: 'primary',
+      accent: '#222222',
+      segments: [{ orientation: 'horizontal', points: [{ x: 0, y: 20 }, { x: 10, y: 20 }] }],
+    }, {
+      id: 'route:a-1',
+      routeOwnerId: 'owner:a',
+      kind: 'primary',
+      accent: '#111111',
+      segments: [{ orientation: 'horizontal', points: [{ x: 0, y: 10 }, { x: 10, y: 10 }] }],
+    }]
+    layoutFamilyTree.mockResolvedValueOnce(scene)
+
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]))
+    await flushPromises()
+
+    const owners = wrapper.findAll('g[data-route-owner]')
+    expect(owners.map(owner => owner.attributes('data-route-owner'))).toEqual([
+      'owner:a',
+      'owner:z',
+    ])
+    expect(owners[0].findAll('path').map(path => path.attributes('stroke'))).toEqual([
+      '#111111',
+      '#222222',
+    ])
+    expect(owners[0].findAll('path')).toHaveLength(2)
+  })
+
   it('preserves select and open events from member cards', async () => {
-    const wrapper = mountCanvas([mk('A'), mk('B')])
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]))
     await flushPromises()
 
     const nodes = wrapper.findAll('[data-testid="member-node"]')
@@ -177,7 +217,7 @@ describe('FamilyCanvas', () => {
 
   it('shows the empty state for an empty scene', async () => {
     layoutFamilyTree.mockResolvedValueOnce(structuredClone(emptyScene))
-    const wrapper = mountCanvas([])
+    const wrapper = mountCanvas(familyData([]))
     await flushPromises()
 
     expect(wrapper.text()).toContain('暂无成员')
@@ -187,10 +227,31 @@ describe('FamilyCanvas', () => {
   it('passes complete family data to the facade', async () => {
     const members = [mk('A')]
     const data = familyData(members)
-    mountCanvas(members, data)
+    mountCanvas(data)
     await flushPromises()
 
     expect(layoutFamilyTree).toHaveBeenCalledWith(members, { data })
+  })
+
+  it('renders every member from the single data source', async () => {
+    const members = [mk('A'), mk('B')]
+    const wrapper = mountCanvas(familyData(members))
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="member-node"]')).toHaveLength(2)
+    expect(wrapper.text()).toContain('A')
+    expect(wrapper.text()).toContain('B')
+  })
+
+  it('uses data members rather than pending scene state for the empty message', async () => {
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree.mockReturnValueOnce(pending.promise)
+    const data = familyData([mk('A'), mk('B')])
+
+    const wrapper = mountCanvas(data)
+    await nextTick()
+
+    expect(wrapper.text()).not.toContain('暂无成员')
   })
 
   it('ignores stale async layout results', async () => {
@@ -200,12 +261,12 @@ describe('FamilyCanvas', () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise)
     const firstMembers = [mk('A'), mk('B')]
-    const wrapper = mountCanvas(firstMembers)
+    const wrapper = mountCanvas(familyData(firstMembers))
     await nextTick()
 
     const nextMembers = [mk('C')]
     const nextData = familyData(nextMembers)
-    await wrapper.setProps({ members: nextMembers, data: nextData })
+    await wrapper.setProps({ data: nextData })
     const nextScene = structuredClone(coupleScene)
     nextScene.units[0].memberIds = ['C']
     nextScene.units[0].kind = 'single'
@@ -226,7 +287,7 @@ describe('FamilyCanvas', () => {
   })
 
   it('focuses a changed viewpoint at the pixel card center', async () => {
-    const wrapper = mountCanvas([mk('A'), mk('B')])
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]))
     await flushPromises()
 
     await wrapper.setProps({ viewpointId: 'B' })
@@ -235,11 +296,48 @@ describe('FamilyCanvas', () => {
     expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
   })
 
+  it('focuses the latest viewpoint after the accepted async scene and never from a stale scene', async () => {
+    const stale = deferred<LayoutScene>()
+    const accepted = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockReturnValueOnce(stale.promise)
+      .mockReturnValueOnce(accepted.promise)
+    const firstData = familyData([mk('A'), mk('B')])
+    const wrapper = mountCanvas(firstData, { viewpointId: 'A' })
+    await nextTick()
+
+    await wrapper.setProps({ viewpointId: 'B' })
+    await wrapper.setProps({ data: structuredClone(firstData) })
+    stale.resolve(structuredClone(coupleScene))
+    await flushPromises()
+    expect(focusStagePoint).not.toHaveBeenCalled()
+
+    accepted.resolve(structuredClone(coupleScene))
+    await flushPromises()
+    expect(focusStagePoint).toHaveBeenCalledTimes(1)
+    expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
+  })
+
+  it('does not override a restored initial pan and zoom when the first scene arrives', async () => {
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree.mockReturnValueOnce(pending.promise)
+    mountCanvas(familyData([mk('A'), mk('B')]), {
+      viewpointId: 'A',
+      initialView: { x: 10, y: 20, scale: 1.5 },
+    })
+    await nextTick()
+
+    pending.resolve(structuredClone(coupleScene))
+    await flushPromises()
+
+    expect(focusStagePoint).not.toHaveBeenCalled()
+  })
+
   it('preserves viewpoint kinship labels on member cards', async () => {
     const getKinship = vi.fn((fromId: string, toId: string) => (
       fromId === 'A' && toId === 'B' ? '配偶' : null
     ))
-    const wrapper = mountCanvas([mk('A'), mk('B')], undefined, {
+    const wrapper = mountCanvas(familyData([mk('A'), mk('B')]), {
       viewpointId: 'A',
       getKinship,
     })
