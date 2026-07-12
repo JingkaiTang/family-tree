@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { migrate } from './migrate'
-import { createEmptyFamily, SCHEMA_VERSION, type Member } from './schema'
+import { createEmptyFamily, FamilyData, SCHEMA_VERSION, type Member } from './schema'
 
 function member(id: string, patch: Partial<Member> = {}): Member {
   return {
@@ -93,6 +93,28 @@ describe('migrate', () => {
     expect(migrated.childLayoutAssignments).toEqual(raw.childLayoutAssignments)
   })
 
+  it('ignores malformed legacy overrides before schema validation without throwing', () => {
+    const raw = rawFamily([member('a'), member('b')], {
+      schemaVersion: 2,
+      childLayoutAssignments: {},
+      gridLayoutOverrides: {
+        'person:b': { order: -1 },
+        'invalid:null': null,
+        'invalid:string': 'bad',
+        'invalid:missing': {},
+        'invalid:nan': { order: Number.NaN },
+        'invalid:infinity': { order: Number.POSITIVE_INFINITY },
+      },
+    })
+
+    const migrated = migrate(raw)
+
+    expect(migrated.layoutPreferences.rowOrders).toEqual([{
+      id: 'row:v2:0',
+      unitIds: ['unit:person:b', 'unit:person:a'],
+    }])
+  })
+
   it('preserves V3 preferences when migration is run repeatedly', () => {
     const family = createEmptyFamily()
     family.members.a = member('a')
@@ -106,6 +128,98 @@ describe('migrate', () => {
 
     expect(twice).toEqual(once)
     expect(twice.layoutPreferences).toEqual(family.layoutPreferences)
+  })
+
+  it('reconciles stale V3 row and accent preferences against current units', () => {
+    const family = createEmptyFamily()
+    family.members = {
+      a: member('a'),
+      b: member('b'),
+    }
+    family.layoutPreferences = {
+      rowOrders: [{
+        id: 'row:dirty',
+        unitIds: [
+          'unit:person:b',
+          'unit:person:a',
+          'unit:person:b',
+          'unit:person:unknown',
+        ],
+      }],
+      familyAccentAssignments: {
+        'unit:person:a': '#123456',
+        'unit:person:unknown': '#999999',
+      },
+    }
+
+    expect(migrate(family).layoutPreferences).toEqual({
+      rowOrders: [{
+        id: 'row:dirty',
+        unitIds: ['unit:person:b', 'unit:person:a'],
+      }],
+      familyAccentAssignments: {
+        'unit:person:a': '#123456',
+      },
+    })
+  })
+
+  it('rejects future schema versions instead of rewriting them', () => {
+    const raw = {
+      ...createEmptyFamily(),
+      schemaVersion: SCHEMA_VERSION + 1,
+    }
+
+    expect(() => migrate(raw)).toThrow('文件版本过新，当前版本不支持')
+  })
+
+  it('requires the current schema version during final validation', () => {
+    expect(FamilyData.safeParse({
+      ...createEmptyFamily(),
+      schemaVersion: SCHEMA_VERSION - 1,
+    }).success).toBe(false)
+  })
+
+  it.each([2, 3])('preserves root and member extension fields from V%s data', (version) => {
+    const extendedMember = {
+      ...member('a'),
+      futureMemberField: { enabled: true },
+    }
+    const raw = rawFamily([extendedMember], {
+      schemaVersion: version,
+      childLayoutAssignments: {},
+      gridLayoutOverrides: {},
+      layoutPreferences: version === 3
+        ? { rowOrders: [], familyAccentAssignments: {} }
+        : undefined,
+      futureRootField: { mode: 'extension' },
+    })
+
+    const parsed = FamilyData.parse(migrate(raw))
+
+    expect((parsed as unknown as Record<string, unknown>).futureRootField).toEqual({
+      mode: 'extension',
+    })
+    expect((parsed.members.a as unknown as Record<string, unknown>).futureMemberField).toEqual({
+      enabled: true,
+    })
+  })
+
+  it('does not mutate V1 input while normalizing conflicting current spouses', () => {
+    const a = member('a')
+    const b = member('b')
+    const c = member('c')
+    linkSpouse(a, c)
+    linkSpouse(a, b)
+    const raw = rawFamily([a, b, c])
+    const before = structuredClone(raw)
+
+    const migrated = migrate(raw)
+
+    expect(raw).toEqual(before)
+    expect(migrated.members.a.spouses).toEqual([
+      { id: 'b', type: 'married' },
+      { id: 'c', type: 'divorced' },
+    ])
   })
 
   it('normalizes multiple current spouses deterministically', () => {

@@ -109,4 +109,42 @@ describe('family store relation invariants', () => {
     family.setFamilyAccentAssignment('unit:person:a', null)
     expect(family.data.layoutPreferences.familyAccentAssignments).toEqual({})
   })
+
+  it('reconciles semantic layout preferences after deleting a member', () => {
+    const family = useFamilyStore()
+    family.$patch((state) => {
+      state.data.members = {
+        a: mk('a'),
+        b: mk('b'),
+      }
+      state.data.layoutPreferences = {
+        rowOrders: [{
+          id: 'row:dirty',
+          unitIds: [
+            'unit:person:b',
+            'unit:person:a',
+            'unit:person:b',
+            'unit:person:unknown',
+          ],
+        }],
+        familyAccentAssignments: {
+          'unit:person:a': '#111111',
+          'unit:person:b': '#222222',
+          'unit:person:unknown': '#999999',
+        },
+      }
+    })
+
+    family.deleteMember('b')
+
+    expect(family.data.layoutPreferences).toEqual({
+      rowOrders: [{
+        id: 'row:dirty',
+        unitIds: ['unit:person:a'],
+      }],
+      familyAccentAssignments: {
+        'unit:person:a': '#111111',
+      },
+    })
+  })
 })

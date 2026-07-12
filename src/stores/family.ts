@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { reconcileLayoutPreferences } from '@/core/family-layout/reconcilePreferences'
 import type { ChildLayoutAssignment, FamilyData, GridLayoutOverride, Member, ProjectMeta } from '@/core/schema'
 import { createEmptyFamily } from '@/core/schema'
 import { setLastProjectPath } from '@/services/prefs'
@@ -96,6 +97,7 @@ export const useFamilyStore = defineStore('family', () => {
       delete data.value.manualPositions[id]
     }
     delete data.value.members[id]
+    data.value.layoutPreferences = reconcileLayoutPreferences(data.value)
     markDirty()
   }
 

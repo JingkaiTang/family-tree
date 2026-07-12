@@ -1,4 +1,7 @@
-import { convertLegacyGridPreferences } from './family-layout/reconcilePreferences'
+import {
+  convertLegacyGridPreferences,
+  reconcileLayoutPreferences,
+} from './family-layout/reconcilePreferences'
 import { type FamilyData, SCHEMA_VERSION, type Member } from './schema'
 
 type MutableFamily = Record<string, unknown> & {
@@ -23,8 +26,11 @@ export function migrate(raw: unknown): FamilyData {
     throw new Error('Invalid family data: root value is not an object')
   }
 
-  const data = raw as Record<string, unknown>
+  const data = structuredClone(raw) as Record<string, unknown>
   const version = typeof data.schemaVersion === 'number' ? data.schemaVersion : 0
+  if (version > SCHEMA_VERSION) {
+    throw new Error('文件版本过新，当前版本不支持')
+  }
   let current: MutableFamily = { ...data, schemaVersion: version }
 
   if (current.schemaVersion < 2) {
@@ -42,6 +48,7 @@ export function migrate(raw: unknown): FamilyData {
     rowOrders: [],
     familyAccentAssignments: {},
   }
+  current.layoutPreferences = reconcileLayoutPreferences(current as unknown as FamilyData)
   return current as unknown as FamilyData
 }
 

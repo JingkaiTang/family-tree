@@ -47,7 +47,7 @@ export const Member = z.object({
   godparents: z.array(GodparentRef).default([]),
   /** 干儿子 / 干女儿 */
   godchildren: z.array(GodchildRef).default([]),
-})
+}).passthrough()
 export type Member = z.infer<typeof Member>
 
 // ---------------- FamilyData ----------------
@@ -92,7 +92,7 @@ export const PersistedLayoutPreferences = z.object({
 export type PersistedLayoutPreferences = z.infer<typeof PersistedLayoutPreferences>
 
 export const FamilyData = z.object({
-  schemaVersion: z.number(),
+  schemaVersion: z.literal(SCHEMA_VERSION),
   members: z.record(z.string(), Member),
   nicknameOverrides: NicknameOverrides.default({}),
   /** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */
@@ -104,7 +104,7 @@ export const FamilyData = z.object({
   rootMemberId: z.string().optional(),
   /** 上次使用的视角成员 id；打开项目时自动恢复并聚焦到该节点 */
   defaultViewpointId: z.string().optional(),
-})
+}).passthrough()
 export type FamilyData = z.infer<typeof FamilyData>
 
 // ---------------- ProjectMeta ----------------
