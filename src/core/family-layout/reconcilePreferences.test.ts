@@ -205,6 +205,28 @@ describe('reconcileLayoutPreferences', () => {
     ])
   })
 
+  it('keeps a complete reordered source row isolated from another generation', () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const child = member('child')
+    linkParent(child, parentA)
+    const data = createEmptyFamily()
+    data.members = { parentA, parentB, child }
+    data.layoutPreferences.rowOrders = [{
+      id: 'row:0',
+      unitIds: [
+        'unit:person:parent-b',
+        'unit:person:parent-a',
+        'unit:person:child',
+      ],
+    }]
+
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
+      id: 'row:0',
+      unitIds: ['unit:person:parent-b', 'unit:person:parent-a'],
+    }])
+  })
+
   it('does not create default rows when there are no persisted rows', () => {
     const data = createEmptyFamily()
     data.members.a = member('a')

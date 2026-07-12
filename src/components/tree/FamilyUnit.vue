@@ -17,6 +17,9 @@ const props = defineProps<{
   selectedId?: string | null
   viewpointId?: string | null
   dragOffset?: Point
+  previewOffset?: Point
+  isDragging?: boolean
+  animatePosition?: boolean
   kinshipByMemberId?: Record<string, string>
 }>()
 
@@ -30,6 +33,7 @@ export interface FamilyUnitDragPayload {
 const emit = defineEmits<{
   (event: 'unit-drag', payload: FamilyUnitDragPayload): void
   (event: 'unit-drop', payload: FamilyUnitDragPayload): void
+  (event: 'unit-cancel', payload: FamilyUnitDragPayload): void
   (event: 'select', id: string): void
   (event: 'open', id: string): void
 }>()
@@ -66,7 +70,8 @@ const spouseAxis = computed(() => {
 const unitStyle = computed(() => ({
   width: `${props.unit.rect.width}px`,
   height: `${props.unit.rect.height}px`,
-  transform: `translate(${props.unit.rect.x + (props.dragOffset?.x ?? 0)}px, ${props.unit.rect.y + (props.dragOffset?.y ?? 0)}px)`,
+  transform: `translate(${props.unit.rect.x + (props.dragOffset?.x ?? props.previewOffset?.x ?? 0)}px, ${props.unit.rect.y + (props.dragOffset?.y ?? props.previewOffset?.y ?? 0)}px)`,
+  transition: props.animatePosition ? 'transform 180ms ease' : undefined,
   backgroundColor: `color-mix(in srgb, ${props.unit.accent} 6%, transparent)`,
   borderColor: `color-mix(in srgb, ${props.unit.accent} 25%, transparent)`,
 }))
@@ -79,12 +84,28 @@ function unitPayload(payload: { dx: number; dy: number }): FamilyUnitDragPayload
     dy: payload.dy,
   }
 }
+
+let activeDrag = false
+
+function onMemberDrag(payload: { dx: number; dy: number }) {
+  activeDrag = true
+  emit('unit-drag', unitPayload(payload))
+}
+
+function onMemberDrop(payload: { dx: number; dy: number }) {
+  if (!activeDrag) return
+  activeDrag = false
+  const value = unitPayload(payload)
+  if (payload.dx === 0 && payload.dy === 0) emit('unit-cancel', value)
+  else emit('unit-drop', value)
+}
 </script>
 
 <template>
   <div
     data-testid="family-unit"
-    class="absolute left-0 top-0 rounded-2xl border"
+    class="absolute left-0 top-0 rounded-2xl border motion-reduce:!transition-none"
+    :class="isDragging ? 'z-30 shadow-xl' : ''"
     :style="unitStyle"
   >
     <div
@@ -125,8 +146,8 @@ function unitPayload(payload: { dx: number; dy: number }): FamilyUnitDragPayload
       class="z-10"
       @click="emit('select', value.card.id)"
       @dblclick="emit('open', value.card.id)"
-      @drag="emit('unit-drag', unitPayload($event))"
-      @drop="emit('unit-drop', unitPayload($event))"
+      @drag="onMemberDrag"
+      @drop="onMemberDrop"
     />
   </div>
 </template>

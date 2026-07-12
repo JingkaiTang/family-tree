@@ -6,7 +6,10 @@ const props = defineProps<{
   routes: RoutedFamilyEdge[]
   width: number
   height: number
+  fadedRouteIds?: string[]
 }>()
+
+const fadedRouteIdSet = computed(() => new Set(props.fadedRouteIds ?? []))
 
 const routeOwnerGroups = computed(() => {
   const routesByOwnerId = new Map<string, RoutedFamilyEdge[]>()
@@ -69,6 +72,8 @@ function pointValue(point: Point): string {
         <path
           v-for="(segment, index) in route.segments"
           :key="`${route.id}:${index}`"
+          :data-route-id="route.id"
+          :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
           :d="pathData(segment)"
           :stroke="route.accent"
           :stroke-dasharray="route.kind === 'primary' ? undefined : '6 4'"
