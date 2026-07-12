@@ -2,7 +2,12 @@ import {
   convertLegacyGridPreferences,
   reconcileLayoutPreferences,
 } from './family-layout/reconcilePreferences'
-import { type FamilyData, SCHEMA_VERSION, type Member } from './schema'
+import {
+  type FamilyData,
+  type Member,
+  PersistedLayoutPreferences,
+  SCHEMA_VERSION,
+} from './schema'
 
 type MutableFamily = Record<string, unknown> & {
   schemaVersion: number
@@ -44,12 +49,18 @@ export function migrate(raw: unknown): FamilyData {
   current.members = current.members ?? {}
   current.childLayoutAssignments = current.childLayoutAssignments ?? {}
   current.gridLayoutOverrides = current.gridLayoutOverrides ?? {}
-  current.layoutPreferences = current.layoutPreferences ?? {
-    rowOrders: [],
-    familyAccentAssignments: {},
-  }
+  current.layoutPreferences = parseLayoutPreferences(current.layoutPreferences)
   current.layoutPreferences = reconcileLayoutPreferences(current as unknown as FamilyData)
   return current as unknown as FamilyData
+}
+
+function parseLayoutPreferences(value: unknown): FamilyData['layoutPreferences'] {
+  const parsed = PersistedLayoutPreferences.safeParse(value === undefined ? {} : value)
+  if (!parsed.success) {
+    const details = parsed.error.issues.map(issue => issue.message).join('; ')
+    throw new Error(`Invalid layoutPreferences: ${details}`)
+  }
+  return parsed.data
 }
 
 function migrateV1ToV2(data: MutableFamily): MutableFamily {

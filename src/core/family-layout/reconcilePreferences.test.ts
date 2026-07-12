@@ -46,6 +46,41 @@ describe('convertLegacyGridPreferences', () => {
     })
   })
 
+  it('sorts uncovered units with the legacy effective order zero', () => {
+    const data = createEmptyFamily()
+    data.members = {
+      a: member('a'),
+      b: member('b'),
+    }
+    data.gridLayoutOverrides = {
+      'person:a': { order: 1 },
+    }
+
+    expect(convertLegacyGridPreferences(data).rowOrders).toEqual([{
+      id: 'row:v2:0',
+      unitIds: ['unit:person:b', 'unit:person:a'],
+    }])
+  })
+
+  it('merges alternate legacy slots by minimum order and emits the unit once', () => {
+    const a = member('a')
+    const b = member('b')
+    const c = member('c')
+    a.spouses.push({ id: 'b', type: 'married' })
+    b.spouses.push({ id: 'a', type: 'married' })
+    const data = createEmptyFamily()
+    data.members = { a, b, c }
+    data.gridLayoutOverrides = {
+      'couple:a+b': { order: 2 },
+      'person:a': { order: -2 },
+    }
+
+    expect(convertLegacyGridPreferences(data).rowOrders).toEqual([{
+      id: 'row:v2:0',
+      unitIds: ['unit:partnership:current:a+b', 'unit:person:c'],
+    }])
+  })
+
   it('groups valid legacy slots by current unit generation and sorts rows deterministically', () => {
     const parentA = member('parent-a')
     const parentB = member('parent-b')

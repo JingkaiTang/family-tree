@@ -1,5 +1,10 @@
 import type { FamilyData, PersistedLayoutPreferences } from '@/core/schema'
-import { buildGridFamilyModel } from '@/core/layout/gridFamilyModel'
+import {
+  buildGridFamilyModel,
+  coupleSlotId,
+  personSlotId,
+  singleParentSlotId,
+} from '@/core/layout/gridFamilyModel'
 import { assignGenerations } from './assignGenerations'
 import { buildFamilyUnits } from './buildFamilyUnits'
 import { normalizeFacts } from './normalizeFacts'
@@ -12,21 +17,34 @@ import {
 
 export function convertLegacyGridPreferences(data: FamilyData): PersistedLayoutPreferences {
   const { built, generationByUnitId, unitIdsByGeneration } = buildCurrentLayoutState(data)
-  const legacySlots = new Map(
-    buildGridFamilyModel(data).slots.map(slot => [slot.id, slot]),
+  const memberIdsByLegacySlotId = new Map(
+    buildGridFamilyModel(data).slots.map(slot => [slot.id, slot.memberIds]),
   )
+  const addAlias = (slotId: string, memberIds: string[]) => {
+    if (!memberIdsByLegacySlotId.has(slotId)) memberIdsByLegacySlotId.set(slotId, memberIds)
+  }
+  for (const unit of built.units) {
+    for (const memberId of unit.memberIds) {
+      addAlias(personSlotId(memberId), [memberId])
+      addAlias(singleParentSlotId(memberId), [memberId])
+    }
+    if (unit.memberIds.length === 2) {
+      addAlias(coupleSlotId(unit.memberIds[0], unit.memberIds[1]), unit.memberIds)
+    }
+  }
   const entriesByGeneration = new Map<number, Array<{
     unitId: string
     order: number
+    slotId: string
   }>>()
 
   for (const [slotId, override] of Object.entries(data.gridLayoutOverrides)) {
     const order = readLegacyOrder(override)
     if (order === null) continue
-    const slot = legacySlots.get(slotId)
-    if (!slot) continue
+    const memberIds = memberIdsByLegacySlotId.get(slotId)
+    if (!memberIds) continue
     const unitIds = [...new Set(
-      slot.memberIds
+      memberIds
         .map(memberId => built.unitIdByPersonId[memberId])
         .filter((unitId): unitId is string => unitId !== undefined),
     )]
@@ -35,25 +53,32 @@ export function convertLegacyGridPreferences(data: FamilyData): PersistedLayoutP
     const generation = generationByUnitId[unitId]
     if (generation === undefined) continue
     const entries = entriesByGeneration.get(generation) ?? []
-    entries.push({ unitId, order })
+    entries.push({ unitId, order, slotId })
     entriesByGeneration.set(generation, entries)
   }
 
   const rowOrders = [...entriesByGeneration]
     .sort(([left], [right]) => left - right)
     .map(([generation, entries]) => {
-      const orderedUnitIds = [...new Set(
-        entries
-          .sort((left, right) => left.order - right.order || left.unitId.localeCompare(right.unitId))
-          .map(entry => entry.unitId),
-      )]
-      const orderedUnitIdSet = new Set(orderedUnitIds)
-      const remainingUnitIds = [...(unitIdsByGeneration.get(generation) ?? [])]
-        .filter(unitId => !orderedUnitIdSet.has(unitId))
-        .sort((left, right) => left.localeCompare(right))
+      const overrideByUnitId = new Map<string, { order: number; slotId: string }>()
+      for (const entry of entries) {
+        const current = overrideByUnitId.get(entry.unitId)
+        if (
+          current === undefined
+          || entry.order < current.order
+          || (entry.order === current.order && entry.slotId.localeCompare(current.slotId) < 0)
+        ) {
+          overrideByUnitId.set(entry.unitId, { order: entry.order, slotId: entry.slotId })
+        }
+      }
+      const unitIds = [...(unitIdsByGeneration.get(generation) ?? [])]
+        .sort((left, right) => (
+          (overrideByUnitId.get(left)?.order ?? 0) - (overrideByUnitId.get(right)?.order ?? 0)
+          || left.localeCompare(right)
+        ))
       return {
         id: `row:v2:${generation}`,
-        unitIds: [...orderedUnitIds, ...remainingUnitIds],
+        unitIds,
       }
     })
 

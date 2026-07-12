@@ -163,6 +163,39 @@ describe('migrate', () => {
     })
   })
 
+  it('materializes nested defaults from an empty V3 layoutPreferences object', () => {
+    const raw = {
+      ...createEmptyFamily(),
+      layoutPreferences: {},
+    }
+
+    const migrated = migrate(raw)
+
+    expect(migrated.layoutPreferences).toEqual({
+      rowOrders: [],
+      familyAccentAssignments: {},
+    })
+    expect(FamilyData.parse(migrated).layoutPreferences).toEqual({
+      rowOrders: [],
+      familyAccentAssignments: {},
+    })
+  })
+
+  it.each([
+    null,
+    'invalid',
+    [],
+    { rowOrders: 'invalid' },
+    { familyAccentAssignments: [] },
+  ])('rejects invalid V3 layoutPreferences clearly: %j', (layoutPreferences) => {
+    const raw = {
+      ...createEmptyFamily(),
+      layoutPreferences,
+    }
+
+    expect(() => migrate(raw)).toThrow('Invalid layoutPreferences')
+  })
+
   it('rejects future schema versions instead of rewriting them', () => {
     const raw = {
       ...createEmptyFamily(),
