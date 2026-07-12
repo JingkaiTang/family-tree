@@ -45,6 +45,7 @@ let layoutRequestId = 0
 let suppressInitialSceneFocus = !!props.initialView
 let expectedRowUpdate: { rowId: string; unitIds: string[] } | null = null
 let pendingDropToken: number | null = null
+let pendingSceneRecovery: { data: FamilyData; changedIds: string[] } | null = null
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 const animatePositions = ref(false)
 
@@ -55,6 +56,7 @@ async function updateLayout(options: {
 } = {}) {
   const requestId = ++layoutRequestId
   const pendingTokenAtRequest = pendingDropToken
+  const recoveryAtRequest = options.data ? pendingSceneRecovery : null
   const layoutData = options.data ?? props.data
   const nextScene = await layoutFamilyTree(Object.values(layoutData.members), {
     data: layoutData,
@@ -75,6 +77,9 @@ async function updateLayout(options: {
     }, 180)
   }
   scene.value = nextScene
+  if (recoveryAtRequest !== null && recoveryAtRequest === pendingSceneRecovery) {
+    pendingSceneRecovery = null
+  }
   if (shouldSettleDrag) {
     dragState.value = null
     dragCanDrop.value = false
@@ -224,6 +229,8 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
 
   const previousScene = scene.value
   const nextData = withRowOrderPreference(props.data, state.rowId, rowOrder)
+  const changedIds = affectedMemberIds(payload.memberIds)
+  pendingSceneRecovery = { data: nextData, changedIds }
   pendingDropToken = dragToken
   const expectation = { rowId: state.rowId, unitIds: [...rowOrder] }
   expectedRowUpdate = expectation
@@ -234,7 +241,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
   await updateLayout({
     data: nextData,
     previousScene,
-    changedIds: affectedMemberIds(payload.memberIds),
+    changedIds,
   })
 }
 
@@ -256,6 +263,14 @@ function clearDrag(unitId: string) {
   dragState.value = null
   dragCanDrop.value = false
   pendingDropToken = null
+  const recovery = pendingSceneRecovery
+  if (!recovery) return
+  pendingSceneRecovery = null
+  void updateLayout({
+    data: recovery.data,
+    previousScene: scene.value,
+    changedIds: recovery.changedIds,
+  })
 }
 
 function closestRow(centerY: number) {

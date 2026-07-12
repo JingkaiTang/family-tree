@@ -756,6 +756,130 @@ describe('FamilyCanvas', () => {
       .toContain('translate(240px, 0px)')
   })
 
+  it('recovers the persisted scene after a superseding drag is cancelled', async () => {
+    const firstDrop = deferred<LayoutScene>()
+    const replacement = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockReturnValueOnce(firstDrop.promise)
+      .mockReturnValueOnce(replacement.promise)
+    const { family, wrapper } = mountStoreCanvas(
+      familyData([mk('A'), mk('B'), mk('C'), mk('D')]),
+    )
+    await flushPromises()
+
+    const firstNode = await beginDrag(wrapper, 2, -500, 0)
+    await firstNode.trigger('pointerup', { pointerId: 1, clientX: 100, clientY: 100 })
+    await nextTick()
+    expect(family.data.layoutPreferences.rowOrders).toContainEqual({
+      id: 'row:0',
+      unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
+    })
+
+    const secondNode = await beginDrag(wrapper, 1, 300, 0)
+    await secondNode.trigger('pointercancel', { pointerId: 1 })
+    await nextTick()
+
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
+    expect(layoutFamilyTree.mock.calls[2][1]).toMatchObject({
+      data: {
+        layoutPreferences: {
+          rowOrders: [{
+            id: 'row:0',
+            unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
+          }],
+        },
+      },
+      previousScene: sortableScene,
+      changedIds: ['C'],
+    })
+
+    const staleScene = structuredClone(sortableScene)
+    staleScene.units[0].rect.x = 900
+    staleScene.cards[0].rect.x = 900
+    firstDrop.resolve(staleScene)
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="family-unit"]')[0].attributes('style'))
+      .toContain('translate(0px, 0px)')
+
+    const recoveredScene = structuredClone(sortableScene)
+    recoveredScene.rows[0].unitIds = [
+      'unit:person:C',
+      'unit:person:A',
+      'unit:person:B',
+    ]
+    recoveredScene.units[0].rect.x = 240
+    recoveredScene.units[1].rect.x = 480
+    recoveredScene.units[2].rect.x = 0
+    recoveredScene.cards[0].rect.x = 240
+    recoveredScene.cards[1].rect.x = 480
+    recoveredScene.cards[2].rect.x = 0
+    replacement.resolve(recoveredScene)
+    await flushPromises()
+
+    const units = wrapper.findAll('[data-testid="family-unit"]')
+    expect(units[0].attributes('style')).toContain('translate(240px, 0px)')
+    expect(units[1].attributes('style')).toContain('translate(480px, 0px)')
+    expect(units[2].attributes('style')).toContain('translate(0px, 0px)')
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('lets a valid superseding drop replace recovery without another layout request', async () => {
+    const firstDrop = deferred<LayoutScene>()
+    const secondDrop = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockReturnValueOnce(firstDrop.promise)
+      .mockReturnValueOnce(secondDrop.promise)
+    const { family, wrapper } = mountStoreCanvas(
+      familyData([mk('A'), mk('B'), mk('C'), mk('D')]),
+    )
+    await flushPromises()
+
+    const firstNode = await beginDrag(wrapper, 2, -500, 0)
+    await firstNode.trigger('pointerup', { pointerId: 1, clientX: 100, clientY: 100 })
+    await nextTick()
+
+    const secondNode = await beginDrag(wrapper, 1, 500, 0)
+    await secondNode.trigger('pointerup', { pointerId: 1, clientX: 1100, clientY: 100 })
+    await nextTick()
+
+    expect(family.data.layoutPreferences.rowOrders).toContainEqual({
+      id: 'row:0',
+      unitIds: ['unit:person:A', 'unit:person:C', 'unit:person:B'],
+    })
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
+    expect(layoutFamilyTree.mock.calls[2][1].data.layoutPreferences.rowOrders).toContainEqual({
+      id: 'row:0',
+      unitIds: ['unit:person:A', 'unit:person:C', 'unit:person:B'],
+    })
+
+    const staleScene = structuredClone(sortableScene)
+    staleScene.units[1].rect.x = 900
+    staleScene.cards[1].rect.x = 900
+    firstDrop.resolve(staleScene)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(true)
+
+    const acceptedScene = structuredClone(sortableScene)
+    acceptedScene.rows[0].unitIds = [
+      'unit:person:A',
+      'unit:person:C',
+      'unit:person:B',
+    ]
+    acceptedScene.units[1].rect.x = 480
+    acceptedScene.units[2].rect.x = 240
+    acceptedScene.cards[1].rect.x = 480
+    acceptedScene.cards[2].rect.x = 240
+    secondDrop.resolve(acceptedScene)
+    await flushPromises()
+
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(480px, 0px)')
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
   it('rejects a large vertical drag toward another generation', async () => {
     layoutFamilyTree.mockResolvedValueOnce(structuredClone(sortableScene))
     const { family, wrapper } = mountStoreCanvas(familyData([mk('A'), mk('B'), mk('C'), mk('D')]))
