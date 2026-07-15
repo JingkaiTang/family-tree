@@ -1,4 +1,6 @@
 import { assignGenerations } from './assignGenerations'
+import { discoverRootFamilies } from './discoverRootFamilies'
+import { propagateRootSignatures } from './propagateRootSignatures'
 import {
   buildProjectedInput,
   familyData,
@@ -7,10 +9,12 @@ import {
   member,
 } from './testHelpers'
 import type {
+  AssignRootAccentsInput,
   FamilyUnit,
   ParentageGroup,
   ProjectedFamily,
 } from './types'
+import { EMPTY_LAYOUT_PREFERENCES } from './types'
 
 export interface RootFixture {
   projected: ProjectedFamily
@@ -240,6 +244,57 @@ export function disconnectedRootsFixture(): RootFixture {
   linkSpouse(rightA, rightB)
 
   return buildRootFixture([leftA, leftB, rightA, rightB])
+}
+
+export function rootAccentInputForFixture(
+  fixture: RootFixture,
+): AssignRootAccentsInput {
+  const discovery = discoverRootFamilies(fixture)
+  const signatures = propagateRootSignatures({
+    ...fixture,
+    roots: discovery,
+  })
+
+  return {
+    roots: discovery.roots,
+    signatures,
+    preferences: EMPTY_LAYOUT_PREFERENCES,
+  }
+}
+
+export function rootAccentInputAfterAddingAncestor(): AssignRootAccentsInput {
+  const newA0 = member('new-a0')
+  const newA0Spouse = member('new-a0-spouse')
+  const a0 = member('a0')
+  const a0Spouse = member('a0-spouse')
+  const a1 = member('a1')
+
+  linkSpouse(newA0, newA0Spouse)
+  linkParent(a0, newA0)
+  linkParent(a0, newA0Spouse)
+  linkSpouse(a0, a0Spouse)
+  linkParent(a1, a0)
+  linkParent(a1, a0Spouse)
+
+  const input = rootAccentInputForFixture(buildRootFixture([
+    newA0,
+    newA0Spouse,
+    a0,
+    a0Spouse,
+    a1,
+  ]))
+
+  return {
+    ...input,
+    previousScene: {
+      rootDomains: [{
+        id: 'domain:root:a0+a0-spouse',
+        rootIds: ['root:a0+a0-spouse'],
+        personIds: ['a0', 'a0-spouse', 'a1'],
+        accent: '#4F7CAC',
+      }],
+    },
+  }
 }
 
 function buildRootFixture(members: ReturnType<typeof member>[]): RootFixture {

@@ -133,6 +133,21 @@ export interface RootSignatureResult {
   sourceRootIdByPersonId: Partial<Record<string, string>>
   diagnostics: LayoutDiagnostic[]
 }
+export interface RootAccentDomainSnapshot {
+  id: string
+  rootIds: string[]
+  personIds: string[]
+  accent: string
+}
+export interface RootAccentSceneSnapshot {
+  rootDomains: RootAccentDomainSnapshot[]
+}
+export interface AssignRootAccentsInput {
+  roots: RootFamily[]
+  signatures: RootSignatureResult
+  preferences: LayoutPreferences
+  previousScene?: RootAccentSceneSnapshot
+}
 export interface RootedFamilyUnit extends FamilyUnit {
   rootSignature: RootSignature
   domainId: string

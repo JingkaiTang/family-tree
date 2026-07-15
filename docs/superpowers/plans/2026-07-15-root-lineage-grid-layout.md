@@ -775,7 +775,7 @@ git commit -m "feat: persist root domain layout preferences"
 - Modify: `src/core/family-layout/types.ts`
 - Modify: `src/core/family-layout/rootLayoutTestHelpers.ts`
 
-- [ ] **Step 1: 写稳定颜色和成员来源顺序失败测试**
+- [x] **Step 1: 写稳定颜色和成员来源顺序失败测试**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -805,7 +805,7 @@ describe('assignRootAccents', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/assignRootAccents.test.ts
@@ -813,7 +813,7 @@ npm test -- src/core/family-layout/assignRootAccents.test.ts
 
 Expected: FAIL，提示模块不存在。
 
-- [ ] **Step 3: 实现根色分配**
+- [x] **Step 3: 实现根色分配**
 
 使用固定、色盲相对友好的 10 色调色板；不运行时生成随机颜色：
 
@@ -833,7 +833,7 @@ const ROOT_ACCENT_PALETTE = [
 
 根迁移匹配以旧/新根后代 person ID 的 Jaccard 相似度为主，seed 上下游包含关系为次，稳定 root ID 为最终 tie-break。低于 `0.5` 不继承，避免把颜色错误交给无关根。
 
-- [ ] **Step 4: 验证颜色确定性和迁移继承**
+- [x] **Step 4: 验证颜色确定性和迁移继承**
 
 ```bash
 npm test -- src/core/family-layout/assignRootAccents.test.ts
@@ -842,7 +842,7 @@ npm run typecheck
 
 Expected: PASS；输入顺序反转后 accent map 相等，新根匹配阈值测试通过。
 
-- [ ] **Step 5: 提交根色分配**
+- [x] **Step 5: 提交根色分配**
 
 ```bash
 git add src/core/family-layout/assignRootAccents.ts src/core/family-layout/assignRootAccents.test.ts src/core/family-layout/types.ts src/core/family-layout/rootLayoutTestHelpers.ts
