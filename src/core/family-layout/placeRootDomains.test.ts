@@ -77,6 +77,51 @@ describe('placeRootDomains', () => {
       .toEqual({ id: `row:${domain.id}:${generation}`, generation, unitIds })
   })
 
+  it('anchors a migrated root to the previous root center', () => {
+    const input = preparedSinglePersonLayout()
+    const current = placeRootDomains(input)
+    const currentDomain = current.rootDomains[0]
+    const previousDomain = {
+      ...currentDomain,
+      id: 'domain:root:previous-single',
+      rootIds: ['root:previous-single'],
+      signature: ['root:previous-single'],
+      rect: { ...currentDomain.rect, x: 240 },
+    }
+    const previousScene = {
+      ...current,
+      rootDomains: [previousDomain],
+      gateways: [],
+      routes: [],
+      diagnostics: [],
+    }
+
+    const anchored = placeRootDomains({
+      ...input,
+      previousScene,
+      previousRootIdByRootId: {
+        [currentDomain.rootIds[0]]: 'root:previous-single',
+      },
+    })
+    const explicitlyOrdered = placeRootDomains({
+      ...input,
+      previousScene,
+      previousRootIdByRootId: {
+        [currentDomain.rootIds[0]]: 'root:previous-single',
+      },
+      preferences: {
+        ...input.preferences,
+        rootOrders: [{
+          componentId: currentDomain.componentId,
+          rootIds: [...currentDomain.rootIds],
+        }],
+      },
+    })
+
+    expect(centerX(anchored.rootDomains[0].rect)).toBe(centerX(previousDomain.rect))
+    expect(explicitlyOrdered.rootDomains[0].rect.x).toBe(0)
+  })
+
   it('merges overlapping sibling groups without duplicating a family unit', () => {
     const input = preparedWideThreeFamiliesLayout()
     const scene = placeRootDomains({

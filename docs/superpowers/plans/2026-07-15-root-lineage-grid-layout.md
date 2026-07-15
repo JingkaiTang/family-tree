@@ -1767,7 +1767,7 @@ git commit -m "feat: reset all root layout preferences"
 - Modify: `src/core/family-layout/layoutFamilyScene.test.ts`
 - Modify: `src/core/family-layout/routeAuxiliaryEdges.test.ts`
 
-- [ ] **Step 1: 写动态祖先和局部变化失败测试**
+- [x] **Step 1: 写动态祖先和局部变化失败测试**
 
 ```ts
 it('moves a root upward while preserving the old lineage color and neighborhood', () => {
@@ -1790,7 +1790,7 @@ it('does not move an unchanged disconnected root component', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/discoverRootFamilies.test.ts src/core/family-layout/assignRootAccents.test.ts src/core/family-layout/placeRootDomains.test.ts src/core/family-layout/layoutFamilyScene.test.ts
@@ -1798,7 +1798,7 @@ npm test -- src/core/family-layout/discoverRootFamilies.test.ts src/core/family-
 
 Expected: FAIL，动态根迁移或不相关 component 稳定性尚未满足。
 
-- [ ] **Step 3: 实现旧根到新根匹配记录**
+- [x] **Step 3: 实现旧根到新根匹配记录**
 
 在 discovery/model 结果增加：
 
@@ -1808,7 +1808,7 @@ previousRootIdByRootId: Record<string, string>
 
 匹配规则复用 Task 5 的 descendant overlap；一对一贪心按 score 降序、old/new root ID tie-break，禁止一个旧根被多个新根同时继承。匹配结果同时用于颜色、root order 和 domain anchor。
 
-- [ ] **Step 4: 实现 component 级增量锚定**
+- [x] **Step 4: 实现 component 级增量锚定**
 
 - `changedIds` 先映射到 unit、root signature 和 interaction component。
 - 完全未受影响且 domain 构成未变的 component 保留上一场景 domain rect 与 unit rect。
@@ -1816,7 +1816,7 @@ previousRootIdByRootId: Record<string, string>
 - 若宽度增长与相邻 component 冲突，只把冲突方向后续 component 整体推开；不能压缩 rootGap 或让域交错。
 - root order preference 始终高于 previousScene 锚点。
 
-- [ ] **Step 5: 证明辅助关系不影响主布局**
+- [x] **Step 5: 证明辅助关系不影响主布局**
 
 对相同家庭事实分别打开/关闭历史配偶、secondary parentage 和 godparent：
 
@@ -1828,7 +1828,7 @@ expect(auxiliaryRoutes(withAuxiliary).length).toBeGreaterThan(0)
 
 辅助 route 继续在主场景完成后单独计算，使用虚线和自己的 kind；不得写 root signature、domain、generation 或 primary route occupancy。
 
-- [ ] **Step 6: 验证 GREEN**
+- [x] **Step 6: 验证 GREEN**
 
 ```bash
 npm test -- src/core/family-layout/discoverRootFamilies.test.ts src/core/family-layout/assignRootAccents.test.ts src/core/family-layout/placeRootDomains.test.ts src/core/family-layout/layoutFamilyScene.test.ts src/core/family-layout/routeAuxiliaryEdges.test.ts
@@ -1837,7 +1837,7 @@ npm run typecheck
 
 Expected: PASS。
 
-- [ ] **Step 7: 提交增量稳定性**
+- [x] **Step 7: 提交增量稳定性**
 
 ```bash
 git add src/core/family-layout/discoverRootFamilies.ts src/core/family-layout/discoverRootFamilies.test.ts src/core/family-layout/assignRootAccents.ts src/core/family-layout/assignRootAccents.test.ts src/core/family-layout/placeRootDomains.ts src/core/family-layout/placeRootDomains.test.ts src/core/family-layout/layoutFamilyScene.test.ts src/core/family-layout/routeAuxiliaryEdges.test.ts src/core/family-layout/types.ts

@@ -309,12 +309,26 @@ function rootOrderCost(order: string[], edges: RootInteractionEdge[]): number {
 }
 
 function previousRootX(input: BuildRootDomainsInput): Map<string, number> {
-  const entries = (input.previousScene?.rootDomains ?? []).flatMap(domain => (
+  const previousDomains = input.previousScene?.rootDomains ?? []
+  const entries = previousDomains.flatMap(domain => (
     domain.rect === undefined
       ? []
       : domain.rootIds.map(rootId => [rootId, domain.rect?.x ?? 0] as const)
   ))
-  return new Map(entries.sort((left, right) => left[0].localeCompare(right[0])))
+  const previousXByRootId = new Map(
+    entries.sort((left, right) => left[0].localeCompare(right[0])),
+  )
+  for (const root of [...input.roots].sort((left, right) => (
+    left.id.localeCompare(right.id)
+  ))) {
+    if (previousXByRootId.has(root.id)) continue
+    const previousRootId = input.previousRootIdByRootId?.[root.id]
+    const previousX = previousRootId === undefined
+      ? undefined
+      : previousXByRootId.get(previousRootId)
+    if (previousX !== undefined) previousXByRootId.set(root.id, previousX)
+  }
+  return previousXByRootId
 }
 
 function minimumPreviousX(

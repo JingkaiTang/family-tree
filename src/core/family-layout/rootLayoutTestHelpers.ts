@@ -361,7 +361,7 @@ export function rootAccentInputForFixture(
   }
 }
 
-export function rootAccentInputAfterAddingAncestor(): AssignRootAccentsInput {
+export function addedAncestorFixture(): RootFixture {
   const newA0 = member('new-a0')
   const newA0Spouse = member('new-a0-spouse')
   const a0 = member('a0')
@@ -375,16 +375,23 @@ export function rootAccentInputAfterAddingAncestor(): AssignRootAccentsInput {
   linkParent(a1, a0)
   linkParent(a1, a0Spouse)
 
-  const input = rootAccentInputForFixture(buildRootFixture([
+  return buildRootFixture([
     newA0,
     newA0Spouse,
     a0,
     a0Spouse,
     a1,
-  ]))
+  ])
+}
+
+export function rootAccentInputAfterAddingAncestor(): AssignRootAccentsInput {
+  const input = rootAccentInputForFixture(addedAncestorFixture())
 
   return {
     ...input,
+    previousRootIdByRootId: {
+      'root:new-a0+new-a0-spouse': 'root:a0+a0-spouse',
+    },
     previousScene: {
       rootDomains: [{
         id: 'domain:root:a0+a0-spouse',

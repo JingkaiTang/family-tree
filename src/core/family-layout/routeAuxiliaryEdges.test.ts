@@ -256,10 +256,10 @@ describe('routeAuxiliaryEdges', () => {
       auxiliaryFocusPersonId: 'current',
     })
 
-    expect(JSON.stringify({ units: noFocus.units, cards: noFocus.cards }))
-      .toBe(JSON.stringify({ units: hidden.units, cards: hidden.cards }))
-    expect(JSON.stringify({ units: focused.units, cards: focused.cards }))
-      .toBe(JSON.stringify({ units: hidden.units, cards: hidden.cards }))
+    expect(primaryGeometry(noFocus)).toEqual(primaryGeometry(hidden))
+    expect(primaryGeometry(focused)).toEqual(primaryGeometry(hidden))
+    expect(focused.routes.filter(route => route.kind === 'primary'))
+      .toEqual(hidden.routes.filter(route => route.kind === 'primary'))
     expect(noFocus.routes.filter(route => route.kind !== 'primary')).toEqual([])
     expect(unrelated.routes.filter(route => route.kind !== 'primary')).toEqual([])
     expect(focused.routes.filter(route => route.kind !== 'primary').map(route => route.kind))
@@ -268,6 +268,19 @@ describe('routeAuxiliaryEdges', () => {
       .toEqual(Object.fromEntries(hidden.cards.map(card => [card.id, card.generation])))
   })
 })
+
+function primaryGeometry(scene: ReturnType<typeof layoutFamilyScene>) {
+  return {
+    units: scene.units,
+    cards: scene.cards,
+    hubs: scene.hubs,
+    rows: scene.rows,
+    rootDomains: scene.rootDomains,
+    bridgeDomains: scene.bridgeDomains,
+    gateways: scene.gateways,
+    bounds: scene.bounds,
+  }
+}
 
 function rowGeometry(ids: string[]): SceneGeometry {
   const units = ids.map((id, index) => ({

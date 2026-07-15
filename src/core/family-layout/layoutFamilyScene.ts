@@ -42,6 +42,7 @@ export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
     projected,
     units: baseUnits,
     generationByUnitId: generations.generationByUnitId,
+    previousScene: request.previousScene,
   })
   const signatures = propagateRootSignatures({
     projected,
@@ -53,6 +54,7 @@ export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
     signatures,
     preferences: request.preferences,
     previousScene: request.previousScene,
+    previousRootIdByRootId: discovery.previousRootIdByRootId,
   })
   const domainModel = buildRootDomains({
     projected,
@@ -62,6 +64,7 @@ export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
     accents,
     preferences: request.preferences,
     previousScene: request.previousScene,
+    previousRootIdByRootId: discovery.previousRootIdByRootId,
     preferredComponentPersonId: request.preferredComponentPersonId,
   })
   const units = decorateRootedUnits({
@@ -88,6 +91,7 @@ export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
     retainedDiagnostics,
     request,
     projected.auxiliaryRelations,
+    discovery.previousRootIdByRootId,
   )
 
   if (!first.routingDiagnostics.some(value => (
@@ -116,6 +120,7 @@ export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
     retainedDiagnostics,
     request,
     projected.auxiliaryRelations,
+    discovery.previousRootIdByRootId,
   )
   return hasUnsafeDiagnostic(retry.scene)
     ? buildSafeFallbackScene(
@@ -141,6 +146,7 @@ function buildAttempt(
   retainedDiagnostics: LayoutDiagnostic[],
   request: LayoutRequest,
   auxiliaryRelations: AuxiliaryRelation[],
+  previousRootIdByRootId: Record<string, string>,
 ): LayoutAttempt {
   const geometry = placeRootDomains({
     units,
@@ -149,6 +155,7 @@ function buildAttempt(
     preferences: request.preferences,
     metrics,
     previousScene: request.previousScene,
+    previousRootIdByRootId,
     changedIds: request.changedIds,
   })
   const routing = routeFamilyLanes({

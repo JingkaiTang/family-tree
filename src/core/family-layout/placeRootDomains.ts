@@ -54,7 +54,7 @@ export function placeRootDomains(
   const allocatedDomains = allocateDomainIntervals(
     orderedDomains,
     contentWidthByDomainId,
-    unitById,
+    units,
     input,
   )
   const allocatedDomainById = new Map(
@@ -157,17 +157,12 @@ function domainContentWidth(
 function allocateDomainIntervals(
   domains: LayoutDomain[],
   contentWidthByDomainId: ReadonlyMap<string, number>,
-  unitById: ReadonlyMap<string, RootedFamilyUnit>,
+  units: RootedFamilyUnit[],
   input: PlaceRootDomainsInput,
 ): PlacedLayoutDomain[] {
-  let x = 0
-  return domains.map((domain, index) => {
-    const previous = domains[index - 1]
-    if (previous !== undefined) {
-      x += previous.kind === 'root' && domain.kind === 'root'
-        ? input.metrics.rootGap
-        : input.metrics.bridgeGap
-    }
+  const unitById = new Map(units.map(unit => [unit.id, unit]))
+  const widthByDomainId = new Map<string, number>()
+  for (const domain of domains) {
     let width = snapUp(
       (contentWidthByDomainId.get(domain.id) ?? input.metrics.cardWidth)
         + input.metrics.gridSize * 2,
@@ -182,6 +177,26 @@ function allocateDomainIntervals(
       && (width - familyUnitWidth(rootUnit, input.metrics))
         / input.metrics.gridSize % 2 !== 0
     ) width += input.metrics.gridSize
+    widthByDomainId.set(domain.id, width)
+  }
+  const preferredXByDomainId = buildComponentAnchors(
+    domains,
+    widthByDomainId,
+    units,
+    input,
+  )
+  let previousPlaced: PlacedLayoutDomain | undefined
+  return domains.map(domain => {
+    const width = widthByDomainId.get(domain.id) ?? input.metrics.cardWidth
+    const minimumX = previousPlaced === undefined
+      ? 0
+      : previousPlaced.rect.x + previousPlaced.rect.width
+        + domainGap(previousPlaced, domain, input)
+    const preferredX = preferredXByDomainId.get(domain.id)
+    const x = snapUp(
+      Math.max(minimumX, preferredX ?? minimumX),
+      input.metrics.gridSize,
+    )
     const placed: PlacedLayoutDomain = {
       ...domain,
       rootIds: [...domain.rootIds],
@@ -192,9 +207,160 @@ function allocateDomainIntervals(
       columnStart: x / input.metrics.gridSize,
       columnEnd: (x + width) / input.metrics.gridSize - 1,
     }
-    x += width
+    previousPlaced = placed
     return placed
   })
+}
+
+function domainGap(
+  previous: LayoutDomain,
+  current: LayoutDomain,
+  input: PlaceRootDomainsInput,
+): number {
+  return previous.kind === 'root' && current.kind === 'root'
+    ? input.metrics.rootGap
+    : input.metrics.bridgeGap
+}
+
+function buildComponentAnchors(
+  domains: LayoutDomain[],
+  widthByDomainId: ReadonlyMap<string, number>,
+  units: RootedFamilyUnit[],
+  input: PlaceRootDomainsInput,
+): Map<string, number> {
+  const anchors = new Map<string, number>()
+  const previousDomains = allPreviousDomains(input)
+  const changedComponentIds = collectChangedComponentIds(domains, units, input)
+  for (const componentDomains of groupDomainsByComponent(domains)) {
+    const firstDomain = componentDomains[0]
+    if (
+      firstDomain === undefined
+      || input.preferences.rootOrders.some(preference => (
+        preference.componentId === firstDomain.componentId
+      ))
+    ) continue
+
+    const matchedPreviousDomains = componentDomains
+      .map(domain => findPreviousDomain(domain, input))
+      .filter((domain): domain is PlacedLayoutDomain => domain !== undefined)
+    const previousComponentIds = new Set(
+      matchedPreviousDomains.map(domain => domain.componentId),
+    )
+    if (previousComponentIds.size !== 1) continue
+    const previousComponentId = [...previousComponentIds][0]
+    const previousComponentDomains = previousDomains.filter(domain => (
+      domain.componentId === previousComponentId
+    ))
+    if (previousComponentDomains.length === 0) continue
+
+    const previousLeft = Math.min(...previousComponentDomains.map(domain => (
+      domain.rect.x
+    )))
+    const previousRight = Math.max(...previousComponentDomains.map(domain => (
+      domain.rect.x + domain.rect.width
+    )))
+    const componentWidth = componentDomains.reduce((sum, domain, index) => {
+      const previous = componentDomains[index - 1]
+      return sum + (widthByDomainId.get(domain.id) ?? input.metrics.cardWidth)
+        + (previous === undefined ? 0 : domainGap(previous, domain, input))
+    }, 0)
+    const compositionChanged = !sameDomainComposition(
+      componentDomains,
+      previousComponentDomains,
+    )
+    const isAffected = compositionChanged
+      || changedComponentIds.has(firstDomain.componentId)
+      || changedComponentIds.has(previousComponentId)
+    const preferredX = isAffected
+      ? (previousLeft + previousRight - componentWidth) / 2
+      : previousLeft
+    anchors.set(
+      firstDomain.id,
+      snapNearest(preferredX, input.metrics.gridSize),
+    )
+  }
+  return anchors
+}
+
+function groupDomainsByComponent(domains: LayoutDomain[]): LayoutDomain[][] {
+  const groups: LayoutDomain[][] = []
+  for (const domain of domains) {
+    const current = groups.at(-1)
+    if (current?.[0]?.componentId === domain.componentId) current.push(domain)
+    else groups.push([domain])
+  }
+  return groups
+}
+
+function collectChangedComponentIds(
+  domains: LayoutDomain[],
+  units: RootedFamilyUnit[],
+  input: PlaceRootDomainsInput,
+): Set<string> {
+  const changedIds = new Set(input.changedIds ?? [])
+  if (changedIds.size === 0) return new Set()
+  const componentIdByDomainId = new Map(
+    domains.map(domain => [domain.id, domain.componentId]),
+  )
+  const previousDomains = allPreviousDomains(input)
+  for (const domain of previousDomains) {
+    componentIdByDomainId.set(domain.id, domain.componentId)
+  }
+  const changedComponentIds = new Set<string>()
+  const addUnitComponent = (unit: RootedFamilyUnit | PlacedRootedFamilyUnit) => {
+    if (
+      !changedIds.has(unit.id)
+      && !unit.memberIds.some(personId => changedIds.has(personId))
+    ) return
+    const componentId = componentIdByDomainId.get(unit.domainId)
+    if (componentId !== undefined) changedComponentIds.add(componentId)
+  }
+  units.forEach(addUnitComponent)
+  input.previousScene?.units.forEach(addUnitComponent)
+  return changedComponentIds
+}
+
+function sameDomainComposition(
+  currentDomains: LayoutDomain[],
+  previousDomains: PlacedLayoutDomain[],
+): boolean {
+  if (currentDomains.length !== previousDomains.length) return false
+  const previousById = new Map(previousDomains.map(domain => [domain.id, domain]))
+  return currentDomains.every(domain => {
+    const previous = previousById.get(domain.id)
+    return previous !== undefined && sameIds(previous.unitIds, [...domain.unitIds].sort())
+  })
+}
+
+function allPreviousDomains(input: PlaceRootDomainsInput): PlacedLayoutDomain[] {
+  return [
+    ...(input.previousScene?.rootDomains ?? []),
+    ...(input.previousScene?.bridgeDomains ?? []),
+  ]
+}
+
+function findPreviousDomain(
+  domain: LayoutDomain,
+  input: PlaceRootDomainsInput,
+): PlacedLayoutDomain | undefined {
+  const previousDomains = allPreviousDomains(input)
+  const exact = previousDomains.find(previous => previous.id === domain.id)
+  if (exact !== undefined) return exact
+
+  const previousRootIds = domain.rootIds
+    .map(rootId => input.previousRootIdByRootId?.[rootId] ?? rootId)
+    .sort((left, right) => left.localeCompare(right))
+  return previousDomains.find(previous => (
+    previous.kind === domain.kind
+    && sameIds(previous.rootIds, previousRootIds)
+  ))
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false
+  const sortedLeft = [...left].sort((first, second) => first.localeCompare(second))
+  const sortedRight = [...right].sort((first, second) => first.localeCompare(second))
+  return sortedLeft.every((value, index) => value === sortedRight[index])
 }
 
 function orderDomainRows(

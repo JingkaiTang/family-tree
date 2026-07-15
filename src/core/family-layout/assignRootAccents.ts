@@ -91,8 +91,21 @@ function matchPreviousDomains(
     .sort((left, right) => left.id.localeCompare(right.id))
   if (previousDomains.length === 0) return new Map()
 
+  const domainByRootId = new Map<string, RootAccentDomainSnapshot>()
+  const usedDomainIds = new Set<string>()
+  for (const root of [...input.roots].sort(compareRoots)) {
+    const previousRootId = input.previousRootIdByRootId?.[root.id]
+    const domain = previousRootId === undefined
+      ? undefined
+      : previousDomains.find(value => value.rootIds.includes(previousRootId))
+    if (domain === undefined || usedDomainIds.has(domain.id)) continue
+    domainByRootId.set(root.id, domain)
+    usedDomainIds.add(domain.id)
+  }
+
   const matches: PreviousRootMatch[] = []
   for (const root of [...input.roots].sort(compareRoots)) {
+    if (domainByRootId.has(root.id)) continue
     const currentPersonIds = new Set(
       Object.entries(input.signatures.signatureByPersonId)
         .filter(([, signature]) => signature.includes(root.id))
@@ -121,8 +134,6 @@ function matchPreviousDomains(
     || left.domain.id.localeCompare(right.domain.id)
   ))
 
-  const domainByRootId = new Map<string, RootAccentDomainSnapshot>()
-  const usedDomainIds = new Set<string>()
   for (const match of matches) {
     if (domainByRootId.has(match.rootId) || usedDomainIds.has(match.domain.id)) continue
     domainByRootId.set(match.rootId, match.domain)

@@ -58,4 +58,24 @@ describe('assignRootAccents', () => {
 
     expect(result['root:new-a0+new-a0-spouse']).not.toBe('#123456')
   })
+
+  it('uses an explicit discovered root migration before overlap fallback', () => {
+    const input = rootAccentInputAfterAddingAncestor()
+    const result = assignRootAccents({
+      ...input,
+      previousRootIdByRootId: {
+        'root:new-a0+new-a0-spouse': 'root:old-a0+old-a0-spouse',
+      },
+      previousScene: {
+        rootDomains: [{
+          id: 'domain:root:old-a0+old-a0-spouse',
+          rootIds: ['root:old-a0+old-a0-spouse'],
+          personIds: ['no-overlap'],
+          accent: '#123456',
+        }],
+      },
+    })
+
+    expect(result['root:new-a0+new-a0-spouse']).toBe('#123456')
+  })
 })

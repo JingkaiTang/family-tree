@@ -1,14 +1,26 @@
 import type {
   FamilyUnit,
   ProjectedFamily,
+  RootAccentSceneSnapshot,
   RootDiscoveryResult,
   RootFamily,
 } from './types'
+
+const PREVIOUS_ROOT_MATCH_THRESHOLD = 0.5
 
 export interface DiscoverRootFamiliesInput {
   projected: ProjectedFamily
   units: FamilyUnit[]
   generationByUnitId: Record<string, number>
+  previousScene?: RootAccentSceneSnapshot
+}
+
+interface PreviousRootMatch {
+  rootId: string
+  previousRootId: string
+  previousDomainId: string
+  similarity: number
+  seedContainment: number
 }
 
 interface IncomingSpouseInput {
@@ -90,14 +102,114 @@ export function discoverRootFamilies(
     || left.generation - right.generation
     || left.id.localeCompare(right.id)
   ))
+  const previousRootIdByRootId = matchPreviousRoots(
+    roots,
+    childIdsByParent,
+    partnerIdByPersonId,
+    input.previousScene,
+  )
 
   return {
     roots,
     seedRootIdByPersonId,
+    previousRootIdByRootId,
     suppressedIncomingPersonIds: suppressedIncomingPersonIds
       .sort((left, right) => left.localeCompare(right)),
     diagnostics: [],
   }
+}
+
+function matchPreviousRoots(
+  roots: RootFamily[],
+  childIdsByParent: ReadonlyMap<string, string[]>,
+  partnerIdByPersonId: ReadonlyMap<string, string>,
+  previousScene: RootAccentSceneSnapshot | undefined,
+): Record<string, string> {
+  const previousDomains = [...(previousScene?.rootDomains ?? [])]
+    .sort((left, right) => left.id.localeCompare(right.id))
+  if (previousDomains.length === 0) return {}
+
+  const matches: PreviousRootMatch[] = []
+  for (const root of roots) {
+    const currentPersonIds = descendantPersonIds(
+      root.seedPersonIds,
+      childIdsByParent,
+      partnerIdByPersonId,
+    )
+    for (const domain of previousDomains) {
+      const similarity = jaccardSimilarity(currentPersonIds, domain.personIds)
+      if (similarity < PREVIOUS_ROOT_MATCH_THRESHOLD) continue
+      const previousPersonIds = new Set(domain.personIds)
+      const seedContainment = root.seedPersonIds.filter(personId => (
+        previousPersonIds.has(personId)
+      )).length
+      for (const previousRootId of [...domain.rootIds]
+        .sort((left, right) => left.localeCompare(right))) {
+        matches.push({
+          rootId: root.id,
+          previousRootId,
+          previousDomainId: domain.id,
+          similarity,
+          seedContainment,
+        })
+      }
+    }
+  }
+
+  matches.sort((left, right) => (
+    right.similarity - left.similarity
+    || right.seedContainment - left.seedContainment
+    || left.rootId.localeCompare(right.rootId)
+    || left.previousRootId.localeCompare(right.previousRootId)
+    || left.previousDomainId.localeCompare(right.previousDomainId)
+  ))
+
+  const previousRootIdByRootId: Record<string, string> = {}
+  const usedPreviousRootIds = new Set<string>()
+  for (const match of matches) {
+    if (
+      previousRootIdByRootId[match.rootId] !== undefined
+      || usedPreviousRootIds.has(match.previousRootId)
+    ) continue
+    previousRootIdByRootId[match.rootId] = match.previousRootId
+    usedPreviousRootIds.add(match.previousRootId)
+  }
+  return previousRootIdByRootId
+}
+
+function descendantPersonIds(
+  seedPersonIds: string[],
+  childIdsByParent: ReadonlyMap<string, string[]>,
+  partnerIdByPersonId: ReadonlyMap<string, string>,
+): Set<string> {
+  const descendants = new Set(seedPersonIds)
+  const pending = [...seedPersonIds].sort((left, right) => right.localeCompare(left))
+  while (pending.length > 0) {
+    const personId = pending.pop()
+    if (personId === undefined) break
+    for (const childId of childIdsByParent.get(personId) ?? []) {
+      if (descendants.has(childId)) continue
+      descendants.add(childId)
+      pending.push(childId)
+    }
+  }
+  const personIds = new Set(descendants)
+  for (const personId of descendants) {
+    const partnerId = partnerIdByPersonId.get(personId)
+    if (partnerId !== undefined) personIds.add(partnerId)
+  }
+  return personIds
+}
+
+function jaccardSimilarity(
+  currentPersonIds: ReadonlySet<string>,
+  previousPersonIds: string[],
+): number {
+  const previous = new Set(previousPersonIds)
+  const intersectionSize = [...currentPersonIds]
+    .filter(personId => previous.has(personId)).length
+  const unionSize = new Set([...currentPersonIds, ...previous]).size
+  return unionSize === 0 ? 0 : intersectionSize / unionSize
 }
 
 export function isUnexpandedIncomingSpouse(

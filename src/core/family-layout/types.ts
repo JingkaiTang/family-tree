@@ -127,6 +127,7 @@ export interface RootFamily {
 export interface RootDiscoveryResult {
   roots: RootFamily[]
   seedRootIdByPersonId: Record<string, string>
+  previousRootIdByRootId: Record<string, string>
   suppressedIncomingPersonIds: string[]
   diagnostics: LayoutDiagnostic[]
 }
@@ -151,6 +152,7 @@ export interface AssignRootAccentsInput {
   signatures: RootSignatureResult
   preferences: LayoutPreferences
   previousScene?: RootAccentSceneSnapshot
+  previousRootIdByRootId?: Record<string, string>
 }
 export interface RootedFamilyUnit extends FamilyUnit {
   rootSignature: RootSignature
@@ -185,6 +187,7 @@ export interface BuildRootDomainsInput {
   accents: Record<string, string>
   preferences: LayoutPreferences
   previousScene?: RootAccentSceneSnapshot
+  previousRootIdByRootId?: Record<string, string>
   preferredComponentPersonId?: string
 }
 export interface BuildRootDomainsResult {
@@ -209,6 +212,7 @@ export interface PlaceRootDomainsInput {
   preferences: LayoutPreferences
   metrics: LayoutMetrics
   previousScene?: RootLayoutScene
+  previousRootIdByRootId?: Record<string, string>
   changedIds?: string[]
 }
 export interface PlacedLayoutDomain extends LayoutDomain {

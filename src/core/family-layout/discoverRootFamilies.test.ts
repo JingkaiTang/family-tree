@@ -4,6 +4,7 @@ import {
   isUnexpandedIncomingSpouse,
 } from './discoverRootFamilies'
 import {
+  addedAncestorFixture,
   disconnectedRootsFixture,
   incomingSpouseFixture,
   twoRootMarriageFixture,
@@ -63,6 +64,24 @@ describe('discoverRootFamilies', () => {
 
     expect(discoverRootFamilies(reversed))
       .toEqual(discoverRootFamilies(fixture))
+  })
+
+  it('matches a root moved upward to exactly one previous root', () => {
+    const result = discoverRootFamilies({
+      ...addedAncestorFixture(),
+      previousScene: {
+        rootDomains: [{
+          id: 'domain:root:a0+a0-spouse',
+          rootIds: ['root:a0+a0-spouse'],
+          personIds: ['a0', 'a0-spouse', 'a1'],
+          accent: '#4F7CAC',
+        }],
+      },
+    })
+
+    expect(result.previousRootIdByRootId).toEqual({
+      'root:new-a0+new-a0-spouse': 'root:a0+a0-spouse',
+    })
   })
 })
 

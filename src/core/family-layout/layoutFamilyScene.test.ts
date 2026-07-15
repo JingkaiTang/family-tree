@@ -81,6 +81,40 @@ describe('layoutFamilyScene', () => {
     expectNoOverlap(scene)
   })
 
+  it('keeps an unchanged disconnected component fixed when an earlier domain shrinks', () => {
+    const before = layoutFamilyScene(disconnectedResizeRequest(3))
+    const afterRequest = disconnectedResizeRequest(1)
+    afterRequest.previousScene = before
+    afterRequest.changedIds = ['a-child-2', 'a-child-3']
+
+    const after = layoutFamilyScene(afterRequest)
+
+    expect(componentGeometry(after, 'component:z-child')).toEqual(
+      componentGeometry(before, 'component:z-child'),
+    )
+  })
+
+  it('keeps root color and neighborhood when adding an earlier ancestor family', () => {
+    const beforeMembers = ancestorLineage(false)
+    const before = layoutFamilyScene(requestFromMembers(beforeMembers))
+    const afterMembers = ancestorLineage(true)
+    const afterRequest = requestFromMembers(afterMembers)
+    afterRequest.previousScene = before
+    afterRequest.changedIds = ['new-a0', 'new-a0-spouse', 'a0']
+
+    const after = layoutFamilyScene(afterRequest)
+    const oldDomain = before.rootDomains.find(domain => (
+      domain.id === 'domain:root:a0+a0-spouse'
+    ))!
+    const newDomain = after.rootDomains.find(domain => (
+      domain.id === 'domain:root:new-a0+new-a0-spouse'
+    ))!
+
+    expect(newDomain.accent).toBe(oldDomain.accent)
+    expect(Math.abs(centerX(newDomain.rect) - centerX(oldDomain.rect)))
+      .toBeLessThanOrEqual(DEFAULT_LAYOUT_METRICS.gridSize * 2)
+  })
+
   it('lays out multiple cross marriages as one safe scene', () => {
     const lineageA = couple('a-parent-left', 'a-parent-right')
     const lineageB = couple('b-parent-left', 'b-parent-right')
@@ -184,6 +218,54 @@ function couple(leftId: string, rightId: string) {
   const right = member(rightId)
   linkSpouse(left, right)
   return [left, right] as const
+}
+
+function disconnectedResizeRequest(aChildCount: number): LayoutRequest {
+  const aParents = couple('a-root-a', 'a-root-b')
+  const aChildren = Array.from({ length: aChildCount }, (_, index) => (
+    member(`a-child-${index + 1}`)
+  ))
+  for (const child of aChildren) {
+    linkParent(child, aParents[0])
+    linkParent(child, aParents[1])
+  }
+  const zParents = couple('z-root-a', 'z-root-b')
+  const zChild = member('z-child')
+  linkParent(zChild, zParents[0])
+  linkParent(zChild, zParents[1])
+  return requestFromMembers([...aParents, ...aChildren, ...zParents, zChild])
+}
+
+function ancestorLineage(withAncestor: boolean) {
+  const a0 = member('a0')
+  const a0Spouse = member('a0-spouse')
+  const a1 = member('a1')
+  linkSpouse(a0, a0Spouse)
+  linkParent(a1, a0)
+  linkParent(a1, a0Spouse)
+  if (!withAncestor) return [a0, a0Spouse, a1]
+  const newA0 = member('new-a0')
+  const newA0Spouse = member('new-a0-spouse')
+  linkSpouse(newA0, newA0Spouse)
+  linkParent(a0, newA0)
+  linkParent(a0, newA0Spouse)
+  return [newA0, newA0Spouse, a0, a0Spouse, a1]
+}
+
+function componentGeometry(scene: RootLayoutScene, componentId: string) {
+  const domains = [...scene.rootDomains, ...scene.bridgeDomains]
+    .filter(domain => domain.componentId === componentId)
+  const domainIds = new Set(domains.map(domain => domain.id))
+  return {
+    domains: domains.map(domain => ({ id: domain.id, rect: domain.rect })),
+    units: scene.units
+      .filter(unit => domainIds.has(unit.domainId))
+      .map(unit => ({ id: unit.id, rect: unit.rect })),
+  }
+}
+
+function centerX(rect: Rect): number {
+  return rect.x + rect.width / 2
 }
 
 function unsafeDiagnostics(scene: RootLayoutScene) {
