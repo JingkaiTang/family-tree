@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 增加“恢复默认布局”入口，一次清除手动同代顺序、重新运行默认排版，并把画布恢复到 100% 与 `(0, 0)`。
+**Goal:** 增加“恢复默认布局”入口，一次清除手动同代顺序、重新运行默认排版、恢复 100% 缩放，并聚焦视角人物或家族树中心。
 
-**Architecture:** Family Store 只负责清除持久化的 `rowOrders`；TreeView 负责发出一次性重置序号并清理 UI 会话视图；FamilyCanvas 把该序号转换为不携带 `previousScene` 的最新布局请求，并在场景落地后重置画布；PanZoomWrapper 提供强制默认值接口。继续使用现有请求 ID 解决异步竞态，不修改布局算法。
+**Architecture:** Family Store 只负责清除持久化的 `rowOrders`；TreeView 负责发出一次性重置序号并清理 UI 会话视图；FamilyCanvas 把该序号转换为不携带 `previousScene` 的最新布局请求，在场景落地后恢复 100% 缩放，再聚焦有效视角人物或场景中心；PanZoomWrapper 提供强制默认值接口。继续使用现有请求 ID 解决异步竞态，不修改布局算法。
 
 **Tech Stack:** Vue 3、Pinia、TypeScript、Vitest、Vue Test Utils、`@panzoom/panzoom`。
 
@@ -248,7 +248,7 @@ resetToDefaultView.mockReset()
 在视角聚焦测试之后增加：
 
 ```ts
-it('recomputes without a previous scene and resets the viewport after the reset scene', async () => {
+it('recomputes without a previous scene and focuses the viewpoint after the reset scene', async () => {
   const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
   data.layoutPreferences.rowOrders = [{
     id: 'row:0',
@@ -282,7 +282,28 @@ it('recomputes without a previous scene and resets the viewport after the reset 
     },
   })
   expect(resetToDefaultView).toHaveBeenCalledTimes(1)
-  expect(focusStagePoint).not.toHaveBeenCalled()
+  expect(focusStagePoint).toHaveBeenCalledWith(124, 148)
+  expect(resetToDefaultView.mock.invocationCallOrder[0])
+    .toBeLessThan(focusStagePoint.mock.invocationCallOrder[0])
+})
+
+it('focuses the family tree center after reset when no viewpoint is selected', async () => {
+  const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
+  layoutFamilyTree
+    .mockResolvedValueOnce(structuredClone(sortableScene))
+    .mockResolvedValueOnce(structuredClone(sortableScene))
+  const wrapper = mountCanvas(data, { layoutResetVersion: 0 })
+  await flushPromises()
+  focusStagePoint.mockClear()
+
+  await wrapper.setProps({
+    data: structuredClone(data),
+    layoutResetVersion: 1,
+  })
+  await flushPromises()
+
+  expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+  expect(focusStagePoint).toHaveBeenCalledWith(364, 328)
 })
 ```
 
@@ -354,7 +375,7 @@ Run:
 npm test -- src/__tests__/components/FamilyCanvas.test.ts
 ```
 
-Expected: FAIL；重置序号目前不会触发布局，也没有 `resetToDefaultView` 调用。
+Expected: FAIL；重置序号目前不会触发布局，也不会按新场景聚焦视角人物或家族树中心。
 
 - [ ] **Step 5: 增加重置属性和布局选项**
 
@@ -375,6 +396,9 @@ resetViewport?: boolean
 ```ts
 if (options.resetViewport) {
   panzoomRef.value?.resetToDefaultView()
+  if (!viewpointId || !focusMember(viewpointId)) {
+    focusSceneCenter()
+  }
 } else if (
   viewpointId
   && !shouldSuppressFocus
@@ -382,6 +406,36 @@ if (options.resetViewport) {
   && !options.preserveViewport
 ) {
   focusMember(viewpointId)
+}
+```
+
+让人物聚焦返回是否成功，并增加场景中心回退：
+
+```ts
+function focusMember(id: string): boolean {
+  const card = scene.value.cards.find(value => value.id === id)
+  if (!card || !panzoomRef.value) return false
+  panzoomRef.value.focusStagePoint(
+    card.rect.x + card.rect.width / 2 + sceneOffset.value.x,
+    card.rect.y + card.rect.height / 2 + sceneOffset.value.y,
+  )
+  return true
+}
+
+function focusSceneCenter() {
+  if (!panzoomRef.value) return
+  const bounds = scene.value.bounds
+  if (scene.value.cards.length === 0) {
+    panzoomRef.value.focusStagePoint(
+      canvasSize.value.width / 2,
+      canvasSize.value.height / 2,
+    )
+    return
+  }
+  panzoomRef.value.focusStagePoint(
+    bounds.x + bounds.width / 2 + sceneOffset.value.x,
+    bounds.y + bounds.height / 2 + sceneOffset.value.y,
+  )
 }
 ```
 

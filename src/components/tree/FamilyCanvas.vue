@@ -121,6 +121,9 @@ async function updateLayout(options: {
   const viewpointId = props.viewpointId
   if (options.resetViewport) {
     panzoomRef.value?.resetToDefaultView()
+    if (!viewpointId || !focusMember(viewpointId)) {
+      focusSceneCenter()
+    }
   } else if (
     viewpointId
     && !shouldSuppressFocus
@@ -220,12 +223,29 @@ const kinshipByMemberId = computed<Record<string, string>>(() => {
   }))
 })
 
-function focusMember(id: string) {
+function focusMember(id: string): boolean {
   const card = scene.value.cards.find(value => value.id === id)
-  if (!card || !panzoomRef.value) return
+  if (!card || !panzoomRef.value) return false
   panzoomRef.value.focusStagePoint(
     card.rect.x + card.rect.width / 2 + sceneOffset.value.x,
     card.rect.y + card.rect.height / 2 + sceneOffset.value.y,
+  )
+  return true
+}
+
+function focusSceneCenter() {
+  if (!panzoomRef.value) return
+  const bounds = scene.value.bounds
+  if (scene.value.cards.length === 0) {
+    panzoomRef.value.focusStagePoint(
+      canvasSize.value.width / 2,
+      canvasSize.value.height / 2,
+    )
+    return
+  }
+  panzoomRef.value.focusStagePoint(
+    bounds.x + bounds.width / 2 + sceneOffset.value.x,
+    bounds.y + bounds.height / 2 + sceneOffset.value.y,
   )
 }
 

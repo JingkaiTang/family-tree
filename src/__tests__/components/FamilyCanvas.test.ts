@@ -706,7 +706,7 @@ describe('FamilyCanvas', () => {
     expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
   })
 
-  it('recomputes without a previous scene and resets the viewport after the reset scene', async () => {
+  it('recomputes without a previous scene and focuses the viewpoint after the reset scene', async () => {
     const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
     data.layoutPreferences.rowOrders = [{
       id: 'row:0',
@@ -740,7 +740,28 @@ describe('FamilyCanvas', () => {
       },
     })
     expect(resetToDefaultView).toHaveBeenCalledTimes(1)
-    expect(focusStagePoint).not.toHaveBeenCalled()
+    expect(focusStagePoint).toHaveBeenCalledWith(124, 148)
+    expect(resetToDefaultView.mock.invocationCallOrder[0])
+      .toBeLessThan(focusStagePoint.mock.invocationCallOrder[0])
+  })
+
+  it('focuses the family tree center after reset when no viewpoint is selected', async () => {
+    const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+    const wrapper = mountCanvas(data, { layoutResetVersion: 0 })
+    await flushPromises()
+    focusStagePoint.mockClear()
+
+    await wrapper.setProps({
+      data: structuredClone(data),
+      layoutResetVersion: 1,
+    })
+    await flushPromises()
+
+    expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+    expect(focusStagePoint).toHaveBeenCalledWith(364, 328)
   })
 
   it('cancels an active drag before recomputing the default layout', async () => {
@@ -799,6 +820,7 @@ describe('FamilyCanvas', () => {
     await flushPromises()
 
     expect(resetToDefaultView).not.toHaveBeenCalled()
+    expect(focusStagePoint).not.toHaveBeenCalled()
   })
 
   it('preserves viewpoint kinship labels on member cards', async () => {
