@@ -4,8 +4,12 @@ import type {
   OrderedGeneration,
   ParentageGroup,
   PlacedFamilyUnit,
+  PlacedLayoutDomain,
   PlacedPersonCard,
+  PlacedRootedFamilyUnit,
+  PlacedRow,
   PlacedUnionHub,
+  RootSceneGeometry,
   SceneGeometry,
 } from './types'
 
@@ -18,6 +22,14 @@ export function familyUnitWidth(unit: FamilyUnit, metrics: LayoutMetrics): numbe
 export interface MaterializeSceneGeometryInput {
   placedUnits: PlacedFamilyUnit[]
   rows: OrderedGeneration[]
+  parentageGroups: ParentageGroup[]
+  metrics: LayoutMetrics
+}
+
+export interface MaterializeRootSceneGeometryInput {
+  placedUnits: PlacedRootedFamilyUnit[]
+  placedDomains: PlacedLayoutDomain[]
+  rows: PlacedRow[]
   parentageGroups: ParentageGroup[]
   metrics: LayoutMetrics
 }
@@ -35,80 +47,22 @@ export function materializeSceneGeometry(
     }
   }
 
-  const units = input.placedUnits.map(unit => ({
-    ...unit,
-    rect: { ...unit.rect },
-  }))
-  const placedUnitById = new Map(units.map(unit => [unit.id, unit]))
-  const rows = input.rows.map(row => {
-    const originalOrder = new Map(row.unitIds.map((unitId, index) => [unitId, index]))
-    const unitIds = row.unitIds
-      .filter(unitId => placedUnitById.has(unitId))
-      .sort((leftId, rightId) => {
-        const left = placedUnitById.get(leftId)!
-        const right = placedUnitById.get(rightId)!
-        return left.rect.x - right.rect.x
-          || (originalOrder.get(leftId) ?? 0) - (originalOrder.get(rightId) ?? 0)
-          || leftId.localeCompare(rightId)
-      })
-    unitIds.forEach((unitId, order) => { placedUnitById.get(unitId)!.order = order })
-    return { id: `row:${row.generation}`, generation: row.generation, unitIds }
-  })
-  const cards: PlacedPersonCard[] = units.flatMap(unit => (
-    unit.memberIds.map((personId, index) => ({
-      id: personId,
-      unitId: unit.id,
-      generation: unit.generation,
-      rect: {
-        x: unit.rect.x + index * (input.metrics.cardWidth + input.metrics.spouseGap),
-        y: unit.rect.y,
-        width: input.metrics.cardWidth,
-        height: input.metrics.cardHeight,
-      },
-    }))
-  ))
-  const cardById = new Map(cards.map(card => [card.id, card]))
-  const defaultParentageOwnerIds = new Set(
-    input.parentageGroups
-      .filter(group => group.sourceAnchorPersonId === undefined)
-      .map(group => group.sourceUnitId),
+  const units = clonePlacedUnits(input.placedUnits)
+  const rows = materializeRows(
+    input.rows.map(row => ({
+      id: `row:${row.generation}`,
+      generation: row.generation,
+      unitIds: row.unitIds,
+    })),
+    units,
   )
-  const hubs: PlacedUnionHub[] = units
-    .filter(unit => unit.kind === 'couple' || defaultParentageOwnerIds.has(unit.id))
-    .map(unit => ({
-      id: `hub:${unit.id}`,
-      unitId: unit.id,
-      point: {
-        x: unit.kind === 'couple'
-          ? unit.rect.x + input.metrics.cardWidth + input.metrics.spouseGap / 2
-          : unit.rect.x + input.metrics.cardWidth / 2,
-        y: unit.kind === 'couple'
-          ? unit.rect.y + input.metrics.cardHeight / 2
-          : unit.rect.y + input.metrics.cardHeight,
-      },
-    }))
-  const anchoredGroupsByPersonId = new Map<string, ParentageGroup[]>()
-  for (const group of input.parentageGroups) {
-    if (group.sourceAnchorPersonId === undefined) continue
-    const anchoredGroups = anchoredGroupsByPersonId.get(group.sourceAnchorPersonId) ?? []
-    anchoredGroups.push(group)
-    anchoredGroupsByPersonId.set(group.sourceAnchorPersonId, anchoredGroups)
-  }
-  for (const [personId, anchoredGroups] of [...anchoredGroupsByPersonId.entries()]
-    .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))) {
-    const card = cardById.get(personId)
-    if (card === undefined) continue
-    const sortedGroups = anchoredGroups.sort((left, right) => left.id.localeCompare(right.id))
-    const portXs = anchoredPortXs(card, sortedGroups.length, input.metrics.routeSubgrid)
-    sortedGroups.forEach((group, index) => hubs.push({
-      id: group.sourceHubId ?? `hub:${group.id}`,
-      unitId: group.sourceUnitId,
-      point: {
-        x: portXs[index],
-        y: card.rect.y + card.rect.height,
-      },
-    }))
-  }
+  const cards = materializeCards(units, input.metrics)
+  const hubs = materializeHubs(
+    units,
+    cards,
+    input.parentageGroups,
+    input.metrics,
+  )
   const right = Math.max(...units.map(unit => unit.rect.x + unit.rect.width))
   const bottom = Math.max(...units.map(unit => unit.rect.y + unit.rect.height))
 
@@ -119,6 +73,161 @@ export function materializeSceneGeometry(
     rows,
     bounds: { x: 0, y: 0, width: right, height: bottom },
   }
+}
+
+export function materializeRootSceneGeometry(
+  input: MaterializeRootSceneGeometryInput,
+): RootSceneGeometry {
+  if (input.placedUnits.length === 0) {
+    return {
+      units: [],
+      cards: [],
+      hubs: [],
+      rows: [],
+      rootDomains: [],
+      bridgeDomains: [],
+      bounds: { x: 0, y: 0, width: 0, height: 0 },
+    }
+  }
+
+  const units = clonePlacedUnits(input.placedUnits)
+  const rows = materializeRows(input.rows, units)
+  const cards = materializeCards(units, input.metrics)
+  const hubs = materializeHubs(
+    units,
+    cards,
+    input.parentageGroups,
+    input.metrics,
+  )
+  const placedDomains = input.placedDomains.map(domain => ({
+    ...domain,
+    rootIds: [...domain.rootIds],
+    signature: [...domain.signature],
+    personIds: [...domain.personIds],
+    unitIds: [...domain.unitIds],
+    rect: { ...domain.rect },
+  }))
+  const right = Math.max(
+    ...units.map(unit => unit.rect.x + unit.rect.width),
+    ...placedDomains.map(domain => domain.rect.x + domain.rect.width),
+  )
+  const bottom = Math.max(
+    ...units.map(unit => unit.rect.y + unit.rect.height),
+    ...placedDomains.map(domain => domain.rect.y + domain.rect.height),
+  )
+
+  return {
+    units,
+    cards,
+    hubs,
+    rows,
+    rootDomains: placedDomains.filter(domain => domain.kind === 'root'),
+    bridgeDomains: placedDomains.filter(domain => domain.kind !== 'root'),
+    bounds: { x: 0, y: 0, width: right, height: bottom },
+  }
+}
+
+function clonePlacedUnits<T extends PlacedFamilyUnit>(units: T[]): T[] {
+  return units.map(unit => ({
+    ...unit,
+    memberIds: [...unit.memberIds],
+    rect: { ...unit.rect },
+  }))
+}
+
+function materializeRows(
+  inputRows: PlacedRow[],
+  units: PlacedFamilyUnit[],
+): PlacedRow[] {
+  const placedUnitById = new Map(units.map(unit => [unit.id, unit]))
+  return inputRows.map(row => {
+    const originalOrder = new Map(
+      row.unitIds.map((unitId, index) => [unitId, index]),
+    )
+    const unitIds = row.unitIds
+      .filter(unitId => placedUnitById.has(unitId))
+      .sort((leftId, rightId) => {
+        const left = placedUnitById.get(leftId)!
+        const right = placedUnitById.get(rightId)!
+        return left.rect.x - right.rect.x
+          || (originalOrder.get(leftId) ?? 0) - (originalOrder.get(rightId) ?? 0)
+          || leftId.localeCompare(rightId)
+      })
+    unitIds.forEach((unitId, order) => {
+      placedUnitById.get(unitId)!.order = order
+    })
+    return { id: row.id, generation: row.generation, unitIds }
+  })
+}
+
+function materializeCards(
+  units: PlacedFamilyUnit[],
+  metrics: LayoutMetrics,
+): PlacedPersonCard[] {
+  return units.flatMap(unit => unit.memberIds.map((personId, index) => ({
+    id: personId,
+    unitId: unit.id,
+    generation: unit.generation,
+    rect: {
+      x: unit.rect.x + index * (metrics.cardWidth + metrics.spouseGap),
+      y: unit.rect.y,
+      width: metrics.cardWidth,
+      height: metrics.cardHeight,
+    },
+  })))
+}
+
+function materializeHubs(
+  units: PlacedFamilyUnit[],
+  cards: PlacedPersonCard[],
+  parentageGroups: ParentageGroup[],
+  metrics: LayoutMetrics,
+): PlacedUnionHub[] {
+  const cardById = new Map(cards.map(card => [card.id, card]))
+  const defaultParentageOwnerIds = new Set(
+    parentageGroups
+      .filter(group => group.sourceAnchorPersonId === undefined)
+      .map(group => group.sourceUnitId),
+  )
+  const hubs: PlacedUnionHub[] = units
+    .filter(unit => unit.kind === 'couple' || defaultParentageOwnerIds.has(unit.id))
+    .map(unit => ({
+      id: `hub:${unit.id}`,
+      unitId: unit.id,
+      point: {
+        x: unit.kind === 'couple'
+          ? unit.rect.x + metrics.cardWidth + metrics.spouseGap / 2
+          : unit.rect.x + metrics.cardWidth / 2,
+        y: unit.kind === 'couple'
+          ? unit.rect.y + metrics.cardHeight / 2
+          : unit.rect.y + metrics.cardHeight,
+      },
+    }))
+  const anchoredGroupsByPersonId = new Map<string, ParentageGroup[]>()
+  for (const group of parentageGroups) {
+    if (group.sourceAnchorPersonId === undefined) continue
+    const anchoredGroups = anchoredGroupsByPersonId.get(group.sourceAnchorPersonId) ?? []
+    anchoredGroups.push(group)
+    anchoredGroupsByPersonId.set(group.sourceAnchorPersonId, anchoredGroups)
+  }
+  for (const [personId, anchoredGroups] of [...anchoredGroupsByPersonId.entries()]
+    .sort(([leftId], [rightId]) => leftId.localeCompare(rightId))) {
+    const card = cardById.get(personId)
+    if (card === undefined) continue
+    const sortedGroups = anchoredGroups.sort((left, right) => (
+      left.id.localeCompare(right.id)
+    ))
+    const portXs = anchoredPortXs(card, sortedGroups.length, metrics.routeSubgrid)
+    sortedGroups.forEach((group, index) => hubs.push({
+      id: group.sourceHubId ?? `hub:${group.id}`,
+      unitId: group.sourceUnitId,
+      point: {
+        x: portXs[index],
+        y: card.rect.y + card.rect.height,
+      },
+    }))
+  }
+  return hubs
 }
 
 function anchoredPortXs(

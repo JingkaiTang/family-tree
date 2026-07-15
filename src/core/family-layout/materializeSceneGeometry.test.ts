@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { materializeSceneGeometry } from './materializeSceneGeometry'
-import { DEFAULT_LAYOUT_METRICS, type ParentageGroup, type PlacedFamilyUnit } from './types'
+import {
+  materializeRootSceneGeometry,
+  materializeSceneGeometry,
+} from './materializeSceneGeometry'
+import {
+  DEFAULT_LAYOUT_METRICS,
+  type ParentageGroup,
+  type PlacedFamilyUnit,
+  type PlacedLayoutDomain,
+  type PlacedRootedFamilyUnit,
+} from './types'
 
 describe('materializeSceneGeometry', () => {
   it('does not add an unused generic hub beside explicit single-parentage ports', () => {
@@ -109,5 +118,53 @@ describe('materializeSceneGeometry', () => {
     expect(new Set(ports.map(hub => hub.point.x)).size).toBe(11)
     expect(Math.min(...ports.map(hub => hub.point.x))).toBe(252)
     expect(Math.max(...ports.map(hub => hub.point.x))).toBe(396)
+  })
+
+  it('preserves source-root member order in rooted cards and domain geometry', () => {
+    const unit: PlacedRootedFamilyUnit = {
+      id: 'unit:partnership:current:a+b',
+      kind: 'couple',
+      memberIds: ['b', 'a'],
+      generation: 0,
+      width: 360,
+      lineageAffinity: {},
+      accent: '#345678',
+      rootSignature: ['root:a', 'root:b'],
+      domainId: 'domain:bridge:root:a|root:b',
+      memberRootIds: { a: 'root:a', b: 'root:b' },
+      rootAccent: '#4F7CAC',
+      isRootFamily: false,
+      rect: { x: 24, y: 0, width: 360, height: 216 },
+      order: 0,
+    }
+    const domain: PlacedLayoutDomain = {
+      id: unit.domainId,
+      kind: 'pair-bridge',
+      componentId: 'component:a',
+      rootIds: ['root:b', 'root:a'],
+      signature: ['root:a', 'root:b'],
+      personIds: ['a', 'b'],
+      unitIds: [unit.id],
+      order: 0,
+      accent: '#4F7CAC',
+      rect: { x: 0, y: 0, width: 408, height: 216 },
+      columnStart: 0,
+      columnEnd: 16,
+    }
+
+    const scene = materializeRootSceneGeometry({
+      placedUnits: [unit],
+      placedDomains: [domain],
+      rows: [{ id: `row:${domain.id}:0`, generation: 0, unitIds: [unit.id] }],
+      parentageGroups: [],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(scene.cards.map(card => [card.id, card.rect.x])).toEqual([
+      ['b', 24],
+      ['a', 216],
+    ])
+    expect(scene.rootDomains).toEqual([])
+    expect(scene.bridgeDomains).toEqual([domain])
   })
 })

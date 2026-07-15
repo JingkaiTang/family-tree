@@ -1,6 +1,7 @@
 import { assignGenerations } from './assignGenerations'
 import { assignRootAccents } from './assignRootAccents'
 import { buildRootDomains } from './buildRootDomains'
+import { decorateRootedUnits } from './decorateRootedUnits'
 import { discoverRootFamilies } from './discoverRootFamilies'
 import { propagateRootSignatures } from './propagateRootSignatures'
 import {
@@ -16,9 +17,11 @@ import type {
   DecorateRootedUnitsInput,
   FamilyUnit,
   ParentageGroup,
+  PlaceRootDomainsInput,
   ProjectedFamily,
+  Rect,
 } from './types'
-import { EMPTY_LAYOUT_PREFERENCES } from './types'
+import { DEFAULT_LAYOUT_METRICS, EMPTY_LAYOUT_PREFERENCES } from './types'
 
 export interface RootFixture {
   projected: ProjectedFamily
@@ -159,6 +162,65 @@ export function denseThreeRootFixture(): RootFixture {
   ])
 }
 
+export function twoRootMultipleMarriagesFixture(): RootFixture {
+  const a0 = member('a0')
+  const a0Spouse = member('a0-spouse')
+  const a1 = member('a1')
+  const a2 = member('a2')
+  const b0 = member('b0')
+  const b0Spouse = member('b0-spouse')
+  const b1 = member('b1')
+  const b2 = member('b2')
+
+  linkSpouse(a0, a0Spouse)
+  linkParent(a1, a0)
+  linkParent(a1, a0Spouse)
+  linkParent(a2, a0)
+  linkParent(a2, a0Spouse)
+  linkSpouse(b0, b0Spouse)
+  linkParent(b1, b0)
+  linkParent(b1, b0Spouse)
+  linkParent(b2, b0)
+  linkParent(b2, b0Spouse)
+  linkSpouse(a1, b1)
+  linkSpouse(a2, b2)
+
+  return buildRootFixture([
+    a0,
+    a0Spouse,
+    a1,
+    a2,
+    b0,
+    b0Spouse,
+    b1,
+    b2,
+  ])
+}
+
+export function wideThreeFamiliesFixture(): RootFixture {
+  const rootA = member('root-a')
+  const rootB = member('root-b')
+  const members = [rootA, rootB]
+  linkSpouse(rootA, rootB)
+
+  for (const branchId of ['a', 'b', 'c']) {
+    const branch = member(`branch-${branchId}`)
+    const spouse = member(`branch-${branchId}-spouse`)
+    const firstChild = member(`branch-${branchId}-child-1`)
+    const secondChild = member(`branch-${branchId}-child-2`)
+    linkParent(branch, rootA)
+    linkParent(branch, rootB)
+    linkSpouse(branch, spouse)
+    linkParent(firstChild, branch)
+    linkParent(firstChild, spouse)
+    linkParent(secondChild, branch)
+    linkParent(secondChild, spouse)
+    members.push(branch, spouse, firstChild, secondChild)
+  }
+
+  return buildRootFixture(members)
+}
+
 export function adoptedPrimaryFixture(): RootFixture {
   const adoptiveA = member('adoptive-a')
   const adoptiveB = member('adoptive-b')
@@ -248,6 +310,39 @@ export function disconnectedRootsFixture(): RootFixture {
   linkSpouse(rightA, rightB)
 
   return buildRootFixture([leftA, leftB, rightA, rightB])
+}
+
+export function singlePersonFixture(): RootFixture {
+  return buildRootFixture([member('single')])
+}
+
+export function asymmetricRootFixture(): RootFixture {
+  const rootA = member('root-a')
+  const rootB = member('root-b')
+  const leftChild = member('left-child')
+  const rightChild = member('right-child')
+  const leftGrandchildA = member('left-grandchild-a')
+  const leftGrandchildB = member('left-grandchild-b')
+  const leftGrandchildC = member('left-grandchild-c')
+
+  linkSpouse(rootA, rootB)
+  linkParent(leftChild, rootA)
+  linkParent(leftChild, rootB)
+  linkParent(rightChild, rootA)
+  linkParent(rightChild, rootB)
+  linkParent(leftGrandchildA, leftChild)
+  linkParent(leftGrandchildB, leftChild)
+  linkParent(leftGrandchildC, leftChild)
+
+  return buildRootFixture([
+    rootA,
+    rootB,
+    leftChild,
+    rightChild,
+    leftGrandchildA,
+    leftGrandchildB,
+    leftGrandchildC,
+  ])
 }
 
 export function rootAccentInputForFixture(
@@ -340,6 +435,76 @@ export function preparedRootDomains(
     domains: buildRootDomains(preparedInput),
     accents: input.accents,
     preferences,
+  }
+}
+
+export function preparedTwoRootLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(twoRootMarriageFixture())
+}
+
+export function preparedAsymmetricRootLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(asymmetricRootFixture())
+}
+
+export function preparedDenseRootLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(denseThreeRootFixture())
+}
+
+export function preparedDisconnectedRootLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(disconnectedRootsFixture())
+}
+
+export function preparedSameRootCousinLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(sameRootCousinMarriageFixture())
+}
+
+export function preparedUnequalDepthLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(unequalDepthMarriageFixture())
+}
+
+export function preparedSinglePersonLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(singlePersonFixture())
+}
+
+export function preparedAdoptedRootLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(adoptedPrimaryFixture())
+}
+
+export function preparedIncomingSpouseLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(incomingSpouseFixture())
+}
+
+export function preparedOverlappingSignatureLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(overlappingSignatureMarriageFixture())
+}
+
+export function preparedTwoRootMultipleMarriagesLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(twoRootMultipleMarriagesFixture())
+}
+
+export function preparedWideThreeFamiliesLayout(): PlaceRootDomainsInput {
+  return preparedRootLayout(wideThreeFamiliesFixture())
+}
+
+export function centerX(rect: Rect): number {
+  return rect.x + rect.width / 2
+}
+
+export function rectContains(outer: Rect, inner: Rect): boolean {
+  return inner.x >= outer.x
+    && inner.y >= outer.y
+    && inner.x + inner.width <= outer.x + outer.width
+    && inner.y + inner.height <= outer.y + outer.height
+}
+
+function preparedRootLayout(fixture: RootFixture): PlaceRootDomainsInput {
+  const prepared = preparedRootDomains(fixture)
+  return {
+    units: decorateRootedUnits(prepared),
+    parentageGroups: fixture.parentageGroups,
+    domains: prepared.domains.domains,
+    preferences: prepared.preferences,
+    metrics: DEFAULT_LAYOUT_METRICS,
   }
 }
 

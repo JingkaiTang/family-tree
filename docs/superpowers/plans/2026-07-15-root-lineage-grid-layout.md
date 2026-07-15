@@ -1029,7 +1029,7 @@ git commit -m "feat: build root and bridge layout domains"
 - Modify: `src/core/family-layout/types.ts`
 - Modify: `src/core/family-layout/rootLayoutTestHelpers.ts`
 
-- [ ] **Step 1: 写连续列域失败测试**
+- [x] **Step 1: 写连续列域失败测试**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -1074,7 +1074,7 @@ describe('placeRootDomains', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/placeRootDomains.test.ts
@@ -1082,7 +1082,7 @@ npm test -- src/core/family-layout/placeRootDomains.test.ts
 
 Expected: FAIL，提示模块不存在。
 
-- [ ] **Step 3: 实现域内分支跨度计算**
+- [x] **Step 3: 实现域内分支跨度计算**
 
 先对每个 root domain 独立计算逻辑宽度：
 
@@ -1095,7 +1095,7 @@ Expected: FAIL，提示模块不存在。
 
 不得用卡片绝对位置反推 root 归属。
 
-- [ ] **Step 4: 分配连续域区间**
+- [x] **Step 4: 分配连续域区间**
 
 按 Task 6 的 domain sequence 扫描分配列：
 
@@ -1123,7 +1123,7 @@ function allocateDomainIntervals(
 
 bridge band 位于两个 root interval 之间；bridge island 使用自己的连续 interval。任何 domain 都不与另一 domain 的正面积重叠。
 
-- [ ] **Step 5: 实现域内 generation 排序与坐标**
+- [x] **Step 5: 实现域内 generation 排序与坐标**
 
 - 普通 root domain 行应用匹配 `domainId + generation` 的 `rowOrders`。
 - bridge domain 行应用 `bridgeOrders`。
@@ -1133,7 +1133,7 @@ bridge band 位于两个 root interval 之间；bridge island 使用自己的连
 - x 坐标从 branch-first 初值开始，在域内做四次父子居中；每次移动后向左右扫描消除 overlap，并 clamp 回 domain rect。
 - `previousScene` 仅用于 unchanged domain 的 tie-break 和整体平移选择，不能违反新域区间。
 
-- [ ] **Step 6: 物化场景几何**
+- [x] **Step 6: 物化场景几何**
 
 使用 Task 1 的 `RootSceneGeometry`，并在 `materializeSceneGeometry.ts` 增加独立入口，旧入口保留到 Task 9：
 
@@ -1151,7 +1151,7 @@ export function materializeRootSceneGeometry(
 - `bounds` 覆盖所有 domains、units 和 cards；
 - 空场景返回 units/cards/hubs/rows/rootDomains/bridgeDomains 六个空数组和零 bounds。
 
-- [ ] **Step 7: 增加边缘布局测试**
+- [x] **Step 7: 增加边缘布局测试**
 
 覆盖：单根宽树、深窄树、同根表亲婚姻、两根多对互婚、多根 island、断开 component、只有单人、两边记录深度不相等、同代三个家庭各自有多子女。对每个场景断言：
 
@@ -1162,7 +1162,7 @@ expectEveryUnitInsideExactlyOneDomain(scene)
 expectRootDomainsDoNotInterleave(scene)
 ```
 
-- [ ] **Step 8: 验证 GREEN**
+- [x] **Step 8: 验证 GREEN**
 
 ```bash
 npm test -- src/core/family-layout/placeRootDomains.test.ts src/core/family-layout/materializeSceneGeometry.test.ts
@@ -1171,7 +1171,7 @@ npm run typecheck
 
 Expected: PASS。
 
-- [ ] **Step 9: 提交根域网格排版**
+- [x] **Step 9: 提交根域网格排版**
 
 ```bash
 git add src/core/family-layout/placeRootDomains.ts src/core/family-layout/placeRootDomains.test.ts src/core/family-layout/materializeSceneGeometry.ts src/core/family-layout/materializeSceneGeometry.test.ts src/core/family-layout/types.ts src/core/family-layout/rootLayoutTestHelpers.ts

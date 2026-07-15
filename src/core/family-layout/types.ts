@@ -201,6 +201,15 @@ export interface DecorateRootedUnitsInput {
   accents: Record<string, string>
   preferences: LayoutPreferences
 }
+export interface PlaceRootDomainsInput {
+  units: RootedFamilyUnit[]
+  parentageGroups: ParentageGroup[]
+  domains: LayoutDomain[]
+  preferences: LayoutPreferences
+  metrics: LayoutMetrics
+  previousScene?: RootLayoutScene
+  changedIds?: string[]
+}
 export interface PlacedLayoutDomain extends LayoutDomain {
   rect: Rect
   columnStart: number
