@@ -8,13 +8,14 @@ import {
   PersistedLayoutPreferences,
   SCHEMA_VERSION,
 } from './schema'
+import { z } from 'zod'
 
 type MutableFamily = Record<string, unknown> & {
   schemaVersion: number
   members?: Record<string, Member>
   childLayoutAssignments?: FamilyData['childLayoutAssignments']
   gridLayoutOverrides?: FamilyData['gridLayoutOverrides']
-  layoutPreferences?: FamilyData['layoutPreferences']
+  layoutPreferences?: unknown
 }
 
 type SpouseType = Member['spouses'][number]['type']
@@ -42,7 +43,10 @@ export function migrate(raw: unknown): FamilyData {
     current = migrateV1ToV2(current)
   }
   if (current.schemaVersion < 3) {
-    current = migrateV2ToV3(current)
+    current = migrateV2ToV4(current)
+  }
+  if (current.schemaVersion < 4) {
+    current = migrateV3ToV4(current)
   }
 
   current.schemaVersion = SCHEMA_VERSION
@@ -75,7 +79,7 @@ function migrateV1ToV2(data: MutableFamily): MutableFamily {
   }
 }
 
-function migrateV2ToV3(data: MutableFamily): MutableFamily {
+function migrateV2ToV4(data: MutableFamily): MutableFamily {
   const legacyData = {
     ...data,
     members: data.members ?? {},
@@ -85,8 +89,51 @@ function migrateV2ToV3(data: MutableFamily): MutableFamily {
   return {
     ...data,
     layoutPreferences: convertLegacyGridPreferences(legacyData),
-    schemaVersion: 3,
+    schemaVersion: 4,
   }
+}
+
+const LegacyV3LayoutPreferences = z.object({
+  rowOrders: z.array(z.object({
+    id: z.string(),
+    unitIds: z.array(z.string()),
+  })).default([]),
+  familyAccentAssignments: z.record(z.string(), z.string()).default({}),
+})
+
+function migrateV3ToV4(data: MutableFamily): MutableFamily {
+  const parsed = LegacyV3LayoutPreferences.safeParse(
+    data.layoutPreferences === undefined ? {} : data.layoutPreferences,
+  )
+  if (!parsed.success) {
+    const details = parsed.error.issues.map(issue => issue.message).join('; ')
+    throw new Error(`Invalid layoutPreferences: ${details}`)
+  }
+  return {
+    ...data,
+    schemaVersion: 4,
+    layoutPreferences: {
+      rootOrders: [],
+      rowOrders: parsed.data.rowOrders.map(row => ({
+        id: row.id,
+        domainId: 'legacy',
+        generation: generationFromRowId(row.id),
+        unitIds: [...row.unitIds],
+      })),
+      bridgeOrders: [],
+      rootAccentAssignments: {},
+      familyAccentAssignments: {
+        ...parsed.data.familyAccentAssignments,
+      },
+    },
+  }
+}
+
+function generationFromRowId(rowId: string): number {
+  const match = rowId.match(/(-?\d+)$/)
+  if (match === null) return 0
+  const generation = Number(match[1])
+  return Number.isInteger(generation) ? generation : 0
 }
 
 function normalizeCurrentSpouses(members: Record<string, Member>) {

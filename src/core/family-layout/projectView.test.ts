@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { ParentageFact } from './types'
-import { DEFAULT_FAMILY_VIEW_POLICY, DEFAULT_LAYOUT_METRICS } from './types'
+import {
+  DEFAULT_FAMILY_VIEW_POLICY,
+  DEFAULT_LAYOUT_METRICS,
+  EMPTY_LAYOUT_PREFERENCES,
+} from './types'
 import { familyData, linkSpouse, member } from './testHelpers'
 import { normalizeFacts } from './normalizeFacts'
 import { buildFamilyUnits } from './buildFamilyUnits'
@@ -22,10 +26,11 @@ describe('projectView', () => {
       showSecondaryParentage: false,
       showGodparentRelations: false,
     })
-    const built = buildFamilyUnits(projected, {
-      rowOrders: [],
-      familyAccentAssignments: {},
-    }, DEFAULT_LAYOUT_METRICS)
+    const built = buildFamilyUnits(
+      projected,
+      EMPTY_LAYOUT_PREFERENCES,
+      DEFAULT_LAYOUT_METRICS,
+    )
 
     expect(built.units.find(unit => unit.kind === 'couple')?.memberIds).toEqual(['a', 'b'])
     expect(Object.keys(built.unitIdByPersonId).sort()).toEqual(['a', 'b', 'ex'])

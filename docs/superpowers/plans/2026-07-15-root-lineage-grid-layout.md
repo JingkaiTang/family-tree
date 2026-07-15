@@ -116,7 +116,7 @@
 - Create: `src/core/family-layout/rootSignatures.test.ts`
 - Create: `src/core/family-layout/rootLayoutTestHelpers.ts`
 
-- [ ] **Step 1: 写根签名工具的失败测试**
+- [x] **Step 1: 写根签名工具的失败测试**
 
 创建 `src/core/family-layout/rootSignatures.test.ts`：
 
@@ -146,7 +146,7 @@ describe('rootSignatures', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/rootSignatures.test.ts
@@ -154,7 +154,7 @@ npm test -- src/core/family-layout/rootSignatures.test.ts
 
 Expected: FAIL，提示 `rootSignatures.ts` 不存在。
 
-- [ ] **Step 3: 扩展共享类型**
+- [x] **Step 3: 扩展共享类型**
 
 在 `types.ts` 增加以下类型；保留现有 `FamilyUnit` 作为根语义之前的基础类型：
 
@@ -248,7 +248,7 @@ rootGap: 144,
 bridgeGap: 96,
 ```
 
-- [ ] **Step 4: 实现签名工具**
+- [x] **Step 4: 实现签名工具**
 
 创建 `rootSignatures.ts`：
 
@@ -270,7 +270,7 @@ export function rootSignatureKey(signature: RootSignature): string {
 }
 ```
 
-- [ ] **Step 5: 创建共享根族夹具**
+- [x] **Step 5: 创建共享根族夹具**
 
 `rootLayoutTestHelpers.ts` 必须导出以下确定性夹具，全部复用现有 `testHelpers.ts` 的 `member`、`linkParent`、`linkSpouse` 和 `buildProjectedInput`：
 
@@ -296,7 +296,7 @@ export interface RootFixture {
 
 每个 fixture 使用固定成员 ID，不使用随机 UUID；`unequalDepthMarriageFixture` 必须让 A 根记录三代、B 根只记录一代，防止错误地把全局最小 generation 当成唯一根判据。
 
-- [ ] **Step 6: 更新现有场景构造器并验证 GREEN**
+- [x] **Step 6: 更新现有场景构造器并验证 GREEN**
 
 运行：
 
@@ -307,7 +307,7 @@ npm run typecheck
 
 Expected: PASS，且旧公开布局类型和测试不需要兼容性假数据。
 
-- [ ] **Step 7: 提交基础类型**
+- [x] **Step 7: 提交基础类型**
 
 ```bash
 git add src/core/family-layout/types.ts src/core/family-layout/rootSignatures.ts src/core/family-layout/rootSignatures.test.ts src/core/family-layout/rootLayoutTestHelpers.ts
@@ -323,7 +323,7 @@ git commit -m "refactor: add root lineage layout types"
 - Create: `src/core/family-layout/discoverRootFamilies.test.ts`
 - Modify: `src/core/family-layout/types.ts`
 
-- [ ] **Step 1: 写根发现失败测试**
+- [x] **Step 1: 写根发现失败测试**
 
 创建测试覆盖四个判据：祖先夫妻合并为一个根、直接嫁入/娶入者不生成第二根、不同记录深度仍发现两个根、断开分量各自生成根。
 
@@ -364,7 +364,7 @@ describe('discoverRootFamilies', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/discoverRootFamilies.test.ts
@@ -372,7 +372,7 @@ npm test -- src/core/family-layout/discoverRootFamilies.test.ts
 
 Expected: FAIL，提示 `discoverRootFamilies` 不存在。
 
-- [ ] **Step 3: 定义发现结果和稳定根 ID**
+- [x] **Step 3: 定义发现结果和稳定根 ID**
 
 在 `types.ts` 增加：
 
@@ -387,7 +387,7 @@ export interface RootDiscoveryResult {
 
 根 ID 规则固定为 `root:` 加按字典序排序的 seed person ID，以 `+` 连接。根 ID 不包含 generation、卡片位置或 `rootMemberId`。
 
-- [ ] **Step 4: 实现来源候选与嫁入/娶入抑制**
+- [x] **Step 4: 实现来源候选与嫁入/娶入抑制**
 
 实现步骤必须按此顺序：
 
@@ -413,7 +413,7 @@ export function isUnexpandedIncomingSpouse(input: {
 
 没有子女的 source spouse 若其当前配偶已经有可见主父代来源，仍视为未展开 incoming spouse 并继承配偶根。只有该 source person 存在不与当前配偶共享的主子女分支时，才保留为独立根候选。
 
-- [ ] **Step 5: 验证根发现与确定性**
+- [x] **Step 5: 验证根发现与确定性**
 
 ```bash
 npm test -- src/core/family-layout/discoverRootFamilies.test.ts
@@ -422,7 +422,7 @@ npm test -- src/core/family-layout
 
 Expected: PASS；将输入成员、partnership 和 parentage 顺序反转后，根结果仍深度相等。
 
-- [ ] **Step 6: 提交根发现**
+- [x] **Step 6: 提交根发现**
 
 ```bash
 git add src/core/family-layout/discoverRootFamilies.ts src/core/family-layout/discoverRootFamilies.test.ts src/core/family-layout/types.ts
@@ -438,7 +438,7 @@ git commit -m "feat: discover visible root families"
 - Create: `src/core/family-layout/propagateRootSignatures.test.ts`
 - Modify: `src/core/family-layout/types.ts`
 
-- [ ] **Step 1: 写签名传播失败测试**
+- [x] **Step 1: 写签名传播失败测试**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -485,7 +485,7 @@ describe('propagateRootSignatures', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/propagateRootSignatures.test.ts
@@ -493,7 +493,7 @@ npm test -- src/core/family-layout/propagateRootSignatures.test.ts
 
 Expected: FAIL，提示模块不存在。
 
-- [ ] **Step 3: 实现单调集合传播**
+- [x] **Step 3: 实现单调集合传播**
 
 实现固定点算法，且只读取已经投影为主关系的 `primaryParentages` 和 `primaryPartnerships`：
 
@@ -531,11 +531,11 @@ export function propagateRootSignatures(
 - `sourceRootIdByPersonId` 对单根人物取唯一根；跨根人物根据其父代来源记录最接近的确定性根，无法唯一归属时留空，不按性别猜测。
 - fixed-point 超出 `people.length + 1` 仍变化时，返回已有 `PARENTAGE_CYCLE` 诊断，不无限循环。
 
-- [ ] **Step 4: 增加重叠签名边缘测试**
+- [x] **Step 4: 增加重叠签名边缘测试**
 
 补充 `{A,B} × {B,C}` fixture，断言子女为 `{A,B,C}`，且 `secondary-parentage`、历史配偶和教父母不改变任何签名。再补充输入顺序反转的确定性断言。
 
-- [ ] **Step 5: 验证 GREEN**
+- [x] **Step 5: 验证 GREEN**
 
 ```bash
 npm test -- src/core/family-layout/discoverRootFamilies.test.ts src/core/family-layout/propagateRootSignatures.test.ts
@@ -544,7 +544,7 @@ npm run typecheck
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交签名传播**
+- [x] **Step 6: 提交签名传播**
 
 ```bash
 git add src/core/family-layout/propagateRootSignatures.ts src/core/family-layout/propagateRootSignatures.test.ts src/core/family-layout/types.ts src/core/family-layout/rootLayoutTestHelpers.ts
@@ -568,7 +568,7 @@ git commit -m "feat: propagate root lineage signatures"
 - Modify: `src/stores/family.test.ts`
 - Modify: `src/__tests__/pages/TreeView.test.ts`
 
-- [ ] **Step 1: 写 V3 → V4 迁移失败测试**
+- [x] **Step 1: 写 V3 → V4 迁移失败测试**
 
 在 `migrate.test.ts` 增加：
 
@@ -615,7 +615,7 @@ it('migrates a v3 sibling row into its v4 root domain', () => {
 })
 ```
 
-- [ ] **Step 2: 写 Store 全量清除失败测试**
+- [x] **Step 2: 写 Store 全量清除失败测试**
 
 ```ts
 it('clears every manual layout order and preserves accent assignments', () => {
@@ -652,7 +652,7 @@ it('clears every manual layout order and preserves accent assignments', () => {
 })
 ```
 
-- [ ] **Step 3: 运行测试并确认 RED**
+- [x] **Step 3: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/migrate.test.ts src/stores/family.test.ts
@@ -660,7 +660,7 @@ npm test -- src/core/migrate.test.ts src/stores/family.test.ts
 
 Expected: FAIL，schema 仍为 V3，且全量清除 action 不存在。
 
-- [ ] **Step 4: 定义 V4 schema**
+- [x] **Step 4: 定义 V4 schema**
 
 将 `SCHEMA_VERSION` 改为 `4`，并定义：
 
@@ -694,11 +694,11 @@ export const PersistedLayoutPreferences = z.object({
 
 同步 `LayoutPreferences`，不要在 core 层重新定义不一致的字段形状。
 
-- [ ] **Step 5: 实现显式 V3 → V4 迁移**
+- [x] **Step 5: 实现显式 V3 → V4 迁移**
 
 在迁移 switch 中只把 V3 row ID 可解析出的 generation 写入 V4；解析失败时使用 `0`，`domainId` 写 `legacy`。新数组为空，颜色原样保留。V4 parser 继续拒绝损坏对象，不静默丢字段。
 
-- [ ] **Step 6: 实现偏好写入和清理函数**
+- [x] **Step 6: 实现偏好写入和清理函数**
 
 `reconcilePreferences.ts` 增加：
 
@@ -727,14 +727,14 @@ export function withoutManualLayoutOrders(data: FamilyData): FamilyData
 - 去掉不存在的 unit/root；保留仍存在 ID 的相对顺序。
 - 一个 unit 只能出现在同一 `domainId + generation` 的一个 preference 中。
 - 长度小于 2 的排序 preference 删除。
-- 旧 `domainId: legacy` 在第一次根模型可用时按实际 `domainId + generation` 分组转换；不能安全归属的旧项删除。
+- 旧 `domainId: legacy` 若全部有效 unit 属于同一根域，则在 Gate A 转为实际 `domainId + generation`；跨多个根域的旧行暂时保留为 `legacy`，确保 Task 9 切换新引擎前旧排序行为不变。Task 9 再把其中的根间顺序转换为 root order，并删除无法安全归属的残项。
 - 颜色 assignment 只删除不存在的 family/root ID，不重新着色。
 
 `buildCurrentLayoutState` 在现有 normalize/project/build/generation 之后调用 Task 2–3 的根发现与签名传播，再按真实 `domainId + generation` 转换 `legacy` row。`treeLayout.ts` 的 `toLayoutPreferences` 复制全部五个字段；Task 9 之前旧 order engine 仍只读取 `rowOrders` 和 family accent，多出的 V4 字段不改变公开坐标。
 
 把现有 `LayoutPreferences` 测试字面量补齐空 `rootOrders`、`bridgeOrders`、`rootAccentAssignments`，并给 row item 补上真实或 `legacy` domain/generation。只做类型兼容，不改旧 order 测试期望。
 
-- [ ] **Step 7: 更新 Store actions**
+- [x] **Step 7: 更新 Store actions**
 
 新增并导出：
 
@@ -747,7 +747,7 @@ clearAllLayoutOrderPreferences(): void
 
 `clearRowOrderPreferences` 暂时保留为兼容包装，内部调用 `clearAllLayoutOrderPreferences`；Task 12 更新所有调用点后删除包装。仅当内容实际变化时 `markDirty()`。
 
-- [ ] **Step 8: 验证 Gate A**
+- [x] **Step 8: 验证 Gate A**
 
 ```bash
 npm test -- src/core/family-layout/rootSignatures.test.ts src/core/family-layout/discoverRootFamilies.test.ts src/core/family-layout/propagateRootSignatures.test.ts src/core/family-layout/reconcilePreferences.test.ts src/core/migrate.test.ts src/core/treeLayout.test.ts src/stores/family.test.ts src/__tests__/pages/TreeView.test.ts
@@ -758,7 +758,7 @@ npm run build
 
 Expected: 全部 PASS；生产公开布局快照与 Task 1 前一致。
 
-- [ ] **Step 9: 提交 V4 偏好**
+- [x] **Step 9: 提交 V4 偏好**
 
 ```bash
 git add src/core/schema.ts src/core/migrate.ts src/core/migrate.test.ts src/core/family-layout/types.ts src/core/family-layout/reconcilePreferences.ts src/core/family-layout/reconcilePreferences.test.ts src/core/family-layout/orderUnits.test.ts src/core/treeLayout.ts src/stores/family.ts src/stores/family.test.ts src/__tests__/pages/TreeView.test.ts

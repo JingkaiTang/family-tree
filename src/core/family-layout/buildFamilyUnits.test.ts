@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_FAMILY_VIEW_POLICY, DEFAULT_LAYOUT_METRICS } from './types'
+import {
+  DEFAULT_FAMILY_VIEW_POLICY,
+  DEFAULT_LAYOUT_METRICS,
+  EMPTY_LAYOUT_PREFERENCES,
+} from './types'
 import { familyData, linkParent, linkSpouse, member } from './testHelpers'
 import { normalizeFacts } from './normalizeFacts'
 import { projectView } from './projectView'
@@ -15,7 +19,7 @@ describe('buildFamilyUnits', () => {
 
     const built = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
-      { rowOrders: [], familyAccentAssignments: {} },
+      EMPTY_LAYOUT_PREFERENCES,
       DEFAULT_LAYOUT_METRICS,
     )
 
@@ -50,7 +54,7 @@ describe('buildFamilyUnits', () => {
 
     const built = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
-      { rowOrders: [], familyAccentAssignments: {} },
+      EMPTY_LAYOUT_PREFERENCES,
       DEFAULT_LAYOUT_METRICS,
     )
 
@@ -84,7 +88,7 @@ describe('buildFamilyUnits', () => {
 
     const built = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
-      { rowOrders: [], familyAccentAssignments: {} },
+      EMPTY_LAYOUT_PREFERENCES,
       DEFAULT_LAYOUT_METRICS,
     )
 
@@ -116,7 +120,7 @@ describe('buildFamilyUnits', () => {
 
     const built = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
-      { rowOrders: [], familyAccentAssignments: {} },
+      EMPTY_LAYOUT_PREFERENCES,
       DEFAULT_LAYOUT_METRICS,
     )
 
@@ -141,13 +145,13 @@ describe('buildFamilyUnits', () => {
 
     const automatic = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
-      { rowOrders: [], familyAccentAssignments: {} },
+      EMPTY_LAYOUT_PREFERENCES,
       DEFAULT_LAYOUT_METRICS,
     )
     const persisted = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
       {
-        rowOrders: [],
+        ...EMPTY_LAYOUT_PREFERENCES,
         familyAccentAssignments: { 'unit:person:dad': '#123456' },
       },
       DEFAULT_LAYOUT_METRICS,
@@ -176,7 +180,7 @@ describe('buildFamilyUnits', () => {
 
     const built = buildFamilyUnits(
       projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
-      { rowOrders: [], familyAccentAssignments: {} },
+      EMPTY_LAYOUT_PREFERENCES,
       DEFAULT_LAYOUT_METRICS,
     )
 

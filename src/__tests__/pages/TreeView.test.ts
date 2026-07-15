@@ -58,6 +58,8 @@ describe('TreeView row order integration', () => {
 
     expect(family.data.layoutPreferences.rowOrders).toEqual([{
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:b', 'unit:person:a'],
     }])
     expect(wrapper.get('[data-testid="restore-default-layout"]')
@@ -76,10 +78,15 @@ describe('TreeView row order integration', () => {
         viewpoint: mk('viewpoint'),
       }
       state.data.layoutPreferences = {
+        rootOrders: [],
         rowOrders: [{
           id: 'row:0',
+          domainId: 'legacy',
+          generation: 0,
           unitIds: ['unit:person:viewpoint', 'unit:person:parent'],
         }],
+        bridgeOrders: [],
+        rootAccentAssignments: {},
         familyAccentAssignments: {
           'unit:person:parent': '#123456',
         },
@@ -106,7 +113,10 @@ describe('TreeView row order integration', () => {
     await button.trigger('click')
 
     expect(family.data.layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {
         'unit:person:parent': '#123456',
       },

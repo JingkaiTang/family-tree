@@ -710,6 +710,8 @@ describe('FamilyCanvas', () => {
     const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
     data.layoutPreferences.rowOrders = [{
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     }]
     layoutFamilyTree
@@ -926,6 +928,8 @@ describe('FamilyCanvas', () => {
 
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     })
     expect(family.data.manualPositions).toEqual({})
@@ -1016,6 +1020,8 @@ describe('FamilyCanvas', () => {
     expect(options.data).not.toBe(externalData)
     expect(options.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     })
 
@@ -1023,6 +1029,8 @@ describe('FamilyCanvas', () => {
     laterData.members.X = mk('X')
     laterData.layoutPreferences.rowOrders = [{
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     }]
     await wrapper.setProps({ data: laterData })
@@ -1119,6 +1127,8 @@ describe('FamilyCanvas', () => {
     await nextTick()
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     })
 
@@ -1192,11 +1202,15 @@ describe('FamilyCanvas', () => {
 
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:A', 'unit:person:C', 'unit:person:B'],
     })
     expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
     expect(layoutFamilyTree.mock.calls[2][1].data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:A', 'unit:person:C', 'unit:person:B'],
     })
 
@@ -1245,6 +1259,8 @@ describe('FamilyCanvas', () => {
     const normalData = familyData([mk('A'), mk('B'), mk('C'), mk('D'), mk('X')])
     normalData.layoutPreferences.rowOrders = [{
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     }]
     await wrapper.setProps({ data: normalData })
@@ -1393,10 +1409,14 @@ describe('FamilyCanvas', () => {
     expect(layoutFamilyTree).toHaveBeenCalledTimes(4)
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:B', 'unit:person:C', 'unit:person:A'],
     })
     expect(layoutFamilyTree.mock.calls[3][1].data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:B', 'unit:person:C', 'unit:person:A'],
     })
 

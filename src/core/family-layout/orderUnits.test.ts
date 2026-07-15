@@ -12,21 +12,23 @@ import type {
   PersonFact,
   ProjectedFamily,
 } from './types'
+import { EMPTY_LAYOUT_PREFERENCES } from './types'
 
 const noPreferences: LayoutPreferences = {
-  rowOrders: [],
-  familyAccentAssignments: {},
+  ...EMPTY_LAYOUT_PREFERENCES,
 }
 
 describe('orderUnits', () => {
   it('lets a saved row sequence win over birth-date order', () => {
     const units = [single('a'), single('b'), single('c')]
     const preferences: LayoutPreferences = {
+      ...noPreferences,
       rowOrders: [{
         id: 'row-preference-1',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: ['unit:person:c', 'unit:person:a', 'unit:person:b'],
       }],
-      familyAccentAssignments: {},
     }
 
     const rows = orderUnits(input(units, people([
@@ -48,8 +50,11 @@ describe('orderUnits', () => {
       single('right'),
     ]
     const preferences: LayoutPreferences = {
+      ...noPreferences,
       rowOrders: [{
         id: 'row:0',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: [
           'unit:person:left',
           'unit:person:a',
@@ -57,7 +62,6 @@ describe('orderUnits', () => {
           'unit:person:right',
         ],
       }],
-      familyAccentAssignments: {},
     }
 
     expect(orderUnits(input(units, people([
@@ -75,15 +79,17 @@ describe('orderUnits', () => {
   it('applies a saved couple position to both people after they become singles', () => {
     const units = [single('left'), single('a'), single('b'), single('right')]
     const preferences: LayoutPreferences = {
+      ...noPreferences,
       rowOrders: [{
         id: 'row:0',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: [
           'unit:person:left',
           'unit:partnership:current:a+b',
           'unit:person:right',
         ],
       }],
-      familyAccentAssignments: {},
     }
 
     expect(orderUnits(input(units, people([
@@ -107,8 +113,11 @@ describe('orderUnits', () => {
       single('right'),
     ]
     const preferences: LayoutPreferences = {
+      ...noPreferences,
       rowOrders: [{
         id: 'row:0',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: [
           'unit:person:left',
           'unit:partnership:current:a+b',
@@ -116,7 +125,6 @@ describe('orderUnits', () => {
           'unit:person:right',
         ],
       }],
-      familyAccentAssignments: {},
     }
 
     expect(orderUnits(input(units, people([
@@ -451,11 +459,13 @@ describe('orderUnits', () => {
       unitIds: ['unit:person:c', 'unit:person:b', 'unit:person:a'],
     }])
     const preferences: LayoutPreferences = {
+      ...noPreferences,
       rowOrders: [{
         id: 'row-preference-1',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: ['unit:person:a', 'unit:person:b', 'unit:person:c'],
       }],
-      familyAccentAssignments: {},
     }
 
     expect(orderUnits(input(units, people([

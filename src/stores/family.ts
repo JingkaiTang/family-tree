@@ -2,9 +2,21 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import {
   reconcileLayoutPreferences,
+  withBridgeOrderPreference,
+  withDomainRowOrderPreference,
   withRowOrderPreference,
+  withRootOrderPreference,
+  withoutManualLayoutOrders,
 } from '@/core/family-layout/reconcilePreferences'
-import type { ChildLayoutAssignment, FamilyData, GridLayoutOverride, Member, ProjectMeta } from '@/core/schema'
+import type {
+  BridgeOrderPreference,
+  ChildLayoutAssignment,
+  FamilyData,
+  GridLayoutOverride,
+  Member,
+  ProjectMeta,
+  RowOrderPreference,
+} from '@/core/schema'
 import { createEmptyFamily } from '@/core/schema'
 import { setLastProjectPath } from '@/services/prefs'
 
@@ -291,14 +303,27 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setRowOrderPreference(id: string, unitIds: string[]) {
-    data.value = withRowOrderPreference(data.value, id, unitIds)
-    markDirty()
+    applyLayoutPreferenceUpdate(withRowOrderPreference(data.value, id, unitIds))
+  }
+
+  function setRootOrderPreference(componentId: string, rootIds: string[]) {
+    applyLayoutPreferenceUpdate(withRootOrderPreference(data.value, componentId, rootIds))
+  }
+
+  function setDomainRowOrderPreference(preference: RowOrderPreference) {
+    applyLayoutPreferenceUpdate(withDomainRowOrderPreference(data.value, preference))
+  }
+
+  function setBridgeOrderPreference(preference: BridgeOrderPreference) {
+    applyLayoutPreferenceUpdate(withBridgeOrderPreference(data.value, preference))
+  }
+
+  function clearAllLayoutOrderPreferences() {
+    applyLayoutPreferenceUpdate(withoutManualLayoutOrders(data.value))
   }
 
   function clearRowOrderPreferences() {
-    if (data.value.layoutPreferences.rowOrders.length === 0) return
-    data.value.layoutPreferences.rowOrders = []
-    markDirty()
+    clearAllLayoutOrderPreferences()
   }
 
   function setFamilyAccentAssignment(unitId: string, accent: string | null) {
@@ -324,6 +349,15 @@ export const useFamilyStore = defineStore('family', () => {
       delete data.value.manualPositions[id]
       markDirty()
     }
+  }
+
+  function applyLayoutPreferenceUpdate(nextData: FamilyData) {
+    if (
+      JSON.stringify(nextData.layoutPreferences)
+      === JSON.stringify(data.value.layoutPreferences)
+    ) return
+    data.value = nextData
+    markDirty()
   }
 
   // 深度监听 data，一旦任何字段改变就标记 dirty（保底兜底，正常变更都走上面方法）
@@ -367,6 +401,10 @@ export const useFamilyStore = defineStore('family', () => {
     setChildLayoutAssignment,
     setGridLayoutOverride,
     setRowOrderPreference,
+    setRootOrderPreference,
+    setDomainRowOrderPreference,
+    setBridgeOrderPreference,
+    clearAllLayoutOrderPreferences,
     clearRowOrderPreferences,
     setFamilyAccentAssignment,
     setManualPosition,

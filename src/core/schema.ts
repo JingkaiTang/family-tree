@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // 当前 schema 版本。每次 schema 有破坏性变更递增，并在 core/migrate.ts 添加迁移。
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 // ---------------- Enums ----------------
 export const Gender = z.enum(['male', 'female', 'other'])
@@ -82,11 +82,24 @@ export const GridLayoutOverrides = z.record(z.string(), GridLayoutOverride)
 export type GridLayoutOverrides = z.infer<typeof GridLayoutOverrides>
 
 export const RowOrderPreference = z.object({
-  id: z.string(),
-  unitIds: z.array(z.string()),
+  id: z.string().min(1),
+  domainId: z.string().min(1),
+  generation: z.number().int(),
+  unitIds: z.array(z.string().min(1)),
 })
+export type RowOrderPreference = z.infer<typeof RowOrderPreference>
+export const RootOrderPreference = z.object({
+  componentId: z.string().min(1),
+  rootIds: z.array(z.string().min(1)),
+})
+export type RootOrderPreference = z.infer<typeof RootOrderPreference>
+export const BridgeOrderPreference = RowOrderPreference
+export type BridgeOrderPreference = z.infer<typeof BridgeOrderPreference>
 export const PersistedLayoutPreferences = z.object({
+  rootOrders: z.array(RootOrderPreference).default([]),
   rowOrders: z.array(RowOrderPreference).default([]),
+  bridgeOrders: z.array(BridgeOrderPreference).default([]),
+  rootAccentAssignments: z.record(z.string(), z.string()).default({}),
   familyAccentAssignments: z.record(z.string(), z.string()).default({}),
 })
 export type PersistedLayoutPreferences = z.infer<typeof PersistedLayoutPreferences>
@@ -126,7 +139,10 @@ export function createEmptyFamily(): FamilyData {
     childLayoutAssignments: {},
     gridLayoutOverrides: {},
     layoutPreferences: {
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     },
   }

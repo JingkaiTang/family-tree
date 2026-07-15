@@ -1,4 +1,4 @@
-import type { Member } from '@/core/schema'
+import type { Member, PersistedLayoutPreferences } from '@/core/schema'
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
@@ -56,14 +56,13 @@ export const DEFAULT_FAMILY_VIEW_POLICY: FamilyViewPolicy = {
   showGodparentRelations: false,
 }
 
-export interface RowOrderPreference { id: string; unitIds: string[] }
-export interface LayoutPreferences {
-  rowOrders: RowOrderPreference[]
-  familyAccentAssignments: Record<string, string>
-}
+export type LayoutPreferences = PersistedLayoutPreferences
 
 export const EMPTY_LAYOUT_PREFERENCES: LayoutPreferences = {
+  rootOrders: [],
   rowOrders: [],
+  bridgeOrders: [],
+  rootAccentAssignments: {},
   familyAccentAssignments: {},
 }
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyFamily, type Member } from '@/core/schema'
+import {
+  createEmptyFamily,
+  type Member,
+  type RowOrderPreference,
+} from '@/core/schema'
 import {
   convertLegacyGridPreferences,
   reconcileLayoutPreferences,
@@ -32,6 +36,14 @@ function linkCurrentSpouses(left: Member, right: Member) {
   right.spouses.push({ id: left.id, type: 'married' })
 }
 
+function legacyRow(
+  id: string,
+  unitIds: string[],
+  generation = 0,
+): RowOrderPreference {
+  return { id, domainId: 'legacy', generation, unitIds }
+}
+
 describe('convertLegacyGridPreferences', () => {
   it('expands one valid override into the complete current generation row', () => {
     const data = createEmptyFamily()
@@ -44,10 +56,10 @@ describe('convertLegacyGridPreferences', () => {
     }
 
     expect(convertLegacyGridPreferences(data)).toEqual({
-      rowOrders: [{
-        id: 'row:v2:0',
-        unitIds: ['unit:person:b', 'unit:person:a'],
-      }],
+      rootOrders: [],
+      rowOrders: [legacyRow('row:v2:0', ['unit:person:b', 'unit:person:a'])],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
   })
@@ -64,6 +76,8 @@ describe('convertLegacyGridPreferences', () => {
 
     expect(convertLegacyGridPreferences(data).rowOrders).toEqual([{
       id: 'row:v2:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:b', 'unit:person:a'],
     }])
   })
@@ -83,6 +97,8 @@ describe('convertLegacyGridPreferences', () => {
 
     expect(convertLegacyGridPreferences(data).rowOrders).toEqual([{
       id: 'row:v2:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:partnership:current:a+b', 'unit:person:c'],
     }])
   })
@@ -110,16 +126,23 @@ describe('convertLegacyGridPreferences', () => {
     const preferences = convertLegacyGridPreferences(data)
 
     expect(preferences).toEqual({
+      rootOrders: [],
       rowOrders: [
         {
           id: 'row:v2:0',
+          domainId: 'legacy',
+          generation: 0,
           unitIds: ['unit:person:parent-a', 'unit:person:parent-b'],
         },
         {
           id: 'row:v2:1',
+          domainId: 'legacy',
+          generation: 1,
           unitIds: ['unit:person:child-b', 'unit:person:child-a'],
         },
       ],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
     expect(data).toEqual(before)
@@ -134,7 +157,10 @@ describe('convertLegacyGridPreferences', () => {
     }
 
     expect(convertLegacyGridPreferences(data)).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
   })
@@ -149,15 +175,15 @@ describe('reconcileLayoutPreferences', () => {
       c: member('c'),
     }
     data.layoutPreferences = {
-      rowOrders: [{
-        id: 'row:dirty',
-        unitIds: [
+      rootOrders: [],
+      rowOrders: [legacyRow('row:dirty', [
           'unit:person:b',
           'unit:person:a',
           'unit:person:b',
           'unit:person:unknown',
-        ],
-      }],
+      ])],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {
         'unit:person:a': '#111111',
         'unit:person:unknown': '#999999',
@@ -166,10 +192,14 @@ describe('reconcileLayoutPreferences', () => {
     const before = structuredClone(data)
 
     expect(reconcileLayoutPreferences(data)).toEqual({
-      rowOrders: [{
-        id: 'row:dirty',
-        unitIds: ['unit:person:b', 'unit:person:a', 'unit:person:c'],
-      }],
+      rootOrders: [],
+      rowOrders: [legacyRow('row:dirty', [
+        'unit:person:b',
+        'unit:person:a',
+        'unit:person:c',
+      ])],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {
         'unit:person:a': '#111111',
       },
@@ -185,29 +215,17 @@ describe('reconcileLayoutPreferences', () => {
     const data = createEmptyFamily()
     data.members = { child, other, parent }
     data.layoutPreferences.rowOrders = [
-      {
-        id: 'row:z-parent',
-        unitIds: ['unit:person:other', 'unit:person:parent', 'unit:person:child'],
-      },
-      {
-        id: 'row:z-child',
-        unitIds: ['unit:person:child'],
-      },
-      {
-        id: 'row:a-parent',
-        unitIds: ['unit:person:parent', 'unit:person:other'],
-      },
+      legacyRow('row:z-parent', [
+        'unit:person:other',
+        'unit:person:parent',
+        'unit:person:child',
+      ]),
+      legacyRow('row:z-child', ['unit:person:child']),
+      legacyRow('row:a-parent', ['unit:person:parent', 'unit:person:other']),
     ]
 
     expect(reconcileLayoutPreferences(data).rowOrders).toEqual([
-      {
-        id: 'row:a-parent',
-        unitIds: ['unit:person:parent', 'unit:person:other'],
-      },
-      {
-        id: 'row:z-child',
-        unitIds: ['unit:person:child'],
-      },
+      legacyRow('row:a-parent', ['unit:person:parent', 'unit:person:other']),
     ])
   })
 
@@ -218,19 +236,15 @@ describe('reconcileLayoutPreferences', () => {
     linkParent(child, parentA)
     const data = createEmptyFamily()
     data.members = { parentA, parentB, child }
-    data.layoutPreferences.rowOrders = [{
-      id: 'row:0',
-      unitIds: [
+    data.layoutPreferences.rowOrders = [legacyRow('row:0', [
         'unit:person:parent-b',
         'unit:person:parent-a',
         'unit:person:child',
-      ],
-    }]
+    ])]
 
-    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
-      id: 'row:0',
-      unitIds: ['unit:person:parent-b', 'unit:person:parent-a'],
-    }])
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([
+      legacyRow('row:0', ['unit:person:parent-b', 'unit:person:parent-a']),
+    ])
   })
 
   it('inherits the neighboring position when two singles become a couple', () => {
@@ -241,24 +255,20 @@ describe('reconcileLayoutPreferences', () => {
     linkCurrentSpouses(a, b)
     const data = createEmptyFamily()
     data.members = { left, a, b, right }
-    data.layoutPreferences.rowOrders = [{
-      id: 'row:0',
-      unitIds: [
+    data.layoutPreferences.rowOrders = [legacyRow('row:0', [
         'unit:person:left',
         'unit:person:a',
         'unit:person:b',
         'unit:person:right',
-      ],
-    }]
+    ])]
 
-    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
-      id: 'row:0',
-      unitIds: [
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([
+      legacyRow('row:0', [
         'unit:person:left',
         'unit:partnership:current:a+b',
         'unit:person:right',
-      ],
-    }])
+      ]),
+    ])
   })
 
   it('keeps former spouses beside the old couple position when they become singles', () => {
@@ -269,24 +279,20 @@ describe('reconcileLayoutPreferences', () => {
       b: member('b'),
       right: member('right'),
     }
-    data.layoutPreferences.rowOrders = [{
-      id: 'row:0',
-      unitIds: [
+    data.layoutPreferences.rowOrders = [legacyRow('row:0', [
         'unit:person:left',
         'unit:partnership:current:a+b',
         'unit:person:right',
-      ],
-    }]
+    ])]
 
-    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
-      id: 'row:0',
-      unitIds: [
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([
+      legacyRow('row:0', [
         'unit:person:left',
         'unit:person:a',
         'unit:person:b',
         'unit:person:right',
-      ],
-    }])
+      ]),
+    ])
   })
 
   it('inherits member positions when the primary spouse changes', () => {
@@ -298,25 +304,21 @@ describe('reconcileLayoutPreferences', () => {
     linkCurrentSpouses(a, c)
     const data = createEmptyFamily()
     data.members = { left, a, b, c, right }
-    data.layoutPreferences.rowOrders = [{
-      id: 'row:0',
-      unitIds: [
+    data.layoutPreferences.rowOrders = [legacyRow('row:0', [
         'unit:person:left',
         'unit:partnership:current:a+b',
         'unit:person:c',
         'unit:person:right',
-      ],
-    }]
+    ])]
 
-    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
-      id: 'row:0',
-      unitIds: [
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([
+      legacyRow('row:0', [
         'unit:person:left',
         'unit:partnership:current:a+c',
         'unit:person:b',
         'unit:person:right',
-      ],
-    }])
+      ]),
+    ])
   })
 
   it('does not create default rows when there are no persisted rows', () => {
@@ -327,8 +329,84 @@ describe('reconcileLayoutPreferences', () => {
     }
 
     expect(reconcileLayoutPreferences(data)).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
+    })
+  })
+
+  it('reconciles stale root and bridge orders within one cross-root component', () => {
+    const a0 = member('a0')
+    const a0Spouse = member('a0-spouse')
+    const b0 = member('b0')
+    const b0Spouse = member('b0-spouse')
+    const a1 = member('a1')
+    const a2 = member('a2')
+    const b1 = member('b1')
+    const b2 = member('b2')
+    linkCurrentSpouses(a0, a0Spouse)
+    linkCurrentSpouses(b0, b0Spouse)
+    linkParent(a1, a0)
+    linkParent(a1, a0Spouse)
+    linkParent(a2, a0)
+    linkParent(a2, a0Spouse)
+    linkParent(b1, b0)
+    linkParent(b1, b0Spouse)
+    linkParent(b2, b0)
+    linkParent(b2, b0Spouse)
+    linkCurrentSpouses(a1, b1)
+    linkCurrentSpouses(a2, b2)
+    const data = createEmptyFamily()
+    data.members = Object.fromEntries(
+      [a0, a0Spouse, b0, b0Spouse, a1, a2, b1, b2]
+        .map(value => [value.id, value]),
+    )
+    const bridgeDomainId = [
+      'domain:bridge:root:a0+a0-spouse',
+      'root:b0+b0-spouse',
+    ].join('|')
+    data.layoutPreferences.rootOrders = [{
+      componentId: 'component:a0',
+      rootIds: [
+        'root:b0+b0-spouse',
+        'root:unknown',
+        'root:a0+a0-spouse',
+      ],
+    }]
+    data.layoutPreferences.bridgeOrders = [{
+      id: 'bridge:1',
+      domainId: bridgeDomainId,
+      generation: 1,
+      unitIds: [
+        'unit:partnership:current:a2+b2',
+        'unit:unknown',
+        'unit:partnership:current:a1+b1',
+      ],
+    }]
+    data.layoutPreferences.rootAccentAssignments = {
+      'root:a0+a0-spouse': '#111111',
+      'root:unknown': '#999999',
+    }
+
+    const reconciled = reconcileLayoutPreferences(data)
+
+    expect(reconciled.rootOrders).toEqual([{
+      componentId: 'component:a0',
+      rootIds: ['root:b0+b0-spouse', 'root:a0+a0-spouse'],
+    }])
+    expect(reconciled.bridgeOrders).toEqual([{
+      id: 'bridge:1',
+      domainId: bridgeDomainId,
+      generation: 1,
+      unitIds: [
+        'unit:partnership:current:a2+b2',
+        'unit:partnership:current:a1+b1',
+      ],
+    }])
+    expect(reconciled.rootAccentAssignments).toEqual({
+      'root:a0+a0-spouse': '#111111',
     })
   })
 })
@@ -336,7 +414,7 @@ describe('reconcileLayoutPreferences', () => {
 describe('withRowOrderPreference', () => {
   it('upserts a unique row order without mutating the input or legacy fields', () => {
     const data = createEmptyFamily()
-    data.layoutPreferences.rowOrders = [{ id: 'row:other', unitIds: ['unit:person:x'] }]
+    data.layoutPreferences.rowOrders = [legacyRow('row:other', ['unit:person:x'])]
     const before = structuredClone(data)
 
     const next = withRowOrderPreference(data, 'row:0', [
@@ -347,8 +425,8 @@ describe('withRowOrderPreference', () => {
 
     expect(data).toEqual(before)
     expect(next.layoutPreferences.rowOrders).toEqual([
-      { id: 'row:other', unitIds: ['unit:person:x'] },
-      { id: 'row:0', unitIds: ['unit:person:b', 'unit:person:a'] },
+      legacyRow('row:other', ['unit:person:x']),
+      legacyRow('row:0', ['unit:person:b', 'unit:person:a']),
     ])
     expect(next.manualPositions).toEqual({})
     expect(next.gridLayoutOverrides).toEqual({})

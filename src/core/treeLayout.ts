@@ -76,10 +76,25 @@ function mergeViewPolicy(
 
 function toLayoutPreferences(data: FamilyData): LayoutPreferences {
   return {
+    rootOrders: data.layoutPreferences.rootOrders.map(order => ({
+      componentId: order.componentId,
+      rootIds: [...order.rootIds],
+    })),
     rowOrders: data.layoutPreferences.rowOrders.map(row => ({
       id: row.id,
+      domainId: row.domainId,
+      generation: row.generation,
       unitIds: [...row.unitIds],
     })),
+    bridgeOrders: data.layoutPreferences.bridgeOrders.map(row => ({
+      id: row.id,
+      domainId: row.domainId,
+      generation: row.generation,
+      unitIds: [...row.unitIds],
+    })),
+    rootAccentAssignments: {
+      ...data.layoutPreferences.rootAccentAssignments,
+    },
     familyAccentAssignments: {
       ...data.layoutPreferences.familyAccentAssignments,
     },

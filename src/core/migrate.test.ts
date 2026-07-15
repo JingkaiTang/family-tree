@@ -39,13 +39,16 @@ function rawFamily(members: Member[], patch: Record<string, unknown> = {}): Reco
 }
 
 describe('migrate', () => {
-  it('creates V3 families with empty semantic layout preferences', () => {
+  it('creates V4 families with empty semantic layout preferences', () => {
     const family = createEmptyFamily()
 
-    expect(SCHEMA_VERSION).toBe(3)
-    expect(family.schemaVersion).toBe(3)
+    expect(SCHEMA_VERSION).toBe(4)
+    expect(family.schemaVersion).toBe(4)
     expect(family.layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
   })
@@ -61,12 +64,15 @@ describe('migrate', () => {
     expect(migrated.childLayoutAssignments).toEqual({})
     expect(migrated.gridLayoutOverrides).toEqual({})
     expect(migrated.layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
   })
 
-  it('converts V2 grid order into stable V3 row preferences without removing legacy data', () => {
+  it('converts V2 grid order into stable V4 row preferences without removing legacy data', () => {
     const a = member('a')
     const b = member('b')
     const raw = rawFamily([b, a], {
@@ -82,10 +88,15 @@ describe('migrate', () => {
     const migrated = migrate(raw)
 
     expect(migrated.layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [{
         id: 'row:v2:0',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: ['unit:person:b', 'unit:person:a'],
       }],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
     expect(migrated.manualPositions).toEqual(raw.manualPositions)
@@ -111,15 +122,25 @@ describe('migrate', () => {
 
     expect(migrated.layoutPreferences.rowOrders).toEqual([{
       id: 'row:v2:0',
+      domainId: 'legacy',
+      generation: 0,
       unitIds: ['unit:person:b', 'unit:person:a'],
     }])
   })
 
-  it('preserves V3 preferences when migration is run repeatedly', () => {
+  it('preserves V4 preferences when migration is run repeatedly', () => {
     const family = createEmptyFamily()
-    family.members.a = member('a')
+    family.members = { a: member('a'), b: member('b') }
     family.layoutPreferences = {
-      rowOrders: [{ id: 'row:custom', unitIds: ['unit:person:a'] }],
+      rootOrders: [],
+      rowOrders: [{
+        id: 'row:custom',
+        domainId: 'legacy',
+        generation: 0,
+        unitIds: ['unit:person:b', 'unit:person:a'],
+      }],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: { 'unit:person:a': '#123456' },
     }
 
@@ -130,15 +151,59 @@ describe('migrate', () => {
     expect(twice.layoutPreferences).toEqual(family.layoutPreferences)
   })
 
-  it('reconciles stale V3 row and accent preferences against current units', () => {
+  it('migrates a V3 sibling row into its V4 root domain', () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const childA = member('child-a')
+    const childB = member('child-b')
+    linkSpouse(parentA, parentB)
+    linkParent(childA, parentA)
+    linkParent(childA, parentB)
+    linkParent(childB, parentA)
+    linkParent(childB, parentB)
+
+    const migrated = migrate({
+      ...createEmptyFamily(),
+      schemaVersion: 3,
+      members: Object.fromEntries(
+        [parentA, parentB, childA, childB].map(value => [value.id, value]),
+      ),
+      layoutPreferences: {
+        rowOrders: [{
+          id: 'row:1',
+          unitIds: ['unit:person:child-b', 'unit:person:child-a'],
+        }],
+        familyAccentAssignments: { 'unit:person:child-a': '#123456' },
+      },
+    })
+
+    expect(migrated.schemaVersion).toBe(4)
+    expect(migrated.layoutPreferences).toEqual({
+      rootOrders: [],
+      rowOrders: [{
+        id: 'row:1',
+        domainId: 'domain:root:parent-a+parent-b',
+        generation: 1,
+        unitIds: ['unit:person:child-b', 'unit:person:child-a'],
+      }],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
+      familyAccentAssignments: { 'unit:person:child-a': '#123456' },
+    })
+  })
+
+  it('reconciles stale V4 row and accent preferences against current units', () => {
     const family = createEmptyFamily()
     family.members = {
       a: member('a'),
       b: member('b'),
     }
     family.layoutPreferences = {
+      rootOrders: [],
       rowOrders: [{
         id: 'row:dirty',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: [
           'unit:person:b',
           'unit:person:a',
@@ -146,6 +211,11 @@ describe('migrate', () => {
           'unit:person:unknown',
         ],
       }],
+      bridgeOrders: [],
+      rootAccentAssignments: {
+        'root:a': '#345678',
+        'root:unknown': '#999999',
+      },
       familyAccentAssignments: {
         'unit:person:a': '#123456',
         'unit:person:unknown': '#999999',
@@ -153,17 +223,24 @@ describe('migrate', () => {
     }
 
     expect(migrate(family).layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [{
         id: 'row:dirty',
+        domainId: 'legacy',
+        generation: 0,
         unitIds: ['unit:person:b', 'unit:person:a'],
       }],
+      bridgeOrders: [],
+      rootAccentAssignments: {
+        'root:a': '#345678',
+      },
       familyAccentAssignments: {
         'unit:person:a': '#123456',
       },
     })
   })
 
-  it('materializes nested defaults from an empty V3 layoutPreferences object', () => {
+  it('materializes nested defaults from an empty V4 layoutPreferences object', () => {
     const raw = {
       ...createEmptyFamily(),
       layoutPreferences: {},
@@ -172,11 +249,17 @@ describe('migrate', () => {
     const migrated = migrate(raw)
 
     expect(migrated.layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
     expect(FamilyData.parse(migrated).layoutPreferences).toEqual({
+      rootOrders: [],
       rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
       familyAccentAssignments: {},
     })
   })
@@ -187,7 +270,7 @@ describe('migrate', () => {
     [],
     { rowOrders: 'invalid' },
     { familyAccentAssignments: [] },
-  ])('rejects invalid V3 layoutPreferences clearly: %j', (layoutPreferences) => {
+  ])('rejects invalid V4 layoutPreferences clearly: %j', (layoutPreferences) => {
     const raw = {
       ...createEmptyFamily(),
       layoutPreferences,
