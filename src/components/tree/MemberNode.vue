@@ -16,6 +16,8 @@ const props = defineProps<{
   kinship?: string
   /** 是否是当前视角中心 */
   isViewpoint?: boolean
+  rootAccent?: string
+  showRootRail?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -184,6 +186,14 @@ function onPointerCancel(e: PointerEvent) {
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
   >
+    <div
+      v-if="showRootRail && rootAccent"
+      data-testid="member-root-rail"
+      :data-root-accent="rootAccent"
+      class="pointer-events-none absolute inset-y-0 left-0 z-20 w-1"
+      :style="{ backgroundColor: rootAccent }"
+    />
+
     <!-- 照片优先保持竖幅，但必须为姓名、称呼和生卒信息留出文本区。 -->
     <div
       data-testid="member-photo"

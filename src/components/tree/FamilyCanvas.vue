@@ -216,6 +216,16 @@ const hubsByUnitId = computed(() => {
   return values
 })
 
+const rootAccentById = computed(() => Object.fromEntries(
+  scene.value.rootDomains.flatMap(domain => (
+    domain.rootIds.map(rootId => [rootId, domain.accent])
+  )),
+))
+
+const rootOrder = computed(() => [...scene.value.rootDomains]
+  .sort((left, right) => left.rect.x - right.rect.x || left.id.localeCompare(right.id))
+  .flatMap(domain => domain.rootIds))
+
 const kinshipByMemberId = computed<Record<string, string>>(() => {
   const viewpointId = props.viewpointId
   const resolveKinship = props.getKinship
@@ -580,6 +590,8 @@ function dismissDiagnostics() {
             :is-dragging="dragState?.unitId === unit.id"
             :animate-position="animatePositions"
             :kinship-by-member-id="kinshipByMemberId"
+            :root-accent-by-id="rootAccentById"
+            :root-order="rootOrder"
             @unit-drag="onUnitDrag"
             @unit-drop="onUnitDrop"
             @unit-cancel="onUnitCancel"

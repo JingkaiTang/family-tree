@@ -69,19 +69,30 @@ function pointValue(point: Point): string {
       :data-route-owner="group.routeOwnerId"
     >
       <template v-for="route in group.routes" :key="route.id">
-        <path
-          v-for="(segment, index) in route.segments"
-          :key="`${route.id}:${index}`"
-          :data-route-id="route.id"
-          :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
-          :d="pathData(segment)"
-          :stroke="route.accent"
-          :stroke-dasharray="route.kind === 'primary' ? undefined : '8 6'"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          fill="none"
-        />
+        <template v-for="(segment, index) in route.segments" :key="`${route.id}:${index}`">
+          <path
+            v-if="segment.orientation === 'bridge'"
+            data-testid="line-bridge-underlay"
+            :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
+            :d="pathData(segment)"
+            stroke="white"
+            stroke-width="7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            fill="none"
+          />
+          <path
+            :data-route-id="route.id"
+            :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
+            :d="pathData(segment)"
+            :stroke="route.accent"
+            :stroke-dasharray="route.kind === 'primary' ? undefined : '8 6'"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            fill="none"
+          />
+        </template>
       </template>
     </g>
   </svg>

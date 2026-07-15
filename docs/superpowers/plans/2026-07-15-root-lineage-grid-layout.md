@@ -1453,7 +1453,7 @@ git commit -m "feat: switch to root lineage grid layout"
 - Create: `src/__tests__/components/FamilyUnit.test.ts`
 - Modify: `src/__tests__/components/FamilyCanvas.test.ts`
 
-- [ ] **Step 1: 写根视觉失败测试**
+- [x] **Step 1: 写根视觉失败测试**
 
 创建 `FamilyUnit.test.ts`，断言 DOM 语义而不是浏览器实现的 `color-mix` 结果：
 
@@ -1478,7 +1478,7 @@ it('renders a cross-root spouse axis with both source accents', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/__tests__/components/FamilyUnit.test.ts src/__tests__/components/FamilyCanvas.test.ts
@@ -1486,7 +1486,7 @@ npm test -- src/__tests__/components/FamilyUnit.test.ts src/__tests__/components
 
 Expected: FAIL，新 data attributes 和根视觉不存在。
 
-- [ ] **Step 3: 实现成员根色侧边轨**
+- [x] **Step 3: 实现成员根色侧边轨**
 
 `MemberNode` 增加 props：
 
@@ -1497,7 +1497,7 @@ showRootRail?: boolean
 
 在卡片左侧内部渲染 4px rail，颜色来自该人物的唯一来源根；无唯一来源时使用 family `rootAccent`。轨道不能改变 card 宽度、port 坐标或点击/拖拽 hitbox。
 
-- [ ] **Step 4: 实现根家庭强调**
+- [x] **Step 4: 实现根家庭强调**
 
 `FamilyUnit` 根据 `unit.isRootFamily` 渲染：
 
@@ -1509,18 +1509,18 @@ showRootRail?: boolean
 
 所有视觉层 `pointer-events: none`，不能干扰卡片拖拽。
 
-- [ ] **Step 5: 实现跨根夫妻轴**
+- [x] **Step 5: 实现跨根夫妻轴**
 
 - 同根夫妻轴使用单一根色实线。
 - 两根夫妻轴使用按当前卡片空间顺序的两段色/线性渐变，中点仍是 union hub。
 - 多根签名家庭以 domain signature 顺序分段，最多显示四段；超过四根时使用前三根加 family accent 的末段，但 route 元数据仍保留完整签名。
 - 当前配偶轴持续加粗，历史配偶仍只在辅助层使用虚线，不能覆盖当前轴。
 
-- [ ] **Step 6: RelationLayer 保持 owner 分组和 line bridge**
+- [x] **Step 6: RelationLayer 保持 owner 分组和 line bridge**
 
 每个 `RoutedFamilyEdge` 继续独立 `<g data-route-owner>`；bridge segment 使用与所属 route 相同颜色并带背景擦除描边，形成可见跨线拱桥。不同 owner 即使颜色相近也不能合并成一个 SVG path。
 
-- [ ] **Step 7: 验证 GREEN**
+- [x] **Step 7: 验证 GREEN**
 
 ```bash
 npm test -- src/__tests__/components/FamilyUnit.test.ts src/__tests__/components/FamilyCanvas.test.ts
@@ -1530,7 +1530,7 @@ npm run build
 
 Expected: PASS；DOM 中不存在 root domain background/title。
 
-- [ ] **Step 8: 提交根族视觉**
+- [x] **Step 8: 提交根族视觉**
 
 ```bash
 git add src/components/tree/MemberNode.vue src/components/tree/FamilyUnit.vue src/components/tree/RelationLayer.vue src/__tests__/components/FamilyUnit.test.ts src/__tests__/components/FamilyCanvas.test.ts

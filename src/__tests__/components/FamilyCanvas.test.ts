@@ -361,13 +361,16 @@ describe('FamilyCanvas', () => {
       'parentage:parents',
     ])
     const parentRoute = wrapper.find('g[data-route-owner="parentage:parents"]')
-    expect(parentRoute.findAll('path')).toHaveLength(2)
+    expect(parentRoute.findAll('[data-route-id="route:parents"]')).toHaveLength(2)
     expect(parentRoute.find('path').attributes('stroke')).toBe(familyAccent)
     expect(wrapper.find('g[data-route-owner="parentage:other"] path').attributes('stroke'))
       .toBe('#d6578b')
     expect(parentRoute.findAll('path')[1].attributes('d')).toBe(
       'M 228 300 Q 240 288 252 300',
     )
+    const bridgeUnderlay = parentRoute.get('[data-testid="line-bridge-underlay"]')
+    expect(bridgeUnderlay.attributes('stroke')).toBe('white')
+    expect(bridgeUnderlay.attributes('stroke-width')).toBe('7')
   })
 
   it('groups multiple routes for one owner into one stable SVG group', async () => {
