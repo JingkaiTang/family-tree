@@ -11,10 +11,11 @@ import type { LayoutScene } from '@/core/family-layout/types'
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 
-const { focusStagePoint, getScale, layoutFamilyTree } = vi.hoisted(() => ({
+const { focusStagePoint, getScale, layoutFamilyTree, resetToDefaultView } = vi.hoisted(() => ({
   focusStagePoint: vi.fn(),
   getScale: vi.fn(() => 1),
   layoutFamilyTree: vi.fn(),
+  resetToDefaultView: vi.fn(),
 }))
 
 vi.mock('@/core/treeLayout', () => ({ layoutFamilyTree }))
@@ -27,6 +28,7 @@ const PanZoomStub = defineComponent({
     expose({
       focusStagePoint,
       getScale,
+      resetToDefaultView,
     })
     return () => h('div', slots.default?.())
   },
@@ -265,6 +267,7 @@ describe('FamilyCanvas', () => {
     focusStagePoint.mockReset()
     getScale.mockReset()
     getScale.mockReturnValue(1)
+    resetToDefaultView.mockReset()
     layoutFamilyTree.mockReset()
     layoutFamilyTree.mockResolvedValue(structuredClone(coupleScene))
   })
@@ -701,6 +704,101 @@ describe('FamilyCanvas', () => {
 
     expect(focusStagePoint).toHaveBeenCalledTimes(1)
     expect(focusStagePoint).toHaveBeenCalledWith(364, 172)
+  })
+
+  it('recomputes without a previous scene and resets the viewport after the reset scene', async () => {
+    const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
+    data.layoutPreferences.rowOrders = [{
+      id: 'row:0',
+      unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
+    }]
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+    const wrapper = mountCanvas(data, {
+      viewpointId: 'A',
+      layoutResetVersion: 0,
+    })
+    await flushPromises()
+    focusStagePoint.mockClear()
+
+    const resetData = structuredClone(data)
+    resetData.layoutPreferences.rowOrders = []
+    await wrapper.setProps({
+      data: resetData,
+      layoutResetVersion: 1,
+    })
+    await flushPromises()
+
+    expect(layoutFamilyTree).toHaveBeenCalledTimes(2)
+    expect(layoutFamilyTree).toHaveBeenLastCalledWith(Object.values(resetData.members), {
+      data: resetData,
+      view: {
+        showHistoricalPartnerships: false,
+        showSecondaryParentage: false,
+        showGodparentRelations: false,
+      },
+    })
+    expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+    expect(focusStagePoint).not.toHaveBeenCalled()
+  })
+
+  it('cancels an active drag before recomputing the default layout', async () => {
+    const resetLayout = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockReturnValueOnce(resetLayout.promise)
+    const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
+    const wrapper = mountCanvas(data, { layoutResetVersion: 0 })
+    await flushPromises()
+
+    await beginDrag(wrapper, 2, -500, 0)
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(true)
+
+    await wrapper.setProps({
+      data: structuredClone(data),
+      layoutResetVersion: 1,
+    })
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+    resetLayout.resolve(structuredClone(sortableScene))
+    await flushPromises()
+    expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reset the viewport from a reset request superseded by newer data', async () => {
+    const staleReset = deferred<LayoutScene>()
+    const accepted = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockReturnValueOnce(staleReset.promise)
+      .mockReturnValueOnce(accepted.promise)
+    const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
+    const wrapper = mountCanvas(data, { layoutResetVersion: 0 })
+    await flushPromises()
+
+    await beginDrag(wrapper, 2, -500, 0)
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(true)
+
+    await wrapper.setProps({
+      data: structuredClone(data),
+      layoutResetVersion: 1,
+    })
+    await nextTick()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+
+    const newerData = structuredClone(data)
+    newerData.members.X = mk('X')
+    await wrapper.setProps({ data: newerData })
+    await nextTick()
+
+    accepted.resolve(structuredClone(sortableScene))
+    await flushPromises()
+    staleReset.resolve(structuredClone(sortableScene))
+    await flushPromises()
+
+    expect(resetToDefaultView).not.toHaveBeenCalled()
   })
 
   it('preserves viewpoint kinship labels on member cards', async () => {

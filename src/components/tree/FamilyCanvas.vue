@@ -16,6 +16,7 @@ const props = defineProps<{
   viewpointId?: string | null
   getKinship?: (fromId: string, toId: string) => string | null
   initialView?: PanzoomView | null
+  layoutResetVersion?: number
   showAuxiliaryRelations?: boolean
 }>()
 
@@ -49,6 +50,7 @@ let pendingDropToken: number | null = null
 let pendingSceneRecovery: { data: FamilyData; changedIds: string[] } | null = null
 let auxiliaryRefreshQueued = false
 let settleTimer: ReturnType<typeof setTimeout> | null = null
+let observedLayoutResetVersion = props.layoutResetVersion ?? 0
 const animatePositions = ref(false)
 const dismissedDiagnosticKey = ref<string | null>(null)
 
@@ -75,6 +77,7 @@ async function updateLayout(options: {
   previousScene?: LayoutScene
   changedIds?: string[]
   preserveViewport?: boolean
+  resetViewport?: boolean
 } = {}) {
   const requestId = ++layoutRequestId
   const pendingTokenAtRequest = pendingDropToken
@@ -116,7 +119,9 @@ async function updateLayout(options: {
   await nextTick()
   if (requestId !== layoutRequestId) return
   const viewpointId = props.viewpointId
-  if (
+  if (options.resetViewport) {
+    panzoomRef.value?.resetToDefaultView()
+  } else if (
     viewpointId
     && !shouldSuppressFocus
     && !shouldSettleDrag
@@ -152,8 +157,14 @@ function flushQueuedAuxiliaryRefresh(previousScene: LayoutScene) {
 }
 
 watch(
-  () => props.data,
-  () => {
+  [() => props.data, () => props.layoutResetVersion ?? 0],
+  ([, resetVersion]) => {
+    if (resetVersion !== observedLayoutResetVersion) {
+      observedLayoutResetVersion = resetVersion
+      cancelPendingLayoutInteraction()
+      void updateLayout({ resetViewport: true })
+      return
+    }
     if (expectedRowUpdate && hasExpectedRowOrder(props.data, expectedRowUpdate)) {
       expectedRowUpdate = null
       return
@@ -240,6 +251,22 @@ interface FamilyDragState {
 const dragState = ref<FamilyDragState | null>(null)
 const dragCanDrop = ref(false)
 let dragToken = 0
+
+function cancelPendingLayoutInteraction() {
+  layoutRequestId += 1
+  dragToken += 1
+  dragState.value = null
+  dragCanDrop.value = false
+  expectedRowUpdate = null
+  pendingDropToken = null
+  pendingSceneRecovery = null
+  auxiliaryRefreshQueued = false
+  animatePositions.value = false
+  if (settleTimer !== null) {
+    clearTimeout(settleTimer)
+    settleTimer = null
+  }
+}
 
 function screenToStageScale(): number {
   return panzoomRef.value?.getScale() ?? 1
