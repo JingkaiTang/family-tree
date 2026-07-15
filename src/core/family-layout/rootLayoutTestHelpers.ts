@@ -177,6 +177,59 @@ export function incomingSpouseFixture(): RootFixture {
   return buildRootFixture([rootA, rootB, descendant, incoming])
 }
 
+export function overlappingSignatureMarriageFixture(): RootFixture {
+  const a0 = member('a0')
+  const a0Spouse = member('a0-spouse')
+  const b0 = member('b0')
+  const b0Spouse = member('b0-spouse')
+  const c0 = member('c0')
+  const c0Spouse = member('c0-spouse')
+  const a1 = member('a1')
+  const b1Left = member('b1-left')
+  const b1Right = member('b1-right')
+  const c1 = member('c1')
+  const ab = member('ab')
+  const bc = member('bc')
+  const abc = member('abc')
+
+  linkSpouse(a0, a0Spouse)
+  linkSpouse(b0, b0Spouse)
+  linkSpouse(c0, c0Spouse)
+  linkParent(a1, a0)
+  linkParent(a1, a0Spouse)
+  linkParent(b1Left, b0)
+  linkParent(b1Left, b0Spouse)
+  linkParent(b1Right, b0)
+  linkParent(b1Right, b0Spouse)
+  linkParent(c1, c0)
+  linkParent(c1, c0Spouse)
+  linkSpouse(a1, b1Left)
+  linkParent(ab, a1)
+  linkParent(ab, b1Left)
+  linkSpouse(b1Right, c1)
+  linkParent(bc, b1Right)
+  linkParent(bc, c1)
+  linkSpouse(ab, bc)
+  linkParent(abc, ab)
+  linkParent(abc, bc)
+
+  return buildRootFixture([
+    a0,
+    a0Spouse,
+    b0,
+    b0Spouse,
+    c0,
+    c0Spouse,
+    a1,
+    b1Left,
+    b1Right,
+    c1,
+    ab,
+    bc,
+    abc,
+  ])
+}
+
 export function disconnectedRootsFixture(): RootFixture {
   const leftA = member('left-a')
   const leftB = member('left-b')

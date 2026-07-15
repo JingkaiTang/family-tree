@@ -128,6 +128,12 @@ export interface RootDiscoveryResult {
   suppressedIncomingPersonIds: string[]
   diagnostics: LayoutDiagnostic[]
 }
+export interface RootSignatureResult {
+  signatureByPersonId: Record<string, RootSignature>
+  signatureByUnitId: Record<string, RootSignature>
+  sourceRootIdByPersonId: Partial<Record<string, string>>
+  diagnostics: LayoutDiagnostic[]
+}
 export interface RootedFamilyUnit extends FamilyUnit {
   rootSignature: RootSignature
   domainId: string
