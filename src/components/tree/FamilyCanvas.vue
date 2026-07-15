@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { DEFAULT_LAYOUT_METRICS, type Point, type RootLayoutScene } from '@/core/family-layout/types'
+import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type Point } from '@/core/family-layout/types'
 import type { BridgeOrderPreference, FamilyData, RowOrderPreference } from '@/core/schema'
 import {
   withBridgeOrderPreference,
@@ -34,7 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const PADDING = 40
-const EMPTY_SCENE: RootLayoutScene = {
+const EMPTY_SCENE: LayoutScene = {
   units: [],
   cards: [],
   hubs: [],
@@ -50,7 +50,7 @@ const EMPTY_SCENE: RootLayoutScene = {
 void props.rootId
 
 const panzoomRef = ref<InstanceType<typeof PanZoomWrapper> | null>(null)
-const scene = ref<RootLayoutScene>(EMPTY_SCENE)
+const scene = ref<LayoutScene>(EMPTY_SCENE)
 const members = computed(() => Object.values(props.data.members))
 let layoutRequestId = 0
 let suppressInitialSceneFocus = !!props.initialView
@@ -91,7 +91,7 @@ const diagnosticTitle = computed(() => (
 
 async function updateLayout(options: {
   data?: FamilyData
-  previousScene?: RootLayoutScene
+  previousScene?: LayoutScene
   changedIds?: string[]
   preserveViewport?: boolean
   resetViewport?: boolean
@@ -168,7 +168,7 @@ function requestAuxiliaryRefresh() {
   void updateLayout({ preserveViewport: true })
 }
 
-function flushQueuedAuxiliaryRefresh(previousScene: RootLayoutScene) {
+function flushQueuedAuxiliaryRefresh(previousScene: LayoutScene) {
   if (
     !auxiliaryRefreshQueued
     || dragState.value !== null
@@ -218,7 +218,7 @@ const canvasSize = computed(() => ({
 }))
 
 const cardsByUnitId = computed(() => {
-  const values = new Map<string, RootLayoutScene['cards']>()
+  const values = new Map<string, LayoutScene['cards']>()
   for (const card of scene.value.cards) {
     const cards = values.get(card.unitId) ?? []
     cards.push(card)
@@ -228,7 +228,7 @@ const cardsByUnitId = computed(() => {
 })
 
 const hubsByUnitId = computed(() => {
-  const values = new Map<string, RootLayoutScene['hubs']>()
+  const values = new Map<string, LayoutScene['hubs']>()
   for (const hub of scene.value.hubs) {
     const hubs = values.get(hub.unitId) ?? []
     hubs.push(hub)
@@ -559,7 +559,7 @@ function closestRowInDomain(domainId: string, centerY: number) {
     .map(row => {
       const rowUnits = row.unitIds
         .map(unitId => scene.value.units.find(unit => unit.id === unitId))
-        .filter((unit): unit is RootLayoutScene['units'][number] => unit !== undefined)
+        .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
       const rowCenterY = rowUnits.length === 0
         ? Number.POSITIVE_INFINITY
         : rowUnits.reduce((sum, unit) => sum + unit.rect.y + unit.rect.height / 2, 0) / rowUnits.length
@@ -575,7 +575,7 @@ function rootDomainsForComponent(componentId: string) {
 }
 
 function rootInsertionIndex(
-  domains: RootLayoutScene['rootDomains'],
+  domains: LayoutScene['rootDomains'],
   draggedDomainId: string,
   centerX: number,
 ): number {
@@ -629,7 +629,7 @@ const previewOffsetByUnitId = computed<Record<string, Point>>(() => {
   if (!row) return {}
   const rowUnits = row.unitIds
     .map(unitId => scene.value.units.find(unit => unit.id === unitId))
-    .filter((unit): unit is RootLayoutScene['units'][number] => unit !== undefined)
+    .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
   const rowGap = rowUnits.slice(1).reduce<number | null>((minimum, unit, index) => {
     const previous = rowUnits[index]
     const gap = unit.rect.x - previous.rect.x - previous.rect.width
@@ -700,7 +700,7 @@ function rootDomainPreviewOffsets(state: RootDomainDragState): Record<string, Po
   }))
 }
 
-function dragOffsetForUnit(unit: RootLayoutScene['units'][number]): Point | undefined {
+function dragOffsetForUnit(unit: LayoutScene['units'][number]): Point | undefined {
   const state = dragState.value
   if (state === null) return undefined
   if (state.mode === 'root-domain') {
@@ -711,7 +711,7 @@ function dragOffsetForUnit(unit: RootLayoutScene['units'][number]): Point | unde
   return state.unitId === unit.id ? { x: state.dx, y: state.dy } : undefined
 }
 
-function isUnitDragging(unit: RootLayoutScene['units'][number]): boolean {
+function isUnitDragging(unit: LayoutScene['units'][number]): boolean {
   const state = dragState.value
   return state?.mode === 'root-domain'
     ? unit.domainId === state.domainId

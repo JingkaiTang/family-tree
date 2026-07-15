@@ -16,7 +16,7 @@ import {
   preparedWideThreeFamiliesLayout,
   rectContains,
 } from './rootLayoutTestHelpers'
-import type { Rect, RootSceneGeometry } from './types'
+import type { Rect, SceneGeometry } from './types'
 
 describe('placeRootDomains', () => {
   it('allocates non-interleaving root intervals with visible whitespace', () => {
@@ -181,7 +181,7 @@ describe('placeRootDomains', () => {
       parentageGroups: [],
     })
 
-    expect(scene).toEqual<RootSceneGeometry>({
+    expect(scene).toEqual<SceneGeometry>({
       units: [],
       cards: [],
       hubs: [],

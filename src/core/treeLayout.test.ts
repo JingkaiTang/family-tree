@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createEmptyFamily, type FamilyData, type Member } from './schema'
 import { layoutFamilyTree } from './treeLayout'
 import {
+  threeRootChainFamily,
   twoDisconnectedRootComponents,
   twoRootMarriageFamilyData,
 } from '@/__tests__/fixtures/families'
@@ -120,6 +121,24 @@ describe('layoutFamilyTree', () => {
     })
 
     expect(withViewpoint).toEqual(baseline)
+  })
+
+  it('routes one parent family to children in both root and bridge domains', async () => {
+    const family = threeRootChainFamily()
+    const scene = await layoutFamilyTree(Object.values(family))
+    const childDomainIds = new Set(['a-child-1', 'a-child-2'].map(personId => {
+      const card = scene.cards.find(value => value.id === personId)!
+      return scene.units.find(unit => unit.id === card.unitId)!.domainId
+    }))
+
+    expect(childDomainIds.size).toBe(2)
+    expect(scene.routes).toContainEqual(expect.objectContaining({
+      routeOwnerId: 'parentage:a-root-a+a-root-b',
+      kind: 'primary',
+    }))
+    expect(scene.diagnostics.filter(value => (
+      value.code === 'UNROUTABLE_PRIMARY_EDGE'
+    ))).toEqual([])
   })
 
   it('returns one card per member and safe family-unit geometry', async () => {

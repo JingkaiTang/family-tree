@@ -189,6 +189,116 @@ export function denseBridgeFamily(): Record<string, Member> {
   return m
 }
 
+/** 单根三代，第二代包含两个夫妻家庭和多个子女。 */
+export function singleRootThreeGenerationFamily(): Record<string, Member> {
+  const members = Object.fromEntries([
+    'root-a', 'root-b',
+    'branch-a', 'branch-a-spouse', 'branch-b', 'branch-b-spouse',
+    'grandchild-a-1', 'grandchild-a-2', 'grandchild-b-1',
+  ].map(id => [id, mk(id)]))
+  addSpouse(members['root-a'], members['root-b'])
+  for (const branchId of ['branch-a', 'branch-b']) {
+    addParent(members[branchId], members['root-a'])
+    addParent(members[branchId], members['root-b'])
+    addSpouse(members[branchId], members[`${branchId}-spouse`])
+  }
+  for (const childId of ['grandchild-a-1', 'grandchild-a-2']) {
+    addParent(members[childId], members['branch-a'])
+    addParent(members[childId], members['branch-a-spouse'])
+  }
+  addParent(members['grandchild-b-1'], members['branch-b'])
+  addParent(members['grandchild-b-1'], members['branch-b-spouse'])
+  return members
+}
+
+/** 三个可见根通过 A-B、B-C 两组婚姻形成链。 */
+export function threeRootChainFamily(): Record<string, Member> {
+  const members = threeRootCores(2)
+  addSpouse(members['a-child-1'], members['b-child-1'])
+  addSpouse(members['b-child-2'], members['c-child-1'])
+  return members
+}
+
+/** 三个可见根通过 A-B、B-C、C-A 三组婚姻形成环。 */
+export function threeRootRingFamily(): Record<string, Member> {
+  const members = threeRootCores(2)
+  addSpouse(members['a-child-1'], members['b-child-1'])
+  addSpouse(members['b-child-2'], members['c-child-1'])
+  addSpouse(members['c-child-2'], members['a-child-2'])
+  return members
+}
+
+/** {A,B} 与 {B,C} 的后代结婚，下一代根签名应为 {A,B,C}。 */
+export function overlappingRootSignatureFamily(): Record<string, Member> {
+  const members = threeRootCores(2)
+  const ab = mk('ab-child')
+  const bc = mk('bc-child')
+  const abc = mk('abc-child')
+  addSpouse(members['a-child-1'], members['b-child-1'])
+  addParent(ab, members['a-child-1'])
+  addParent(ab, members['b-child-1'])
+  addSpouse(members['b-child-2'], members['c-child-1'])
+  addParent(bc, members['b-child-2'])
+  addParent(bc, members['c-child-1'])
+  addSpouse(ab, bc)
+  addParent(abc, ab)
+  addParent(abc, bc)
+  members[ab.id] = ab
+  members[bc.id] = bc
+  members[abc.id] = abc
+  return members
+}
+
+/** 没有上游祖先的嫁入/娶入成员不应成为独立根。 */
+export function incomingSpouseFamily(): Record<string, Member> {
+  const members = Object.fromEntries([
+    'root-a', 'root-b', 'descendant', 'incoming', 'child',
+  ].map(id => [id, mk(id)]))
+  addSpouse(members['root-a'], members['root-b'])
+  addParent(members.descendant, members['root-a'])
+  addParent(members.descendant, members['root-b'])
+  addSpouse(members.descendant, members.incoming)
+  addParent(members.child, members.descendant)
+  addParent(members.child, members.incoming)
+  return members
+}
+
+/** 两侧祖先记录深度不一致，但双方仍各自保留可见根。 */
+export function unequalDepthRootsFamily(): Record<string, Member> {
+  const members = Object.fromEntries([
+    'a-root-a', 'a-root-b', 'a-middle', 'a-child',
+    'b-root-a', 'b-root-b', 'b-child',
+  ].map(id => [id, mk(id)]))
+  addSpouse(members['a-root-a'], members['a-root-b'])
+  addParent(members['a-middle'], members['a-root-a'])
+  addParent(members['a-middle'], members['a-root-b'])
+  addParent(members['a-child'], members['a-middle'])
+  addSpouse(members['b-root-a'], members['b-root-b'])
+  addParent(members['b-child'], members['b-root-a'])
+  addParent(members['b-child'], members['b-root-b'])
+  addSpouse(members['a-child'], members['b-child'])
+  return members
+}
+
+/** 收养参与主根签名；继亲、历史配偶和干亲只进入辅助层。 */
+export function auxiliaryRelationsFamily(): Record<string, Member> {
+  const members = Object.fromEntries([
+    'parent-a', 'parent-b', 'historical', 'step-parent',
+    'blood-child', 'adopted-child', 'godparent',
+  ].map(id => [id, mk(id)]))
+  addSpouse(members['parent-a'], members['parent-b'])
+  members['parent-a'].spouses.push({ id: 'historical', type: 'divorced' })
+  members.historical.spouses.push({ id: 'parent-a', type: 'divorced' })
+  addParent(members['blood-child'], members['parent-a'])
+  addParent(members['blood-child'], members['parent-b'])
+  addParent(members['blood-child'], members['step-parent'], 'step')
+  addParent(members['adopted-child'], members['parent-a'], 'adopted')
+  addParent(members['adopted-child'], members['parent-b'], 'adopted')
+  members['blood-child'].godparents.push({ id: 'godparent', type: 'godparent' })
+  members.godparent.godchildren.push({ id: 'blood-child', type: 'godchild' })
+  return members
+}
+
 export function twoRootMarriageFamilyData(): FamilyData {
   const members: Record<string, Member> = {
     'a-root-a': mk('a-root-a'),
@@ -343,6 +453,24 @@ function siblingCorePair(childCount: number): Record<string, Member> {
       const child = mk(`${core}-child-${index}`, {
         birthDate: `${1975 + index}-01-01`,
       })
+      addParent(child, parentA)
+      addParent(child, parentB)
+      members[child.id] = child
+    }
+  }
+  return members
+}
+
+function threeRootCores(childCount: number): Record<string, Member> {
+  const members: Record<string, Member> = {}
+  for (const rootId of ['a', 'b', 'c']) {
+    const parentA = mk(`${rootId}-root-a`)
+    const parentB = mk(`${rootId}-root-b`)
+    addSpouse(parentA, parentB)
+    members[parentA.id] = parentA
+    members[parentB.id] = parentB
+    for (let index = 1; index <= childCount; index += 1) {
+      const child = mk(`${rootId}-child-${index}`)
       addParent(child, parentA)
       addParent(child, parentB)
       members[child.id] = child

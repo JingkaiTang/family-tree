@@ -1,6 +1,6 @@
 import {
   familyUnitWidth,
-  materializeRootSceneGeometry,
+  materializeSceneGeometry,
 } from './materializeSceneGeometry'
 import type {
   LayoutDiagnostic,
@@ -8,10 +8,10 @@ import type {
   LayoutMetrics,
   ParentageGroup,
   PlacedLayoutDomain,
-  PlacedRootedFamilyUnit,
+  PlacedFamilyUnit,
   PlacedRow,
   RootedFamilyUnit,
-  RootLayoutScene,
+  LayoutScene,
 } from './types'
 
 export function buildSafeFallbackScene(
@@ -20,11 +20,11 @@ export function buildSafeFallbackScene(
   parentageGroups: ParentageGroup[],
   metrics: LayoutMetrics,
   diagnostics: LayoutDiagnostic[],
-): RootLayoutScene {
+): LayoutScene {
   const { units, domains } = reconcileFallbackDomains(inputUnits, inputDomains)
   if (units.length === 0) {
     return {
-      ...materializeRootSceneGeometry({
+      ...materializeSceneGeometry({
         placedUnits: [],
         placedDomains: [],
         rows: [],
@@ -90,7 +90,7 @@ export function buildSafeFallbackScene(
     domainX += width
   }
   const domainById = new Map(placedDomains.map(domain => [domain.id, domain]))
-  const placedUnits: PlacedRootedFamilyUnit[] = rows.flatMap(row => {
+  const placedUnits: PlacedFamilyUnit[] = rows.flatMap(row => {
     const domain = domainById.get(row.domainId)
     if (domain === undefined) return []
     let nextX = domain.rect.x + metrics.gridSize
@@ -98,7 +98,7 @@ export function buildSafeFallbackScene(
       const unit = unitById.get(unitId)
       if (unit === undefined) return []
       const width = familyUnitWidth(unit, metrics)
-      const placed: PlacedRootedFamilyUnit = {
+      const placed: PlacedFamilyUnit = {
         ...unit,
         memberIds: [...unit.memberIds],
         rootSignature: [...unit.rootSignature],
@@ -120,7 +120,7 @@ export function buildSafeFallbackScene(
     unit.rect.y + unit.rect.height
   )))
   placedDomains.forEach(domain => { domain.rect.height = bottom })
-  const geometry = materializeRootSceneGeometry({
+  const geometry = materializeSceneGeometry({
     placedUnits,
     placedDomains,
     rows,

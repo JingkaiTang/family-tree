@@ -291,6 +291,11 @@ function rowGeometry(ids: string[]): SceneGeometry {
     width: 168,
     lineageAffinity: {},
     accent: '#111111',
+    rootSignature: ['root:test'],
+    domainId: 'domain:root:test',
+    memberRootIds: { [id]: 'root:test' },
+    rootAccent: '#4F7CAC',
+    isRootFamily: false,
     rect: { x: index * 288, y: 0, width: 168, height: 216 },
     order: index,
   }))
@@ -304,6 +309,21 @@ function rowGeometry(ids: string[]): SceneGeometry {
     })),
     hubs: [],
     rows: [{ id: 'row:0', generation: 0, unitIds: units.map(unit => unit.id) }],
+    rootDomains: [{
+      id: 'domain:root:test',
+      kind: 'root',
+      componentId: 'component:test',
+      rootIds: ['root:test'],
+      signature: ['root:test'],
+      personIds: [...ids],
+      unitIds: units.map(unit => unit.id),
+      order: 0,
+      accent: '#4F7CAC',
+      rect: { x: 0, y: 0, width: Math.max(168, ids.length * 288), height: 216 },
+      columnStart: 0,
+      columnEnd: Math.max(6, ids.length * 12 - 1),
+    }],
+    bridgeDomains: [],
     bounds: { x: 0, y: 0, width: Math.max(0, ids.length * 288 - 120), height: 216 },
   }
 }

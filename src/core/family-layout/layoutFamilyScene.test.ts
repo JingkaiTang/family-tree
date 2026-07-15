@@ -7,7 +7,7 @@ import {
   DEFAULT_LAYOUT_METRICS,
   EMPTY_LAYOUT_PREFERENCES,
 } from './types'
-import type { FamilyFacts, LayoutRequest, Rect, RootLayoutScene } from './types'
+import type { FamilyFacts, LayoutRequest, LayoutScene, Rect } from './types'
 
 describe('layoutFamilyScene', () => {
   it('returns an empty zero-sized scene for empty input', () => {
@@ -252,7 +252,7 @@ function ancestorLineage(withAncestor: boolean) {
   return [newA0, newA0Spouse, a0, a0Spouse, a1]
 }
 
-function componentGeometry(scene: RootLayoutScene, componentId: string) {
+function componentGeometry(scene: LayoutScene, componentId: string) {
   const domains = [...scene.rootDomains, ...scene.bridgeDomains]
     .filter(domain => domain.componentId === componentId)
   const domainIds = new Set(domains.map(domain => domain.id))
@@ -268,7 +268,7 @@ function centerX(rect: Rect): number {
   return rect.x + rect.width / 2
 }
 
-function unsafeDiagnostics(scene: RootLayoutScene) {
+function unsafeDiagnostics(scene: LayoutScene) {
   const unsafeCodes = new Set([
     'NODE_OVERLAP',
     'CROSS_FAMILY_SEGMENT_OVERLAP',
@@ -279,7 +279,7 @@ function unsafeDiagnostics(scene: RootLayoutScene) {
   return scene.diagnostics.filter(value => unsafeCodes.has(value.code))
 }
 
-function expectNoOverlap(scene: RootLayoutScene) {
+function expectNoOverlap(scene: LayoutScene) {
   expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
   expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
 }

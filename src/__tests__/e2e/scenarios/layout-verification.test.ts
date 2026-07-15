@@ -1,39 +1,57 @@
 import { describe, expect, it } from 'vitest'
 import {
+  auxiliaryRelationsFamily,
   crossMarriedSiblingsFamily,
   denseBridgeFamily,
+  incomingSpouseFamily,
   largeFamily,
   manySameGenerationFamilies,
   multiHistoricalUnionFamily,
   multiUnionFamily,
+  overlappingRootSignatureFamily,
   parentageCycleFamily,
   pedigreeCollapseFamily,
+  singleRootThreeGenerationFamily,
+  threeRootChainFamily,
+  threeRootRingFamily,
+  twoDisconnectedRootComponents,
+  twoRootMarriageFamilyData,
+  unequalDepthRootsFamily,
 } from '@/__tests__/fixtures/families'
-import { layoutFamilyTree } from '@/core/treeLayout'
-import { createEmptyFamily, type Member } from '@/core/schema'
-import { normalizeFacts } from '@/core/family-layout/normalizeFacts'
-import { projectView } from '@/core/family-layout/projectView'
-import { buildFamilyUnits } from '@/core/family-layout/buildFamilyUnits'
-import { assignGenerations } from '@/core/family-layout/assignGenerations'
-import { clusterLineages } from '@/core/family-layout/clusterLineages'
+import { layoutFamilyTree, type LayoutScene } from '@/core/treeLayout'
+import type { Member } from '@/core/schema'
 import { positiveCollinearOverlap } from '@/core/family-layout/testHelpers'
 import {
-  DEFAULT_FAMILY_VIEW_POLICY,
   DEFAULT_LAYOUT_METRICS,
-  EMPTY_LAYOUT_PREFERENCES,
 } from '@/core/family-layout/types'
+import { validateScene } from '@/core/family-layout/validateScene'
 
 const UNSAFE_DIAGNOSTIC_CODES = new Set([
   'NODE_OVERLAP',
   'CROSS_FAMILY_SEGMENT_OVERLAP',
   'UNROUTABLE_PRIMARY_EDGE',
+  'INVALID_ROOT_DOMAIN_ASSIGNMENT',
+  'ROOT_DOMAIN_INTRUSION',
 ])
 
-const fixtures: Array<[string, () => Record<string, Member>]> = [
+const smallFixtures: Array<[string, () => Record<string, Member>]> = [
+  ['single root, three generations', singleRootThreeGenerationFamily],
+  ['one cross-root marriage', () => twoRootMarriageFamilyData().members],
   ['cross-married siblings', crossMarriedSiblingsFamily],
   ['dense bridge family', denseBridgeFamily],
+  ['three-root chain', threeRootChainFamily],
+  ['three-root ring', threeRootRingFamily],
+  ['overlapping root signatures', overlappingRootSignatureFamily],
   ['pedigree collapse', pedigreeCollapseFamily],
+  ['unexpanded incoming spouse', incomingSpouseFamily],
+  ['unequal root depth', unequalDepthRootsFamily],
+  ['adoption and auxiliary relations', auxiliaryRelationsFamily],
+  ['disconnected components', () => twoDisconnectedRootComponents().members],
   ['many same-generation families', () => manySameGenerationFamilies(5)],
+]
+
+const fixtures: Array<[string, () => Record<string, Member>]> = [
+  ...smallFixtures,
   ['large deterministic family', () => largeFamily(20260711, 500)],
 ]
 
@@ -42,11 +60,19 @@ describe('public family layout invariants', () => {
     const members = Object.values(fixture())
     const scene = await layoutFamilyTree(members)
 
-    expect(scene.cards).toHaveLength(members.length)
-    expect(new Set(scene.cards.map(card => card.id)).size).toBe(scene.cards.length)
-    expect(scene.diagnostics.filter(diagnostic => (
-      UNSAFE_DIAGNOSTIC_CODES.has(diagnostic.code)
-    ))).toEqual([])
+    expectValidRootLayout(scene, members.map(member => member.id))
+  })
+
+  it.each(smallFixtures)('is deterministic under input permutations for %s', async (
+    _name,
+    fixture,
+  ) => {
+    const members = Object.values(fixture())
+    const baseline = await layoutFamilyTree(permutedMembers(members, 0))
+
+    expect(await layoutFamilyTree(permutedMembers(members, 1))).toEqual(baseline)
+    expect(await layoutFamilyTree(permutedMembers(members, 2))).toEqual(baseline)
+    expect(await layoutFamilyTree(permutedMembers(members, 0))).toEqual(baseline)
   })
 
   it('retains both cards and diagnoses a parentage cycle', async () => {
@@ -153,11 +179,12 @@ describe('public family layout invariants', () => {
     expect(scene.routes.filter(route => route.kind === 'historical-partnership')).toHaveLength(2)
   })
 
-  it('wires cross-married siblings into a bridge cluster through the real pipeline', () => {
-    const clusters = clustersFor(crossMarriedSiblingsFamily())
+  it('places multiple sparse cross-root marriages in one bridge band', async () => {
+    const scene = await layoutFamilyTree(Object.values(crossMarriedSiblingsFamily()))
 
-    expect(clusters.filter(cluster => cluster.kind === 'bridge')).toEqual([
+    expect(scene.bridgeDomains).toEqual([
       expect.objectContaining({
+        kind: 'pair-bridge',
         unitIds: expect.arrayContaining([
           'unit:partnership:current:a-child-1+b-child-1',
           'unit:partnership:current:a-child-2+b-child-2',
@@ -166,15 +193,53 @@ describe('public family layout invariants', () => {
     ])
   })
 
-  it('wires three dense bridges into a supercomponent through the real pipeline', () => {
-    const clusters = clustersFor(denseBridgeFamily())
+  it('uses a multi-root island for rings and overlapping signatures', async () => {
+    const ring = await layoutFamilyTree(Object.values(threeRootRingFamily()))
+    const overlapping = await layoutFamilyTree(
+      Object.values(overlappingRootSignatureFamily()),
+    )
+    const mergedUnit = overlapping.units.find(unit => (
+      unit.id === 'unit:partnership:current:ab-child+bc-child'
+    ))!
 
-    expect(clusters.some(cluster => (
-      cluster.kind === 'supercomponent'
-      && cluster.unitIds.includes('unit:partnership:current:a-child-1+b-child-1')
-      && cluster.unitIds.includes('unit:partnership:current:a-child-2+b-child-2')
-      && cluster.unitIds.includes('unit:partnership:current:a-child-3+b-child-3')
+    expect(ring.bridgeDomains).toEqual([
+      expect.objectContaining({ kind: 'multi-root-island' }),
+    ])
+    expect(mergedUnit.rootSignature).toHaveLength(3)
+    expect(overlapping.bridgeDomains.some(domain => (
+      domain.id === mergedUnit.domainId && domain.rootIds.length === 3
     ))).toBe(true)
+  })
+
+  it('keeps same-root marriage local and suppresses an incoming spouse root', async () => {
+    const sameRoot = await layoutFamilyTree(Object.values(pedigreeCollapseFamily()))
+    const incoming = await layoutFamilyTree(Object.values(incomingSpouseFamily()))
+
+    expect(sameRoot.bridgeDomains).toEqual([])
+    expect(incoming.rootDomains).toHaveLength(1)
+    expect(incoming.bridgeDomains).toEqual([])
+  })
+
+  it('adds auxiliary routes without changing primary geometry or routing', async () => {
+    const members = Object.values(auxiliaryRelationsFamily())
+    const baseline = await layoutFamilyTree(members)
+    const focused = await layoutFamilyTree(members, {
+      view: {
+        showHistoricalPartnerships: true,
+        showSecondaryParentage: true,
+        showGodparentRelations: true,
+      },
+      auxiliaryFocusPersonId: 'blood-child',
+    })
+
+    expect(primaryGeometry(focused)).toEqual(primaryGeometry(baseline))
+    expect(focused.routes.filter(route => route.kind === 'primary'))
+      .toEqual(baseline.routes.filter(route => route.kind === 'primary'))
+    expect(new Set(focused.routes.filter(route => route.kind !== 'primary')
+      .map(route => route.kind))).toEqual(new Set([
+      'secondary-parentage',
+      'godparent',
+    ]))
   })
 })
 
@@ -231,24 +296,6 @@ describe('largeFamily fixture', () => {
   })
 })
 
-function clustersFor(family: Record<string, Member>) {
-  const data = createEmptyFamily()
-  data.members = family
-  const normalized = normalizeFacts(data)
-  const projected = projectView(normalized.facts, DEFAULT_FAMILY_VIEW_POLICY)
-  const built = buildFamilyUnits(
-    projected,
-    EMPTY_LAYOUT_PREFERENCES,
-    DEFAULT_LAYOUT_METRICS,
-  )
-  const assigned = assignGenerations(projected, built)
-  const units = built.units.map(unit => ({
-    ...unit,
-    generation: assigned.generationByUnitId[unit.id] ?? 0,
-  }))
-  return clusterLineages(projected, units, built.parentageGroups)
-}
-
 function routeHasEndpoint(
   route: { segments: Array<{ points: Array<{ x: number; y: number }> }> },
   point: { x: number; y: number },
@@ -258,6 +305,91 @@ function routeHasEndpoint(
       endpoint.x === point.x && endpoint.y === point.y
     ))
   ))
+}
+
+function expectValidRootLayout(scene: LayoutScene, expectedPersonIds: string[]) {
+  expect(scene.cards.map(card => card.id).sort()).toEqual([...expectedPersonIds].sort())
+  expect(new Set(scene.cards.map(card => card.id)).size).toBe(expectedPersonIds.length)
+  expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
+  expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
+  const domains = [...scene.rootDomains, ...scene.bridgeDomains]
+  for (const unit of scene.units) {
+    const containing = domains.filter(domain => rectContains(domain.rect, unit.rect))
+    expect(containing.map(domain => domain.id)).toEqual([unit.domainId])
+  }
+  const orderedRoots = [...scene.rootDomains].sort((left, right) => (
+    left.rect.x - right.rect.x || left.id.localeCompare(right.id)
+  ))
+  for (let index = 1; index < orderedRoots.length; index += 1) {
+    expect(orderedRoots[index - 1].rect.x + orderedRoots[index - 1].rect.width)
+      .toBeLessThanOrEqual(orderedRoots[index].rect.x)
+  }
+  if (scene.routes.length < 100) {
+    for (let left = 0; left < scene.routes.length; left += 1) {
+      for (let right = left + 1; right < scene.routes.length; right += 1) {
+        if (scene.routes[left].routeOwnerId === scene.routes[right].routeOwnerId) continue
+        for (const leftSegment of scene.routes[left].segments) {
+          for (const rightSegment of scene.routes[right].segments) {
+            expect(positiveCollinearOverlap(leftSegment, rightSegment)).toBe(false)
+          }
+        }
+      }
+    }
+  }
+  expect(scene.diagnostics.filter(diagnostic => (
+    UNSAFE_DIAGNOSTIC_CODES.has(diagnostic.code)
+  ))).toEqual([])
+  expect(validateScene(scene, DEFAULT_LAYOUT_METRICS)).toEqual([])
+}
+
+function permutedMembers(members: Member[], variant: number): Member[] {
+  const cloned = structuredClone(members).map(member => ({
+    ...member,
+    parents: [...member.parents].reverse(),
+    children: [...member.children].reverse(),
+    siblings: [...member.siblings].reverse(),
+    spouses: [...member.spouses].reverse(),
+    godparents: [...member.godparents].reverse(),
+    godchildren: [...member.godchildren].reverse(),
+  }))
+  if (variant === 1) return cloned.reverse()
+  if (variant === 2 && cloned.length > 1) return [...cloned.slice(1), cloned[0]]
+  return cloned
+}
+
+function rectContains(
+  outer: { x: number; y: number; width: number; height: number },
+  inner: { x: number; y: number; width: number; height: number },
+): boolean {
+  return inner.x >= outer.x
+    && inner.y >= outer.y
+    && inner.x + inner.width <= outer.x + outer.width
+    && inner.y + inner.height <= outer.y + outer.height
+}
+
+function hasOverlappingRects(
+  rects: Array<{ x: number; y: number; width: number; height: number }>,
+): boolean {
+  return rects.some((left, leftIndex) => rects.some((right, rightIndex) => (
+    leftIndex < rightIndex
+    && left.x < right.x + right.width
+    && left.x + left.width > right.x
+    && left.y < right.y + right.height
+    && left.y + left.height > right.y
+  )))
+}
+
+function primaryGeometry(scene: LayoutScene) {
+  return {
+    units: scene.units,
+    cards: scene.cards,
+    hubs: scene.hubs,
+    rows: scene.rows,
+    rootDomains: scene.rootDomains,
+    bridgeDomains: scene.bridgeDomains,
+    gateways: scene.gateways,
+    bounds: scene.bounds,
+  }
 }
 
 function parentageKey(member: Member): string {

@@ -8,7 +8,7 @@ import FamilyUnit from '@/components/tree/FamilyUnit.vue'
 import { mk } from '@/__tests__/fixtures/families'
 import type {
   PlacedPersonCard,
-  PlacedRootedFamilyUnit,
+  PlacedFamilyUnit,
   PlacedUnionHub,
 } from '@/core/family-layout/types'
 
@@ -44,7 +44,7 @@ describe('FamilyUnit root identity', () => {
 })
 
 function mountFamilyUnit(
-  unit: PlacedRootedFamilyUnit,
+  unit: PlacedFamilyUnit,
   rootAccentById: Record<string, string> = { 'root:a': LEFT_ACCENT },
 ) {
   const cards: PlacedPersonCard[] = unit.memberIds.map((id, index) => ({
@@ -76,7 +76,7 @@ function mountFamilyUnit(
   })
 }
 
-function rootFamilyUnit(): PlacedRootedFamilyUnit {
+function rootFamilyUnit(): PlacedFamilyUnit {
   return {
     id: 'unit:root-family',
     kind: 'couple',
@@ -95,7 +95,7 @@ function rootFamilyUnit(): PlacedRootedFamilyUnit {
   }
 }
 
-function crossRootFamilyUnit(): PlacedRootedFamilyUnit {
+function crossRootFamilyUnit(): PlacedFamilyUnit {
   return {
     ...rootFamilyUnit(),
     id: 'unit:cross-root-family',

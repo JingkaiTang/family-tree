@@ -5,14 +5,13 @@ import type {
   PlacedLayoutDomain,
   Point,
   Rect,
-  RootLayoutScene,
   RouteGateway,
   RoutedFamilyEdge,
   RouteSegment,
 } from './types'
 
 export function validateScene(
-  scene: LayoutScene | RootLayoutScene,
+  scene: LayoutScene,
   metrics: LayoutMetrics,
 ): LayoutDiagnostic[] {
   const diagnostics: LayoutDiagnostic[] = []
@@ -26,7 +25,7 @@ export function validateScene(
     ids: sortedIds(left.id, right.id),
     message: `Family units ${sortedIds(left.id, right.id).join(' and ')} overlap`,
   }))
-  if (isRootLayoutScene(scene)) validateRootedGeometry(scene, diagnostics)
+  validateRootedGeometry(scene, diagnostics)
   const routeGeometry = scene.routes.map(route => ({
     bounds: routeBounds(route),
     segmentBounds: route.segments.map(segment => pointsBounds(segment.points)),
@@ -58,7 +57,7 @@ export function validateScene(
 }
 
 function validateRootedGeometry(
-  scene: RootLayoutScene,
+  scene: LayoutScene,
   diagnostics: LayoutDiagnostic[],
 ): void {
   const domains = [...scene.rootDomains, ...scene.bridgeDomains]
@@ -168,14 +167,6 @@ function rectContains(outer: Rect, inner: Rect): boolean {
     && inner.y >= outer.y
     && inner.x + inner.width <= outer.x + outer.width
     && inner.y + inner.height <= outer.y + outer.height
-}
-
-function isRootLayoutScene(
-  scene: LayoutScene | RootLayoutScene,
-): scene is RootLayoutScene {
-  return 'rootDomains' in scene
-    && 'bridgeDomains' in scene
-    && 'gateways' in scene
 }
 
 function validateRouteTerminals(

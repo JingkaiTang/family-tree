@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type {
   PlacedPersonCard,
-  PlacedRootedFamilyUnit,
+  PlacedFamilyUnit,
   PlacedUnionHub,
   Point,
 } from '@/core/family-layout/types'
@@ -10,7 +10,7 @@ import type { Member } from '@/core/schema'
 import MemberNode from './MemberNode.vue'
 
 const props = defineProps<{
-  unit: PlacedRootedFamilyUnit
+  unit: PlacedFamilyUnit
   cards: PlacedPersonCard[]
   members: Member[]
   hubs: PlacedUnionHub[]

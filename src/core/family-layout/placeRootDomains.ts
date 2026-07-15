@@ -1,16 +1,16 @@
 import {
   familyUnitWidth,
-  materializeRootSceneGeometry,
+  materializeSceneGeometry,
 } from './materializeSceneGeometry'
 import type {
   LayoutDomain,
   ParentageGroup,
   PlaceRootDomainsInput,
   PlacedLayoutDomain,
-  PlacedRootedFamilyUnit,
+  PlacedFamilyUnit,
   PlacedRow,
   RootedFamilyUnit,
-  RootSceneGeometry,
+  SceneGeometry,
 } from './types'
 
 interface ParentageEdge {
@@ -25,9 +25,9 @@ interface DomainRow extends PlacedRow {
 
 export function placeRootDomains(
   input: PlaceRootDomainsInput,
-): RootSceneGeometry {
+): SceneGeometry {
   if (input.units.length === 0 || input.domains.length === 0) {
-    return materializeRootSceneGeometry({
+    return materializeSceneGeometry({
       placedUnits: [],
       placedDomains: [],
       rows: [],
@@ -89,7 +89,7 @@ export function placeRootDomains(
     rect: { ...domain.rect, height: bottom },
   }))
 
-  return materializeRootSceneGeometry({
+  return materializeSceneGeometry({
     placedUnits,
     placedDomains,
     rows,
@@ -307,7 +307,7 @@ function collectChangedComponentIds(
     componentIdByDomainId.set(domain.id, domain.componentId)
   }
   const changedComponentIds = new Set<string>()
-  const addUnitComponent = (unit: RootedFamilyUnit | PlacedRootedFamilyUnit) => {
+  const addUnitComponent = (unit: RootedFamilyUnit | PlacedFamilyUnit) => {
     if (
       !changedIds.has(unit.id)
       && !unit.memberIds.some(personId => changedIds.has(personId))
@@ -456,7 +456,7 @@ function placeInitialRows(
   domainById: ReadonlyMap<string, PlacedLayoutDomain>,
   firstGeneration: number,
   input: PlaceRootDomainsInput,
-): PlacedRootedFamilyUnit[] {
+): PlacedFamilyUnit[] {
   return rows.flatMap(row => {
     const domain = domainById.get(row.domainId)
     const rowUnits = row.unitIds
@@ -472,7 +472,7 @@ function placeInitialRows(
     )
     return rowUnits.map((unit, order) => {
       const width = widths[order]
-      const placed: PlacedRootedFamilyUnit = {
+      const placed: PlacedFamilyUnit = {
         ...unit,
         memberIds: [...unit.memberIds],
         rootSignature: [...unit.rootSignature],
@@ -493,7 +493,7 @@ function placeInitialRows(
 }
 
 function centerParentChildBranches(
-  units: PlacedRootedFamilyUnit[],
+  units: PlacedFamilyUnit[],
   rows: DomainRow[],
   edges: ParentageEdge[],
   domainById: ReadonlyMap<string, PlacedLayoutDomain>,
@@ -521,7 +521,7 @@ function centerParentChildBranches(
       const source = unitById.get(sourceId)
       const children = childIds
         .map(childId => unitById.get(childId))
-        .filter((unit): unit is PlacedRootedFamilyUnit => unit !== undefined)
+        .filter((unit): unit is PlacedFamilyUnit => unit !== undefined)
       if (source === undefined || children.length === 0) continue
       const childLeft = Math.min(...children.map(child => child.rect.x))
       const childRight = Math.max(...children.map(child => (
@@ -554,7 +554,7 @@ function centerParentChildBranches(
       if (domain === undefined) continue
       const rowUnits = row.unitIds
         .map(unitId => unitById.get(unitId))
-        .filter((unit): unit is PlacedRootedFamilyUnit => unit !== undefined)
+        .filter((unit): unit is PlacedFamilyUnit => unit !== undefined)
       normalizeRowInsideDomain(rowUnits, domain, input)
     }
   }
@@ -568,7 +568,7 @@ function centerParentChildBranches(
 }
 
 function normalizeRowInsideDomain(
-  units: PlacedRootedFamilyUnit[],
+  units: PlacedFamilyUnit[],
   domain: PlacedLayoutDomain,
   input: PlaceRootDomainsInput,
 ): void {
@@ -727,7 +727,7 @@ function addDesiredCenter(
   centersByUnitId.set(unitId, centers)
 }
 
-function centerX(unit: PlacedRootedFamilyUnit): number {
+function centerX(unit: PlacedFamilyUnit): number {
   return unit.rect.x + unit.rect.width / 2
 }
 

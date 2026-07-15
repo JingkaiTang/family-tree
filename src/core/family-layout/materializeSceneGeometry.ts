@@ -1,15 +1,12 @@
 import type {
   FamilyUnit,
   LayoutMetrics,
-  OrderedGeneration,
   ParentageGroup,
   PlacedFamilyUnit,
   PlacedLayoutDomain,
   PlacedPersonCard,
-  PlacedRootedFamilyUnit,
   PlacedRow,
   PlacedUnionHub,
-  RootSceneGeometry,
   SceneGeometry,
 } from './types'
 
@@ -21,13 +18,6 @@ export function familyUnitWidth(unit: FamilyUnit, metrics: LayoutMetrics): numbe
 
 export interface MaterializeSceneGeometryInput {
   placedUnits: PlacedFamilyUnit[]
-  rows: OrderedGeneration[]
-  parentageGroups: ParentageGroup[]
-  metrics: LayoutMetrics
-}
-
-export interface MaterializeRootSceneGeometryInput {
-  placedUnits: PlacedRootedFamilyUnit[]
   placedDomains: PlacedLayoutDomain[]
   rows: PlacedRow[]
   parentageGroups: ParentageGroup[]
@@ -37,47 +27,6 @@ export interface MaterializeRootSceneGeometryInput {
 export function materializeSceneGeometry(
   input: MaterializeSceneGeometryInput,
 ): SceneGeometry {
-  if (input.placedUnits.length === 0) {
-    return {
-      units: [],
-      cards: [],
-      hubs: [],
-      rows: [],
-      bounds: { x: 0, y: 0, width: 0, height: 0 },
-    }
-  }
-
-  const units = clonePlacedUnits(input.placedUnits)
-  const rows = materializeRows(
-    input.rows.map(row => ({
-      id: `row:${row.generation}`,
-      generation: row.generation,
-      unitIds: row.unitIds,
-    })),
-    units,
-  )
-  const cards = materializeCards(units, input.metrics)
-  const hubs = materializeHubs(
-    units,
-    cards,
-    input.parentageGroups,
-    input.metrics,
-  )
-  const right = Math.max(...units.map(unit => unit.rect.x + unit.rect.width))
-  const bottom = Math.max(...units.map(unit => unit.rect.y + unit.rect.height))
-
-  return {
-    units,
-    cards,
-    hubs,
-    rows,
-    bounds: { x: 0, y: 0, width: right, height: bottom },
-  }
-}
-
-export function materializeRootSceneGeometry(
-  input: MaterializeRootSceneGeometryInput,
-): RootSceneGeometry {
   if (input.placedUnits.length === 0) {
     return {
       units: [],

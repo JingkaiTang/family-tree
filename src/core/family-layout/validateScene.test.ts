@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { validateScene } from './validateScene'
+import { validateScene as validateLayoutScene } from './validateScene'
 import { placeRootDomains } from './placeRootDomains'
 import { preparedTwoRootLayout } from './rootLayoutTestHelpers'
 import { routeFamilyLanes } from './routeFamilyLanes'
-import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type RoutedFamilyEdge } from './types'
+import {
+  DEFAULT_LAYOUT_METRICS,
+  type LayoutMetrics,
+  type LayoutScene,
+  type RoutedFamilyEdge,
+} from './types'
 
 describe('validateScene', () => {
+  it('rejects non-empty geometry without a matching layout domain', () => {
+    const scene = baseScene()
+
+    expect(validateLayoutScene(scene, DEFAULT_LAYOUT_METRICS).filter(value => (
+      value.code === 'ROOT_DOMAIN_INTRUSION'
+    ))).not.toEqual([])
+  })
+
   it('accepts an attached obstacle-free family route', () => {
     const scene = baseScene()
     scene.routes = [route('parentage:valid', [
@@ -342,10 +355,56 @@ function emptyScene(): LayoutScene {
     cards: [],
     hubs: [],
     rows: [],
+    rootDomains: [],
+    bridgeDomains: [],
+    gateways: [],
     routes: [],
     bounds: { x: 0, y: 0, width: 0, height: 0 },
     diagnostics: [],
   }
+}
+
+function validateScene(scene: LayoutScene, metrics: LayoutMetrics) {
+  if (scene.rootDomains.length + scene.bridgeDomains.length > 0) {
+    return validateLayoutScene(scene, metrics)
+  }
+  const units = [...scene.units]
+  const knownUnitIds = new Set(units.map(unit => unit.id))
+  for (const card of scene.cards) {
+    if (knownUnitIds.has(card.unitId)) continue
+    units.push({
+      ...placedUnit(card.unitId, card.id, card.rect.x, card.rect.y),
+      rect: { ...card.rect },
+      width: card.rect.width,
+    })
+    knownUnitIds.add(card.unitId)
+  }
+  if (units.length === 0 && scene.cards.length === 0) {
+    return validateLayoutScene(scene, metrics)
+  }
+  const rects = [...units.map(unit => unit.rect), ...scene.cards.map(card => card.rect)]
+  const left = Math.min(...rects.map(rect => rect.x))
+  const top = Math.min(...rects.map(rect => rect.y))
+  const right = Math.max(...rects.map(rect => rect.x + rect.width))
+  const bottom = Math.max(...rects.map(rect => rect.y + rect.height))
+  return validateLayoutScene({
+    ...scene,
+    units,
+    rootDomains: [{
+      id: 'domain:root:test',
+      kind: 'root',
+      componentId: 'component:test',
+      rootIds: ['root:test'],
+      signature: ['root:test'],
+      personIds: scene.cards.map(card => card.id),
+      unitIds: units.map(unit => unit.id),
+      order: 0,
+      accent: '#4F7CAC',
+      rect: { x: left, y: top, width: right - left, height: bottom - top },
+      columnStart: left / metrics.gridSize,
+      columnEnd: right / metrics.gridSize - 1,
+    }],
+  }, metrics)
 }
 
 function placedUnit(id: string, personId: string, x: number, y: number) {
@@ -357,6 +416,11 @@ function placedUnit(id: string, personId: string, x: number, y: number) {
     width: 100,
     lineageAffinity: {},
     accent: '',
+    rootSignature: ['root:test'],
+    domainId: 'domain:root:test',
+    memberRootIds: { [personId]: 'root:test' },
+    rootAccent: '#4F7CAC',
+    isRootFamily: false,
     rect: { x, y, width: 100, height: 100 },
     order: 0,
   }

@@ -58,7 +58,7 @@ describe('buildSafeFallbackScene', () => {
     ])
   })
 
-  it('places generation rows deterministically with compactGrid geometry', () => {
+  it('places generation rows deterministically with fallback geometry', () => {
     const units = [
       single('child-b', ['child-b-person'], 1),
       couple('parents', ['parent-a', 'parent-b'], 0),

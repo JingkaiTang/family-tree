@@ -9,6 +9,7 @@ const result = spawnSync(process.execPath, [
   vitestPath,
   'run',
   'src/core/family-layout/layoutPerformance.test.ts',
+  '--disableConsoleIntercept',
   ...process.argv.slice(2),
 ], {
   env: { ...process.env, FAMILY_LAYOUT_PERF_BUDGET_MS: '1000' },

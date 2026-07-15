@@ -7,7 +7,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, nextTick } from 'vue'
 import FamilyCanvas from '@/components/tree/FamilyCanvas.vue'
 import { createEmptyFamily, type FamilyData, type Member } from '@/core/schema'
-import type { RootLayoutScene as LayoutScene } from '@/core/family-layout/types'
+import type { LayoutScene } from '@/core/family-layout/types'
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 

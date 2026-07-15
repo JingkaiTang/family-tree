@@ -11,10 +11,11 @@ import {
 import { validateScene } from './validateScene'
 import {
   DEFAULT_LAYOUT_METRICS,
-  type FamilyUnit,
   type ParentageGroup,
+  type PlacedLayoutDomain,
   type Point,
   type Rect,
+  type RootedFamilyUnit,
   type RouteSegment,
   type SceneGeometry,
 } from './types'
@@ -177,7 +178,7 @@ describe('routeFamilyLanes', () => {
     expect(new Set(result.routes.flatMap(route => route.segments
       .filter(segment => segment.orientation === 'horizontal')
       .map(segment => segment.points[0].y))).size).toBeGreaterThan(1)
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, metrics))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, metrics))
       .toEqual([])
   })
 
@@ -229,7 +230,7 @@ describe('routeFamilyLanes', () => {
       ids: ['parentage:third'],
       message: 'Unable to route primary family edge parentage:third',
     }])
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, metrics))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, metrics))
       .toEqual([])
   })
 
@@ -338,7 +339,7 @@ describe('routeFamilyLanes', () => {
     })
 
     expect(result.diagnostics).toEqual([])
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
   })
 
@@ -367,7 +368,7 @@ describe('routeFamilyLanes', () => {
     })
 
     expect(result.diagnostics).toEqual([])
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
   })
 
@@ -385,10 +386,13 @@ describe('routeFamilyLanes', () => {
     }]
     const geometry = materializeSceneGeometry({
       placedUnits: units.map((unit, order) => ({ ...unit, order })),
+      placedDomains: [rootDomainFor(units)],
       rows: [{
+        id: 'row:0',
         generation: 0,
         unitIds: units.filter(unit => unit.generation === 0).map(unit => unit.id),
       }, {
+        id: 'row:1',
         generation: 1,
         unitIds: units.filter(unit => unit.generation === 1).map(unit => unit.id),
       }],
@@ -409,7 +413,7 @@ describe('routeFamilyLanes', () => {
       segment.orientation === 'vertical'
       && segment.points.every(point => point.x === targetBase + 180)
     ))).toBe(true)
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
   })
 
@@ -427,7 +431,9 @@ describe('routeFamilyLanes', () => {
     }))
     const geometry = materializeSceneGeometry({
       placedUnits: units.map((unit, order) => ({ ...unit, order })),
-      rows: [{ generation: 0, unitIds: [source.id] }, {
+      placedDomains: [rootDomainFor(units)],
+      rows: [{ id: 'row:0', generation: 0, unitIds: [source.id] }, {
+        id: 'row:1',
         generation: 1,
         unitIds: [firstChild.id, secondChild.id],
       }],
@@ -448,7 +454,7 @@ describe('routeFamilyLanes', () => {
       const route = result.routes.find(value => value.routeOwnerId === group.id)!
       expect(route.segments[0].points[0]).toEqual(hub.point)
     }
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
   })
 
@@ -487,7 +493,7 @@ describe('routeFamilyLanes', () => {
       segment.orientation === 'bridge'
       && segment.points.some(point => point.x === 566)
     ))).toBe(true)
-    expect(validateScene({ ...geometry, routes: result.routes, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
+    expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
   })
 
@@ -575,7 +581,7 @@ function overlappingFamilyFixture(
   familyCount: number,
   childY = DEFAULT_LAYOUT_METRICS.cardHeight + DEFAULT_LAYOUT_METRICS.generationGap,
 ): {
-  units: Array<FamilyUnit & { rect: Rect }>
+  units: Array<RootedFamilyUnit & { rect: Rect }>
   parentageGroups: ParentageGroup[]
   geometry: SceneGeometry
 } {
@@ -612,8 +618,8 @@ function overlappingFamilyFixture(
 }
 
 function geometryFor(
-  units: Array<FamilyUnit & { rect: Rect }>,
-  sourceUnits: Array<FamilyUnit & { rect: Rect }>,
+  units: Array<RootedFamilyUnit & { rect: Rect }>,
+  sourceUnits: Array<RootedFamilyUnit & { rect: Rect }>,
 ): SceneGeometry {
   const cards = units.map(unit => ({
     id: unit.memberIds[0],
@@ -644,11 +650,18 @@ function geometryFor(
       generation: 1,
       unitIds: units.filter(unit => unit.generation === 1).map(unit => unit.id),
     }],
+    rootDomains: [rootDomainFor(units)],
+    bridgeDomains: [],
     bounds: { x: 0, y: 0, width: right, height: bottom },
   }
 }
 
-function singleUnit(id: string, x: number, y: number, accent: string): FamilyUnit & { rect: Rect } {
+function singleUnit(
+  id: string,
+  x: number,
+  y: number,
+  accent: string,
+): RootedFamilyUnit & { rect: Rect } {
   return {
     id: `unit:person:${id}`,
     kind: 'single',
@@ -657,6 +670,7 @@ function singleUnit(id: string, x: number, y: number, accent: string): FamilyUni
     width: DEFAULT_LAYOUT_METRICS.cardWidth,
     lineageAffinity: {},
     accent,
+    ...rootFields([id]),
     rect: {
       x,
       y,
@@ -666,15 +680,22 @@ function singleUnit(id: string, x: number, y: number, accent: string): FamilyUni
   }
 }
 
-function coupleUnit(id: string, x: number, y: number, accent: string): FamilyUnit & { rect: Rect } {
+function coupleUnit(
+  id: string,
+  x: number,
+  y: number,
+  accent: string,
+): RootedFamilyUnit & { rect: Rect } {
+  const memberIds = [`${id}-left`, `${id}-right`]
   return {
     id: `unit:partnership:${id}`,
     kind: 'couple',
-    memberIds: [`${id}-left`, `${id}-right`],
+    memberIds,
     generation: y === 0 ? 0 : 1,
     width: DEFAULT_LAYOUT_METRICS.cardWidth * 2 + DEFAULT_LAYOUT_METRICS.spouseGap,
     lineageAffinity: {},
     accent,
+    ...rootFields(memberIds),
     rect: {
       x,
       y,
@@ -690,7 +711,7 @@ function narrowUnit(
   y: number,
   accent: string,
   size = 8,
-): FamilyUnit & { rect: Rect } {
+): RootedFamilyUnit & { rect: Rect } {
   return {
     id: `unit:person:${id}`,
     kind: 'single',
@@ -699,12 +720,45 @@ function narrowUnit(
     width: size,
     lineageAffinity: {},
     accent,
+    ...rootFields([id]),
     rect: {
       x: centerX - size / 2,
       y,
       width: size,
       height: DEFAULT_LAYOUT_METRICS.cardHeight,
     },
+  }
+}
+
+function rootFields(memberIds: string[]) {
+  return {
+    rootSignature: ['root:test'],
+    domainId: 'domain:root:test',
+    memberRootIds: Object.fromEntries(memberIds.map(id => [id, 'root:test'])),
+    rootAccent: '#4F7CAC',
+    isRootFamily: false,
+  }
+}
+
+function rootDomainFor(
+  units: Array<RootedFamilyUnit & { rect: Rect }>,
+): PlacedLayoutDomain {
+  const left = Math.min(...units.map(unit => unit.rect.x))
+  const right = Math.max(...units.map(unit => unit.rect.x + unit.rect.width))
+  const bottom = Math.max(...units.map(unit => unit.rect.y + unit.rect.height))
+  return {
+    id: 'domain:root:test',
+    kind: 'root',
+    componentId: 'component:test',
+    rootIds: ['root:test'],
+    signature: ['root:test'],
+    personIds: units.flatMap(unit => unit.memberIds),
+    unitIds: units.map(unit => unit.id),
+    order: 0,
+    accent: '#4F7CAC',
+    rect: { x: left, y: 0, width: right - left, height: bottom },
+    columnStart: left / DEFAULT_LAYOUT_METRICS.gridSize,
+    columnEnd: right / DEFAULT_LAYOUT_METRICS.gridSize - 1,
   }
 }
 

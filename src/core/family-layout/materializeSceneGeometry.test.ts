@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import {
-  materializeRootSceneGeometry,
-  materializeSceneGeometry,
-} from './materializeSceneGeometry'
+import { materializeSceneGeometry } from './materializeSceneGeometry'
 import {
   DEFAULT_LAYOUT_METRICS,
   type ParentageGroup,
   type PlacedFamilyUnit,
   type PlacedLayoutDomain,
-  type PlacedRootedFamilyUnit,
+  type PlacedRow,
 } from './types'
 
 describe('materializeSceneGeometry', () => {
@@ -21,6 +18,7 @@ describe('materializeSceneGeometry', () => {
       width: 168,
       lineageAffinity: {},
       accent: '',
+      ...rootFields(['a']),
       rect: { x: 48, y: 0, width: 168, height: 216 },
       order: 0,
     }
@@ -32,7 +30,7 @@ describe('materializeSceneGeometry', () => {
       childPersonIds: [`child:${id}`],
     }))
 
-    const scene = materializeSceneGeometry({
+    const scene = materializeTestGeometry({
       placedUnits: [source],
       rows: [{ generation: 0, unitIds: [source.id] }],
       parentageGroups,
@@ -54,6 +52,7 @@ describe('materializeSceneGeometry', () => {
       width: 360,
       lineageAffinity: {},
       accent: '',
+      ...rootFields(['a', 'b']),
       rect: { x: 240, y: 0, width: 360, height: 216 },
       order: 0,
     }
@@ -65,7 +64,7 @@ describe('materializeSceneGeometry', () => {
       childPersonIds: [`child:${id}`],
     }))
 
-    const scene = materializeSceneGeometry({
+    const scene = materializeTestGeometry({
       placedUnits: [source],
       rows: [{ generation: 0, unitIds: [source.id] }],
       parentageGroups: [...parentageGroups].reverse(),
@@ -95,6 +94,7 @@ describe('materializeSceneGeometry', () => {
       width: 360,
       lineageAffinity: {},
       accent: '',
+      ...rootFields(['a', 'b']),
       rect: { x: 240, y: 0, width: 360, height: 216 },
       order: 0,
     }
@@ -106,7 +106,7 @@ describe('materializeSceneGeometry', () => {
       childPersonIds: [`child:${index}`],
     }))
 
-    const scene = materializeSceneGeometry({
+    const scene = materializeTestGeometry({
       placedUnits: [source],
       rows: [{ generation: 0, unitIds: [source.id] }],
       parentageGroups: [...parentageGroups].reverse(),
@@ -121,7 +121,7 @@ describe('materializeSceneGeometry', () => {
   })
 
   it('preserves source-root member order in rooted cards and domain geometry', () => {
-    const unit: PlacedRootedFamilyUnit = {
+    const unit: PlacedFamilyUnit = {
       id: 'unit:partnership:current:a+b',
       kind: 'couple',
       memberIds: ['b', 'a'],
@@ -152,7 +152,7 @@ describe('materializeSceneGeometry', () => {
       columnEnd: 16,
     }
 
-    const scene = materializeRootSceneGeometry({
+    const scene = materializeSceneGeometry({
       placedUnits: [unit],
       placedDomains: [domain],
       rows: [{ id: `row:${domain.id}:0`, generation: 0, unitIds: [unit.id] }],
@@ -168,3 +168,43 @@ describe('materializeSceneGeometry', () => {
     expect(scene.bridgeDomains).toEqual([domain])
   })
 })
+
+function rootFields(memberIds: string[]) {
+  return {
+    rootSignature: ['root:test'],
+    domainId: 'domain:root:test',
+    memberRootIds: Object.fromEntries(memberIds.map(id => [id, 'root:test'])),
+    rootAccent: '#4F7CAC',
+    isRootFamily: true,
+  }
+}
+
+function materializeTestGeometry(input: {
+  placedUnits: PlacedFamilyUnit[]
+  rows: Array<Omit<PlacedRow, 'id'>>
+  parentageGroups: ParentageGroup[]
+  metrics: typeof DEFAULT_LAYOUT_METRICS
+}) {
+  const domain: PlacedLayoutDomain = {
+    id: 'domain:root:test',
+    kind: 'root',
+    componentId: 'component:test',
+    rootIds: ['root:test'],
+    signature: ['root:test'],
+    personIds: input.placedUnits.flatMap(unit => unit.memberIds),
+    unitIds: input.placedUnits.map(unit => unit.id),
+    order: 0,
+    accent: '#4F7CAC',
+    rect: { x: 0, y: 0, width: 1200, height: 216 },
+    columnStart: 0,
+    columnEnd: 49,
+  }
+  return materializeSceneGeometry({
+    ...input,
+    placedDomains: [domain],
+    rows: input.rows.map(row => ({
+      ...row,
+      id: `row:${row.generation}`,
+    })),
+  })
+}

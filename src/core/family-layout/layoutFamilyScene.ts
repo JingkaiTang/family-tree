@@ -18,7 +18,7 @@ import type {
   LayoutRequest,
   ParentageGroup,
   RootedFamilyUnit,
-  RootLayoutScene,
+  LayoutScene,
 } from './types'
 import { validateScene } from './validateScene'
 
@@ -30,7 +30,7 @@ const UNSAFE_CODES = new Set<LayoutDiagnostic['code']>([
   'ROOT_DOMAIN_INTRUSION',
 ])
 
-export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
+export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
   const projected = projectView(request.facts, request.view)
   const built = buildFamilyUnits(projected, request.preferences, request.metrics)
   const generations = assignGenerations(projected, built)
@@ -134,7 +134,7 @@ export function layoutFamilyScene(request: LayoutRequest): RootLayoutScene {
 }
 
 interface LayoutAttempt {
-  scene: RootLayoutScene
+  scene: LayoutScene
   routingDiagnostics: LayoutDiagnostic[]
 }
 
@@ -164,7 +164,7 @@ function buildAttempt(
     parentageGroups,
     metrics,
   })
-  const scene: RootLayoutScene = {
+  const scene: LayoutScene = {
     ...geometry,
     gateways: routing.gateways,
     routes: routing.routes,
@@ -198,7 +198,7 @@ function withExpandedGenerationGap(
   }
 }
 
-function hasUnsafeDiagnostic(scene: RootLayoutScene): boolean {
+function hasUnsafeDiagnostic(scene: LayoutScene): boolean {
   return scene.diagnostics.some(value => UNSAFE_CODES.has(value.code))
 }
 

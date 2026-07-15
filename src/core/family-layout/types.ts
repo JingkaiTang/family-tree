@@ -100,7 +100,7 @@ export interface LayoutRequest {
   preferences: LayoutPreferences
   metrics: LayoutMetrics
   inputDiagnostics: LayoutDiagnostic[]
-  previousScene?: RootLayoutScene
+  previousScene?: LayoutScene
   changedIds?: string[]
   auxiliaryFocusPersonId?: string
   preferredComponentPersonId?: string
@@ -211,7 +211,7 @@ export interface PlaceRootDomainsInput {
   domains: LayoutDomain[]
   preferences: LayoutPreferences
   metrics: LayoutMetrics
-  previousScene?: RootLayoutScene
+  previousScene?: LayoutScene
   previousRootIdByRootId?: Record<string, string>
   changedIds?: string[]
 }
@@ -236,16 +236,6 @@ export interface ParentageGroup {
   sourceAnchorPersonId?: string
   childPersonIds: string[]
 }
-export interface LineageCluster {
-  id: string
-  unitIds: string[]
-  personIds: string[]
-  kind: 'core' | 'bridge' | 'supercomponent'
-}
-export interface OrderedGeneration {
-  generation: number
-  unitIds: string[]
-}
 export interface AuxiliaryRelation {
   id: string
   kind: 'historical-partnership' | 'secondary-partnership' | 'secondary-parentage' | 'godparent'
@@ -259,20 +249,12 @@ export interface ProjectedFamily {
   auxiliaryRelations: AuxiliaryRelation[]
   diagnostics: LayoutDiagnostic[]
 }
-export interface PlacedFamilyUnit extends FamilyUnit { rect: Rect; order: number }
-export interface PlacedRootedFamilyUnit extends RootedFamilyUnit { rect: Rect; order: number }
+export interface PlacedFamilyUnit extends RootedFamilyUnit { rect: Rect; order: number }
 export interface PlacedPersonCard { id: string; unitId: string; rect: Rect; generation: number }
 export interface PlacedUnionHub { id: string; unitId: string; point: Point }
 export interface PlacedRow { id: string; generation: number; unitIds: string[] }
 export interface SceneGeometry {
   units: PlacedFamilyUnit[]
-  cards: PlacedPersonCard[]
-  hubs: PlacedUnionHub[]
-  rows: PlacedRow[]
-  bounds: Rect
-}
-export interface RootSceneGeometry {
-  units: PlacedRootedFamilyUnit[]
   cards: PlacedPersonCard[]
   hubs: PlacedUnionHub[]
   rows: PlacedRow[]
@@ -304,16 +286,7 @@ export interface RouteFamilyLanesResult {
   gateways: RouteGateway[]
   diagnostics: LayoutDiagnostic[]
 }
-export interface LayoutScene {
-  units: PlacedFamilyUnit[]
-  cards: PlacedPersonCard[]
-  hubs: PlacedUnionHub[]
-  rows: PlacedRow[]
-  routes: RoutedFamilyEdge[]
-  bounds: Rect
-  diagnostics: LayoutDiagnostic[]
-}
-export interface RootLayoutScene extends RootSceneGeometry {
+export interface LayoutScene extends SceneGeometry {
   gateways: RouteGateway[]
   routes: RoutedFamilyEdge[]
   diagnostics: LayoutDiagnostic[]

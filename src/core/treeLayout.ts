@@ -6,16 +6,15 @@ import {
   DEFAULT_LAYOUT_METRICS,
   type FamilyViewPolicy,
   type LayoutPreferences,
-  type RootLayoutScene,
+  type LayoutScene,
 } from './family-layout/types'
 
-export type { RootLayoutScene } from './family-layout/types'
-export type LayoutScene = RootLayoutScene
+export type { LayoutScene } from './family-layout/types'
 
 export interface LayoutFamilyTreeOptions {
   data?: FamilyData
   view?: Partial<FamilyViewPolicy>
-  previousScene?: RootLayoutScene
+  previousScene?: LayoutScene
   changedIds?: string[]
   auxiliaryFocusPersonId?: string
 }
@@ -23,7 +22,7 @@ export interface LayoutFamilyTreeOptions {
 export async function layoutFamilyTree(
   members: Member[],
   options: LayoutFamilyTreeOptions = {},
-): Promise<RootLayoutScene> {
+): Promise<LayoutScene> {
   const data = options.data ?? temporaryFamily(members)
   const normalized = normalizeFacts(data)
 

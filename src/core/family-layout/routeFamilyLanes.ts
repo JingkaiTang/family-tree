@@ -7,7 +7,6 @@ import type {
   PlacedPersonCard,
   Point,
   Rect,
-  RootSceneGeometry,
   RouteFamilyLanesResult,
   RouteGateway,
   RoutedFamilyEdge,
@@ -16,7 +15,7 @@ import type {
 } from './types'
 
 export interface RouteFamilyLanesInput {
-  geometry: SceneGeometry | RootSceneGeometry
+  geometry: SceneGeometry
   units: FamilyUnit[]
   parentageGroups: ParentageGroup[]
   metrics: LayoutMetrics
@@ -58,14 +57,10 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
   const placedUnitsById = new Map(input.geometry.units.map(unit => [unit.id, unit]))
   const hubsById = new Map(input.geometry.hubs.map(hub => [hub.id, hub]))
   const cardsById = new Map(input.geometry.cards.map(card => [card.id, card]))
-  const rootedGeometry = isRootSceneGeometry(input.geometry)
-    ? input.geometry
-    : undefined
+  const rootedGeometry = input.geometry
   const domainById = new Map(
-    rootedGeometry === undefined
-      ? []
-      : [...rootedGeometry.rootDomains, ...rootedGeometry.bridgeDomains]
-        .map(domain => [domain.id, domain] as const),
+    [...rootedGeometry.rootDomains, ...rootedGeometry.bridgeDomains]
+      .map(domain => [domain.id, domain] as const),
   )
   const requests: RouteRequest[] = []
 
@@ -95,13 +90,10 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       return domainId === undefined ? [] : [domainId]
     }))]
     if (
-      rootedGeometry !== undefined
-      && (
-        sourceDomainId === undefined
-        || targetDomainIds.length !== 1
-        || !domainById.has(sourceDomainId)
-        || !domainById.has(targetDomainIds[0])
-      )
+      sourceDomainId === undefined
+      || targetDomainIds.length === 0
+      || !domainById.has(sourceDomainId)
+      || targetDomainIds.some(domainId => !domainById.has(domainId))
     ) {
       diagnostics.push(unroutable(group.id))
       continue
@@ -121,7 +113,9 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       minX: Math.min(...childPorts.map(point => point.x)),
       maxX: Math.max(...childPorts.map(point => point.x)),
       sourceDomainId,
-      targetDomainId: targetDomainIds[0],
+      targetDomainId: targetDomainIds.length === 1
+        ? targetDomainIds[0]
+        : undefined,
     })
   }
 
@@ -697,7 +691,7 @@ function bridgeHorizontal(
 function routeIntersectsObstacle(
   route: RoutedFamilyEdge,
   request: RouteRequest,
-  geometry: SceneGeometry | RootSceneGeometry,
+  geometry: SceneGeometry,
   metrics: LayoutMetrics,
 ): boolean {
   const ownCardIds = new Set([
@@ -799,12 +793,6 @@ function unroutable(groupId: string): LayoutDiagnostic {
 
 function compareById(left: { id: string }, right: { id: string }): number {
   return left.id.localeCompare(right.id)
-}
-
-function isRootSceneGeometry(
-  geometry: SceneGeometry | RootSceneGeometry,
-): geometry is RootSceneGeometry {
-  return 'rootDomains' in geometry && 'bridgeDomains' in geometry
 }
 
 function placedUnitDomainId(unit: object): string | undefined {
