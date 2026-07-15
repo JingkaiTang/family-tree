@@ -73,6 +73,8 @@ export interface LayoutMetrics {
   cardHeight: number
   spouseGap: number
   familyGap: number
+  rootGap: number
+  bridgeGap: number
   generationGap: number
   routeSubgrid: number
   cardClearance: number
@@ -84,6 +86,8 @@ export const DEFAULT_LAYOUT_METRICS: LayoutMetrics = {
   cardHeight: 216,
   spouseGap: 24,
   familyGap: 72,
+  rootGap: 144,
+  bridgeGap: 96,
   generationGap: 360,
   routeSubgrid: 8,
   cardClearance: 12,
@@ -108,6 +112,47 @@ export interface FamilyUnit {
   width: number
   lineageAffinity: Record<string, number>
   accent: string
+}
+export type RootSignature = string[]
+export type LayoutDomainKind = 'root' | 'pair-bridge' | 'multi-root-island'
+export interface RootFamily {
+  id: string
+  rootUnitId: string
+  seedPersonIds: string[]
+  generation: number
+  componentId: string
+}
+export interface RootedFamilyUnit extends FamilyUnit {
+  rootSignature: RootSignature
+  domainId: string
+  memberRootIds: Partial<Record<string, string>>
+  rootAccent: string
+  isRootFamily: boolean
+}
+export interface LayoutDomain {
+  id: string
+  kind: LayoutDomainKind
+  componentId: string
+  rootIds: string[]
+  signature: RootSignature
+  personIds: string[]
+  unitIds: string[]
+  order: number
+  accent: string
+}
+export interface PlacedLayoutDomain extends LayoutDomain {
+  rect: Rect
+  columnStart: number
+  columnEnd: number
+}
+export interface RootLayoutModel {
+  roots: RootFamily[]
+  signatureByPersonId: Record<string, RootSignature>
+  signatureByUnitId: Record<string, RootSignature>
+  sourceRootIdByPersonId: Partial<Record<string, string>>
+  domainIdByUnitId: Record<string, string>
+  domains: LayoutDomain[]
+  diagnostics: LayoutDiagnostic[]
 }
 export interface ParentageGroup {
   id: string
@@ -140,6 +185,7 @@ export interface ProjectedFamily {
   diagnostics: LayoutDiagnostic[]
 }
 export interface PlacedFamilyUnit extends FamilyUnit { rect: Rect; order: number }
+export interface PlacedRootedFamilyUnit extends RootedFamilyUnit { rect: Rect; order: number }
 export interface PlacedPersonCard { id: string; unitId: string; rect: Rect; generation: number }
 export interface PlacedUnionHub { id: string; unitId: string; point: Point }
 export interface PlacedRow { id: string; generation: number; unitIds: string[] }
@@ -148,6 +194,15 @@ export interface SceneGeometry {
   cards: PlacedPersonCard[]
   hubs: PlacedUnionHub[]
   rows: PlacedRow[]
+  bounds: Rect
+}
+export interface RootSceneGeometry {
+  units: PlacedRootedFamilyUnit[]
+  cards: PlacedPersonCard[]
+  hubs: PlacedUnionHub[]
+  rows: PlacedRow[]
+  rootDomains: PlacedLayoutDomain[]
+  bridgeDomains: PlacedLayoutDomain[]
   bounds: Rect
 }
 export interface RouteSegment {
@@ -161,6 +216,13 @@ export interface RoutedFamilyEdge {
   accent: string
   segments: RouteSegment[]
 }
+export interface RouteGateway {
+  id: string
+  domainId: string
+  side: 'left' | 'right' | 'top' | 'bottom'
+  point: Point
+  routeOwnerId: string
+}
 export interface RouteFamilyLanesResult {
   routes: RoutedFamilyEdge[]
   diagnostics: LayoutDiagnostic[]
@@ -172,5 +234,10 @@ export interface LayoutScene {
   rows: PlacedRow[]
   routes: RoutedFamilyEdge[]
   bounds: Rect
+  diagnostics: LayoutDiagnostic[]
+}
+export interface RootLayoutScene extends RootSceneGeometry {
+  gateways: RouteGateway[]
+  routes: RoutedFamilyEdge[]
   diagnostics: LayoutDiagnostic[]
 }

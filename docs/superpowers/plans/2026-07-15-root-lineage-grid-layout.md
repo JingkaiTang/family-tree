@@ -232,7 +232,7 @@ export interface RootLayoutScene extends RootSceneGeometry {
 }
 ```
 
-Gate A 的旧流水线继续使用旧 `LayoutScene`，Gate B 的新纯函数使用上述严格类型；不能把根字段做成 optional，因为那会让旧/新流水线静默混用。TypeScript 允许接口引用同文件后面声明的 `RouteGateway` / `RoutedFamilyEdge`。Task 9 切换 facade 返回类型，Task 14 删除旧引擎后再把 `RootLayoutScene` 收敛回唯一的 `LayoutScene` 名称。
+Task 1 同时声明 `RouteGateway` 的稳定数据形状（`id/domainId/side/point/routeOwnerId`），Task 8 只实现其分配和校验行为。Gate A 的旧流水线继续使用旧 `LayoutScene`，Gate B 的新纯函数使用上述严格类型；不能把根字段做成 optional，因为那会让旧/新流水线静默混用。Task 9 切换 facade 返回类型，Task 14 删除旧引擎后再把 `RootLayoutScene` 收敛回唯一的 `LayoutScene` 名称。
 
 在 `LayoutMetrics` 和默认值增加：
 
@@ -456,7 +456,7 @@ describe('propagateRootSignatures', () => {
     const roots = discoverRootFamilies(fixture)
     const result = propagateRootSignatures({ ...fixture, roots })
 
-    expect(result.signatureByUnitId['unit:couple:a2+b1']).toEqual([
+    expect(result.signatureByUnitId['unit:partnership:current:a2+b1']).toEqual([
       'root:a0+a0-spouse',
       'root:b0+b0-spouse',
     ])
@@ -471,7 +471,7 @@ describe('propagateRootSignatures', () => {
     const roots = discoverRootFamilies(fixture)
     const result = propagateRootSignatures({ ...fixture, roots })
 
-    expect(result.signatureByUnitId['unit:couple:left-cousin+right-cousin'])
+    expect(result.signatureByUnitId['unit:partnership:current:left-cousin+right-cousin'])
       .toEqual(['root:a0+a0-spouse'])
   })
 
@@ -922,7 +922,7 @@ it('orders a cross-root couple by source root position', () => {
   })
   const units = decorateRootedUnits(prepared)
 
-  expect(units.find(unit => unit.id === 'unit:couple:a2+b1')?.memberIds)
+  expect(units.find(unit => unit.id === 'unit:partnership:current:a2+b1')?.memberIds)
     .toEqual(['b1', 'a2'])
 })
 })
