@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
@@ -24,6 +24,17 @@ const saveStatus = computed(() => {
 })
 
 const rootId = computed(() => data.value.rootMemberId)
+const layoutResetVersion = ref(0)
+const canRestoreDefaultLayout = computed(() => (
+  data.value.layoutPreferences.rowOrders.length > 0
+))
+
+function restoreDefaultLayout() {
+  if (!canRestoreDefaultLayout.value) return
+  family.clearRowOrderPreferences()
+  ui.setCanvasView(null)
+  layoutResetVersion.value += 1
+}
 
 function onBack() {
   ui.setViewpoint(null)
@@ -207,6 +218,14 @@ function seedFixture() {
           清除视角
         </button>
         <button
+          data-testid="restore-default-layout"
+          class="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!canRestoreDefaultLayout"
+          @click="restoreDefaultLayout"
+        >
+          恢复默认布局
+        </button>
+        <button
           v-if="memberCount === 0"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"
           @click="seedFixture"
@@ -242,6 +261,7 @@ function seedFixture() {
         :viewpoint-id="viewpointId"
         :get-kinship="kinshipResolver"
         :initial-view="ui.canvasView"
+        :layout-reset-version="layoutResetVersion"
         :show-auxiliary-relations="showAuxiliaryRelations"
         @select="onSelect"
         @open="onOpen"
