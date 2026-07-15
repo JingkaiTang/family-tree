@@ -11,6 +11,8 @@ export type LayoutDiagnosticCode =
   | 'UNROUTABLE_PRIMARY_EDGE'
   | 'CROSS_FAMILY_SEGMENT_OVERLAP'
   | 'NODE_OVERLAP'
+  | 'INVALID_ROOT_DOMAIN_ASSIGNMENT'
+  | 'ROOT_DOMAIN_INTRUSION'
 
 export interface LayoutDiagnostic {
   code: LayoutDiagnosticCode
@@ -138,6 +140,7 @@ export interface RootAccentDomainSnapshot {
   rootIds: string[]
   personIds: string[]
   accent: string
+  rect?: Rect
 }
 export interface RootAccentSceneSnapshot {
   rootDomains: RootAccentDomainSnapshot[]
@@ -165,6 +168,38 @@ export interface LayoutDomain {
   unitIds: string[]
   order: number
   accent: string
+}
+export interface RootInteractionEdge {
+  id: string
+  leftRootId: string
+  rightRootId: string
+  weight: number
+  unitIds: string[]
+}
+export interface BuildRootDomainsInput {
+  projected: ProjectedFamily
+  units: FamilyUnit[]
+  roots: RootFamily[]
+  signatures: RootSignatureResult
+  accents: Record<string, string>
+  preferences: LayoutPreferences
+  previousScene?: RootAccentSceneSnapshot
+  preferredComponentPersonId?: string
+}
+export interface BuildRootDomainsResult {
+  domains: LayoutDomain[]
+  domainIdByUnitId: Record<string, string>
+  rootOrder: string[]
+  interactionEdges: RootInteractionEdge[]
+  diagnostics: LayoutDiagnostic[]
+}
+export interface DecorateRootedUnitsInput {
+  baseUnits: FamilyUnit[]
+  roots: RootFamily[]
+  signatures: RootSignatureResult
+  domains: BuildRootDomainsResult
+  accents: Record<string, string>
+  preferences: LayoutPreferences
 }
 export interface PlacedLayoutDomain extends LayoutDomain {
   rect: Rect

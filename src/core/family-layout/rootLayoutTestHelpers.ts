@@ -1,4 +1,6 @@
 import { assignGenerations } from './assignGenerations'
+import { assignRootAccents } from './assignRootAccents'
+import { buildRootDomains } from './buildRootDomains'
 import { discoverRootFamilies } from './discoverRootFamilies'
 import { propagateRootSignatures } from './propagateRootSignatures'
 import {
@@ -10,6 +12,8 @@ import {
 } from './testHelpers'
 import type {
   AssignRootAccentsInput,
+  BuildRootDomainsInput,
+  DecorateRootedUnitsInput,
   FamilyUnit,
   ParentageGroup,
   ProjectedFamily,
@@ -294,6 +298,48 @@ export function rootAccentInputAfterAddingAncestor(): AssignRootAccentsInput {
         accent: '#4F7CAC',
       }],
     },
+  }
+}
+
+export function rootDomainInputForFixture(
+  fixture: RootFixture,
+): BuildRootDomainsInput {
+  const accentInput = rootAccentInputForFixture(fixture)
+  const accents = assignRootAccents(accentInput)
+
+  return {
+    projected: fixture.projected,
+    units: fixture.units,
+    roots: accentInput.roots,
+    signatures: accentInput.signatures,
+    accents,
+    preferences: accentInput.preferences,
+  }
+}
+
+export function preparedRootDomains(
+  fixture: RootFixture,
+  options: { rootOrder?: string[] } = {},
+): DecorateRootedUnitsInput {
+  const input = rootDomainInputForFixture(fixture)
+  const componentId = input.roots.find(root => (
+    options.rootOrder?.includes(root.id)
+  ))?.componentId
+  const preferences = componentId !== undefined && options.rootOrder !== undefined
+    ? {
+        ...input.preferences,
+        rootOrders: [{ componentId, rootIds: options.rootOrder }],
+      }
+    : input.preferences
+  const preparedInput = { ...input, preferences }
+
+  return {
+    baseUnits: fixture.units,
+    roots: input.roots,
+    signatures: input.signatures,
+    domains: buildRootDomains(preparedInput),
+    accents: input.accents,
+    preferences,
   }
 }
 

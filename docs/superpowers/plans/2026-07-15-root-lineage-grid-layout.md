@@ -861,7 +861,7 @@ git commit -m "feat: assign stable root lineage accents"
 - Modify: `src/core/family-layout/types.ts`
 - Modify: `src/core/family-layout/rootLayoutTestHelpers.ts`
 
-- [ ] **Step 1: 写根域和桥接域失败测试**
+- [x] **Step 1: 写根域和桥接域失败测试**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -928,7 +928,7 @@ it('orders a cross-root couple by source root position', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/buildRootDomains.test.ts src/core/family-layout/decorateRootedUnits.test.ts
@@ -936,7 +936,7 @@ npm test -- src/core/family-layout/buildRootDomains.test.ts src/core/family-layo
 
 Expected: FAIL，提示模块不存在。
 
-- [ ] **Step 3: 构建加权根交互图**
+- [x] **Step 3: 构建加权根交互图**
 
 新增内部结构：
 
@@ -959,7 +959,7 @@ interface RootInteractionEdge {
 - `{A,B,C}` 单位直接触发 multi-root island。
 - 单根 signature 的 unit 永远进入对应 root domain，包括同根不同支系婚姻。
 
-- [ ] **Step 4: 实现稳定根顺序**
+- [x] **Step 4: 实现稳定根顺序**
 
 顺序优先级：
 
@@ -972,7 +972,7 @@ interface RootInteractionEdge {
 
 断开 component 的顺序先按是否包含 `request.preferredComponentPersonId`，再按上一场景 x，最后按 component ID。这个字段由 `rootMemberId` 映射而来，只能影响 component 顺序。
 
-- [ ] **Step 5: 放置 bridge domain 的逻辑顺序**
+- [x] **Step 5: 放置 bridge domain 的逻辑顺序**
 
 - pair bridge 插在它两个 source root domain 之间，并靠近权重更高的交界侧。
 - multi-root island 紧跟其根 interaction component，内部 unit 顺序由 `bridgeOrders` 和稳定 barycenter 决定。
@@ -988,7 +988,7 @@ interface RootInteractionEdge {
 
 Task 9 切换公开流水线时把两者列入 unsafe codes，因为错误域归属会导致卡片混杂。
 
-- [ ] **Step 6: 装饰基础家庭单位**
+- [x] **Step 6: 装饰基础家庭单位**
 
 `decorateRootedUnits` 接收基础 units、签名结果、domains、accent map 和 root order，输出 `RootedFamilyUnit[]`。规则：
 
@@ -1001,7 +1001,7 @@ Task 9 切换公开流水线时把两者列入 unsafe codes，因为错误域归
 
 `buildFamilyUnits` 仍只构建基础 `FamilyUnit`。不要把根发现塞进该函数，防止语义层循环依赖。
 
-- [ ] **Step 7: 验证 GREEN**
+- [x] **Step 7: 验证 GREEN**
 
 ```bash
 npm test -- src/core/family-layout/buildRootDomains.test.ts src/core/family-layout/decorateRootedUnits.test.ts src/core/family-layout/buildFamilyUnits.test.ts
@@ -1010,7 +1010,7 @@ npm run typecheck
 
 Expected: PASS；输入顺序反转不改变 domains 和 root order。
 
-- [ ] **Step 8: 提交域模型和 rooted units**
+- [x] **Step 8: 提交域模型和 rooted units**
 
 ```bash
 git add src/core/family-layout/buildRootDomains.ts src/core/family-layout/buildRootDomains.test.ts src/core/family-layout/decorateRootedUnits.ts src/core/family-layout/decorateRootedUnits.test.ts src/core/family-layout/types.ts src/core/family-layout/rootLayoutTestHelpers.ts
