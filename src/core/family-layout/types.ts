@@ -122,6 +122,12 @@ export interface RootFamily {
   generation: number
   componentId: string
 }
+export interface RootDiscoveryResult {
+  roots: RootFamily[]
+  seedRootIdByPersonId: Record<string, string>
+  suppressedIncomingPersonIds: string[]
+  diagnostics: LayoutDiagnostic[]
+}
 export interface RootedFamilyUnit extends FamilyUnit {
   rootSignature: RootSignature
   domainId: string

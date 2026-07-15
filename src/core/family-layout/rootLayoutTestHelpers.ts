@@ -177,6 +177,18 @@ export function incomingSpouseFixture(): RootFixture {
   return buildRootFixture([rootA, rootB, descendant, incoming])
 }
 
+export function disconnectedRootsFixture(): RootFixture {
+  const leftA = member('left-a')
+  const leftB = member('left-b')
+  const rightA = member('right-a')
+  const rightB = member('right-b')
+
+  linkSpouse(leftA, leftB)
+  linkSpouse(rightA, rightB)
+
+  return buildRootFixture([leftA, leftB, rightA, rightB])
+}
+
 function buildRootFixture(members: ReturnType<typeof member>[]): RootFixture {
   const { projected, built } = buildProjectedInput(familyData(members))
   const generations = assignGenerations(projected, built)
