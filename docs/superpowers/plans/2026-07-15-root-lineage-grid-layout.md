@@ -1189,7 +1189,7 @@ git commit -m "feat: place continuous root lineage domains"
 - Modify: `src/core/family-layout/validateScene.ts`
 - Modify: `src/core/family-layout/validateScene.test.ts`
 
-- [ ] **Step 1: 写域 gateway 和不同 owner 不重线失败测试**
+- [x] **Step 1: 写域 gateway 和不同 owner 不重线失败测试**
 
 在 router 测试增加两组同代相邻家庭、各自连接下代的场景，以及跨根家庭场景：
 
@@ -1214,7 +1214,7 @@ it('routes a cross-domain parentage through deterministic gateways', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/routeFamilyLanes.test.ts src/core/family-layout/validateScene.test.ts
@@ -1222,7 +1222,7 @@ npm test -- src/core/family-layout/routeFamilyLanes.test.ts src/core/family-layo
 
 Expected: FAIL，route 没有 gateway 元数据，且邻近家庭 fixture 暴露重叠/不可路由。
 
-- [ ] **Step 3: 增加固定端口和 gateway 类型**
+- [x] **Step 3: 增加固定端口和 gateway 类型**
 
 ```ts
 export interface RouteGateway {
@@ -1242,7 +1242,7 @@ export interface RoutedFamilyEdge {
 
 为保持 Task 8 中间提交可编译，`RouteFamilyLanesInput` 暂时接受 `SceneGeometry | RootSceneGeometry`：旧几何沿用当前同域路由且返回空 gateways，新几何启用 domain gateway。所有新 primary routes 都显式写 `gatewayIds`（同域可为空数组）；辅助 route 可省略该字段。Task 9 切换后收窄生产调用为 `RootSceneGeometry`。
 
-- [ ] **Step 4: 分配 route-owner 独占车道**
+- [x] **Step 4: 分配 route-owner 独占车道**
 
 保留当前按 group 范围从宽到窄排序，但 occupancy key 必须包含 orientation 和 subgrid coordinate。候选线段接受条件：
 
@@ -1255,7 +1255,7 @@ export interface RoutedFamilyEdge {
 
 gateway 坐标按 `routeOwnerId` 在同一域边界的字典序占用 8px subgrid 槽，不得两个 owner 使用相同点；gateway 是路由元数据，不渲染可见节点。
 
-- [ ] **Step 5: 明确同家庭允许共享的结构**
+- [x] **Step 5: 明确同家庭允许共享的结构**
 
 `buildRoute` 仍为一个 `ParentageGroup.id` 生成单一 route tree：
 
@@ -1265,7 +1265,7 @@ gateway 坐标按 `routeOwnerId` 在同一域边界的字典序占用 8px subgri
 
 只在同一 `RoutedFamilyEdge` 内 coalesce。这正是“同一个父辈出来的线可以一起”；任何跨 `routeOwnerId` coalesce 都是 bug。
 
-- [ ] **Step 6: 扩展 validator**
+- [x] **Step 6: 扩展 validator**
 
 新增校验：
 
@@ -1278,7 +1278,7 @@ gateway 坐标按 `routeOwnerId` 在同一域边界的字典序占用 8px subgri
 
 已有 `CROSS_FAMILY_SEGMENT_OVERLAP` 继续表达共线和假 T；gateway 或 domain 错误使用 `ROOT_DOMAIN_INTRUSION`；断线/错端点继续使用 `UNROUTABLE_PRIMARY_EDGE`。
 
-- [ ] **Step 7: 验证复杂路由**
+- [x] **Step 7: 验证复杂路由**
 
 运行：
 
@@ -1289,7 +1289,7 @@ npm run typecheck
 
 Expected: PASS；fixture 中至少包含允许点交叉但需要 bridge 的两条不同颜色路线，以及同代三个家庭不能共享 child bus 的回归用例。
 
-- [ ] **Step 8: 提交域感知路由**
+- [x] **Step 8: 提交域感知路由**
 
 ```bash
 git add src/core/family-layout/types.ts src/core/family-layout/routeFamilyLanes.ts src/core/family-layout/routeFamilyLanes.test.ts src/core/family-layout/validateScene.ts src/core/family-layout/validateScene.test.ts

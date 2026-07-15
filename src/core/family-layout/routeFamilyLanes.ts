@@ -3,17 +3,20 @@ import type {
   LayoutDiagnostic,
   LayoutMetrics,
   ParentageGroup,
+  PlacedLayoutDomain,
   PlacedPersonCard,
   Point,
   Rect,
+  RootSceneGeometry,
   RouteFamilyLanesResult,
+  RouteGateway,
   RoutedFamilyEdge,
   RouteSegment,
   SceneGeometry,
 } from './types'
 
 export interface RouteFamilyLanesInput {
-  geometry: SceneGeometry
+  geometry: SceneGeometry | RootSceneGeometry
   units: FamilyUnit[]
   parentageGroups: ParentageGroup[]
   metrics: LayoutMetrics
@@ -36,6 +39,10 @@ interface RouteRequest {
   childClearanceTop: number
   minX: number
   maxX: number
+  sourceDomainId?: string
+  targetDomainId?: string
+  gatewaySlotIndex?: number
+  gatewaySlotCount?: number
 }
 
 interface VerticalOccupancy {
@@ -51,6 +58,15 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
   const placedUnitsById = new Map(input.geometry.units.map(unit => [unit.id, unit]))
   const hubsById = new Map(input.geometry.hubs.map(hub => [hub.id, hub]))
   const cardsById = new Map(input.geometry.cards.map(card => [card.id, card]))
+  const rootedGeometry = isRootSceneGeometry(input.geometry)
+    ? input.geometry
+    : undefined
+  const domainById = new Map(
+    rootedGeometry === undefined
+      ? []
+      : [...rootedGeometry.rootDomains, ...rootedGeometry.bridgeDomains]
+        .map(domain => [domain.id, domain] as const),
+  )
   const requests: RouteRequest[] = []
 
   for (const group of [...input.parentageGroups].sort(compareById)) {
@@ -72,6 +88,24 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       continue
     }
     const childPorts = children.map(child => topPort(child.rect))
+    const sourceDomainId = placedUnitDomainId(placedSource)
+    const targetDomainIds = [...new Set(children.flatMap(child => {
+      const childUnit = placedUnitsById.get(child.unitId)
+      const domainId = childUnit === undefined ? undefined : placedUnitDomainId(childUnit)
+      return domainId === undefined ? [] : [domainId]
+    }))]
+    if (
+      rootedGeometry !== undefined
+      && (
+        sourceDomainId === undefined
+        || targetDomainIds.length !== 1
+        || !domainById.has(sourceDomainId)
+        || !domainById.has(targetDomainIds[0])
+      )
+    ) {
+      diagnostics.push(unroutable(group.id))
+      continue
+    }
     requests.push({
       group,
       sourceUnit,
@@ -86,9 +120,12 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       ))),
       minX: Math.min(...childPorts.map(point => point.x)),
       maxX: Math.max(...childPorts.map(point => point.x)),
+      sourceDomainId,
+      targetDomainId: targetDomainIds[0],
     })
   }
 
+  assignGatewaySlots(requests, domainById)
   requests.sort((left, right) => (
     (right.maxX - right.minX) - (left.maxX - left.minX)
     || left.group.id.localeCompare(right.group.id)
@@ -96,17 +133,37 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
   const horizontalOccupancyByY = new Map<number, LaneOccupancy>()
   const verticalOccupancy: VerticalOccupancy[] = []
   const rawRoutes: RoutedFamilyEdge[] = []
+  const gateways: RouteGateway[] = []
 
   for (const request of requests) {
     let acceptedRoute: RoutedFamilyEdge | undefined
+    let acceptedGateways: RouteGateway[] = []
     const lastLaneIndex = maximumLaneIndex(request, input.metrics)
-    for (let laneIndex = 0; laneIndex <= lastLaneIndex; laneIndex++) {
+    const firstLaneIndex = request.gatewaySlotIndex ?? 0
+    const laneStride = request.gatewaySlotCount ?? 1
+    for (
+      let laneIndex = firstLaneIndex;
+      laneIndex <= lastLaneIndex;
+      laneIndex += laneStride
+    ) {
       const laneY = request.parentBottom
         + input.metrics.routeSubgrid * (laneIndex + 2)
       if (childBusConflictsAtY(request, laneY, horizontalOccupancyByY)) continue
       const verticalOccupancyStart = verticalOccupancy.length
-      const candidate = buildRoute(request, laneY, verticalOccupancy, input.metrics)
+      const routedCandidate = request.sourceDomainId !== undefined
+        && request.targetDomainId !== undefined
+        && request.sourceDomainId !== request.targetDomainId
+        ? buildCrossDomainRoute(
+            request,
+            laneY,
+            verticalOccupancy,
+            input.metrics,
+            domainById,
+          )
+        : { route: buildRoute(request, laneY, verticalOccupancy, input.metrics), gateways: [] }
+      const candidate = routedCandidate.route
       const blocked = horizontalFootprintConflicts(candidate, horizontalOccupancyByY)
+        || routeConflictsWithAccepted(candidate, rawRoutes)
         || routeIntersectsObstacle(candidate, request, input.geometry, input.metrics)
       if (blocked) {
         verticalOccupancy.length = verticalOccupancyStart
@@ -114,19 +171,63 @@ export function routeFamilyLanes(input: RouteFamilyLanesInput): RouteFamilyLanes
       }
       registerHorizontalFootprint(candidate, horizontalOccupancyByY)
       acceptedRoute = candidate
+      acceptedGateways = routedCandidate.gateways
       break
     }
     if (acceptedRoute === undefined) diagnostics.push(unroutable(request.group.id))
     else rawRoutes.push({
       ...acceptedRoute,
-      segments: coalesceHorizontalSegments(acceptedRoute.segments),
+      segments: (acceptedRoute.gatewayIds?.length ?? 0) > 0
+        ? acceptedRoute.segments
+        : coalesceHorizontalSegments(acceptedRoute.segments),
     })
+    if (acceptedRoute !== undefined) gateways.push(...acceptedGateways)
   }
 
   const routes = addCrossingBridges(rawRoutes, input.metrics.routeSubgrid)
     .sort((left, right) => left.routeOwnerId.localeCompare(right.routeOwnerId))
   diagnostics.sort((left, right) => left.ids.join('+').localeCompare(right.ids.join('+')))
-  return { routes, diagnostics }
+  return {
+    routes,
+    gateways: gateways.sort((left, right) => left.id.localeCompare(right.id)),
+    diagnostics,
+  }
+}
+
+function assignGatewaySlots(
+  requests: RouteRequest[],
+  domainById: ReadonlyMap<string, PlacedLayoutDomain>,
+): void {
+  const requestsByBoundaryPair = new Map<string, RouteRequest[]>()
+  for (const request of requests) {
+    if (
+      request.sourceDomainId === undefined
+      || request.targetDomainId === undefined
+      || request.sourceDomainId === request.targetDomainId
+    ) continue
+    const sourceDomain = domainById.get(request.sourceDomainId)
+    const targetDomain = domainById.get(request.targetDomainId)
+    if (sourceDomain === undefined || targetDomain === undefined) continue
+    const targetIsRight = rectCenterX(targetDomain.rect) > rectCenterX(sourceDomain.rect)
+    const sourceSide = targetIsRight ? 'right' : 'left'
+    const targetSide = targetIsRight ? 'left' : 'right'
+    const key = [
+      `${sourceDomain.id}:${sourceSide}`,
+      `${targetDomain.id}:${targetSide}`,
+      request.parentBottom,
+      request.childClearanceTop,
+    ].join('|')
+    const grouped = requestsByBoundaryPair.get(key) ?? []
+    grouped.push(request)
+    requestsByBoundaryPair.set(key, grouped)
+  }
+  for (const grouped of requestsByBoundaryPair.values()) {
+    grouped.sort((left, right) => left.group.id.localeCompare(right.group.id))
+    grouped.forEach((request, index) => {
+      request.gatewaySlotIndex = index
+      request.gatewaySlotCount = grouped.length
+    })
+  }
 }
 
 function coalesceHorizontalSegments(segments: RouteSegment[]): RouteSegment[] {
@@ -200,6 +301,51 @@ function horizontalFootprintConflicts(
         occupied.maxX,
       )
     )) ?? false
+  ))
+}
+
+function routeConflictsWithAccepted(
+  candidate: RoutedFamilyEdge,
+  acceptedRoutes: RoutedFamilyEdge[],
+): boolean {
+  return acceptedRoutes.some(accepted => candidate.segments.some(candidateSegment => (
+    accepted.segments.some(acceptedSegment => (
+      segmentsShareOwnedGeometry(candidateSegment, acceptedSegment)
+    ))
+  )))
+}
+
+function segmentsShareOwnedGeometry(
+  left: RouteSegment,
+  right: RouteSegment,
+): boolean {
+  if (left.orientation === 'bridge' || right.orientation === 'bridge') return false
+  const [leftStart, leftEnd] = left.points
+  const [rightStart, rightEnd] = right.points
+  if (left.orientation === right.orientation) {
+    const sharesPositiveLength = left.orientation === 'horizontal'
+      ? leftStart.y === rightStart.y && intervalsHavePositiveOverlap(
+          leftStart.x,
+          leftEnd.x,
+          rightStart.x,
+          rightEnd.x,
+        )
+      : leftStart.x === rightStart.x && intervalsHavePositiveOverlap(
+          leftStart.y,
+          leftEnd.y,
+          rightStart.y,
+          rightEnd.y,
+        )
+    if (sharesPositiveLength) return true
+  }
+  const leftEndpoints = [leftStart, leftEnd]
+  const rightEndpoints = [rightStart, rightEnd]
+  return leftEndpoints.some(leftPoint => rightEndpoints.some(rightPoint => (
+    samePoint(leftPoint, rightPoint)
+  ))) || leftEndpoints.some(point => (
+    pointStrictlyInsideSegment(point, rightStart, rightEnd)
+  )) || rightEndpoints.some(point => (
+    pointStrictlyInsideSegment(point, leftStart, leftEnd)
   ))
 }
 
@@ -285,6 +431,115 @@ function buildRoute(
     kind: 'primary',
     accent: request.sourceUnit.accent,
     segments: segments.filter(segment => !zeroLength(segment)),
+    gatewayIds: [],
+  }
+}
+
+function buildCrossDomainRoute(
+  request: RouteRequest,
+  laneY: number,
+  occupancy: VerticalOccupancy[],
+  metrics: LayoutMetrics,
+  domainById: ReadonlyMap<string, PlacedLayoutDomain>,
+): { route: RoutedFamilyEdge; gateways: RouteGateway[] } {
+  const sourceDomain = domainById.get(request.sourceDomainId ?? '')
+  const targetDomain = domainById.get(request.targetDomainId ?? '')
+  if (sourceDomain === undefined || targetDomain === undefined) {
+    return {
+      route: buildRoute(request, laneY, occupancy, metrics),
+      gateways: [],
+    }
+  }
+  const targetIsRight = rectCenterX(targetDomain.rect) > rectCenterX(sourceDomain.rect)
+  const sourceSide = targetIsRight ? 'right' as const : 'left' as const
+  const targetSide = targetIsRight ? 'left' as const : 'right' as const
+  const sourceGateway = gatewayAt(
+    sourceDomain,
+    sourceSide,
+    laneY,
+    request.group.id,
+  )
+  const targetGateway = gatewayAt(
+    targetDomain,
+    targetSide,
+    laneY,
+    request.group.id,
+  )
+  const segments: RouteSegment[] = []
+  const sourceVertical = allocateVertical(
+    request.sourceHub,
+    { x: request.sourceHub.x, y: laneY },
+    request.group.id,
+    occupancy,
+    metrics.routeSubgrid,
+    request.sourceMinX,
+    request.sourceMaxX,
+    true,
+    false,
+  )
+  segments.push(...sourceVertical.segments)
+  if (sourceVertical.x !== sourceGateway.point.x) {
+    segments.push(horizontal(sourceVertical.x, sourceGateway.point.x, laneY))
+  }
+  if (sourceGateway.point.x !== targetGateway.point.x) {
+    segments.push(horizontal(sourceGateway.point.x, targetGateway.point.x, laneY))
+  }
+  const childVerticals = request.childPorts.map(childPort => allocateVertical(
+    { x: childPort.x, y: laneY },
+    childPort,
+    request.group.id,
+    occupancy,
+    metrics.routeSubgrid,
+    request.minX,
+    request.maxX,
+    false,
+    true,
+  ))
+  const busMinX = Math.min(...childVerticals.map(value => value.x))
+  const busMaxX = Math.max(...childVerticals.map(value => value.x))
+  if (request.childPorts.length > 1) {
+    segments.push(horizontal(busMinX, busMaxX, laneY))
+  }
+  const targetConnectionX = Math.max(
+    busMinX,
+    Math.min(busMaxX, targetGateway.point.x),
+  )
+  if (targetGateway.point.x !== targetConnectionX) {
+    segments.push(horizontal(targetGateway.point.x, targetConnectionX, laneY))
+  } else if (request.childPorts.length === 1 && targetGateway.point.x !== busMinX) {
+    segments.push(horizontal(targetGateway.point.x, busMinX, laneY))
+  }
+  childVerticals.forEach(value => segments.push(...value.segments))
+  const gatewayIds = [sourceGateway.id, targetGateway.id]
+
+  return {
+    route: {
+      id: `route:${request.group.id}`,
+      routeOwnerId: request.group.id,
+      kind: 'primary',
+      accent: request.sourceUnit.accent,
+      segments: segments.filter(segment => !zeroLength(segment)),
+      gatewayIds,
+    },
+    gateways: [sourceGateway, targetGateway],
+  }
+}
+
+function gatewayAt(
+  domain: PlacedLayoutDomain,
+  side: 'left' | 'right',
+  y: number,
+  routeOwnerId: string,
+): RouteGateway {
+  return {
+    id: `gateway:${domain.id}:${side}:${routeOwnerId}`,
+    domainId: domain.id,
+    side,
+    point: {
+      x: side === 'left' ? domain.rect.x : domain.rect.x + domain.rect.width,
+      y,
+    },
+    routeOwnerId,
   }
 }
 
@@ -332,7 +587,7 @@ function allocateVerticalX(
   const conflictsAt = (x: number) => occupancy.some(vertical => (
     vertical.routeOwnerId !== routeOwnerId
     && vertical.x === x
-    && positiveOverlap(minY, maxY, vertical.minY, vertical.maxY)
+    && intervalsOverlapOrTouch(minY, maxY, vertical.minY, vertical.maxY)
   ))
   if (!conflictsAt(desiredX)) return desiredX
 
@@ -442,7 +697,7 @@ function bridgeHorizontal(
 function routeIntersectsObstacle(
   route: RoutedFamilyEdge,
   request: RouteRequest,
-  geometry: SceneGeometry,
+  geometry: SceneGeometry | RootSceneGeometry,
   metrics: LayoutMetrics,
 ): boolean {
   const ownCardIds = new Set([
@@ -513,8 +768,14 @@ function intervalsOverlapOrTouch(
   return leftMin <= rightMax && rightMin <= leftMax
 }
 
-function positiveOverlap(leftMin: number, leftMax: number, rightMin: number, rightMax: number): boolean {
-  return Math.max(leftMin, rightMin) < Math.min(leftMax, rightMax)
+function intervalsHavePositiveOverlap(
+  leftStart: number,
+  leftEnd: number,
+  rightStart: number,
+  rightEnd: number,
+): boolean {
+  return Math.max(Math.min(leftStart, leftEnd), Math.min(rightStart, rightEnd))
+    < Math.min(Math.max(leftStart, leftEnd), Math.max(rightStart, rightEnd))
 }
 
 function pointStrictlyInsideSegment(point: Point, start: Point, end: Point): boolean {
@@ -538,4 +799,24 @@ function unroutable(groupId: string): LayoutDiagnostic {
 
 function compareById(left: { id: string }, right: { id: string }): number {
   return left.id.localeCompare(right.id)
+}
+
+function isRootSceneGeometry(
+  geometry: SceneGeometry | RootSceneGeometry,
+): geometry is RootSceneGeometry {
+  return 'rootDomains' in geometry && 'bridgeDomains' in geometry
+}
+
+function placedUnitDomainId(unit: object): string | undefined {
+  return 'domainId' in unit && typeof unit.domainId === 'string'
+    ? unit.domainId
+    : undefined
+}
+
+function rectCenterX(rect: Rect): number {
+  return rect.x + rect.width / 2
+}
+
+function samePoint(left: Point, right: Point): boolean {
+  return left.x === right.x && left.y === right.y
 }

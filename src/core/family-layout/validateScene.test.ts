@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { validateScene } from './validateScene'
+import { placeRootDomains } from './placeRootDomains'
+import { preparedTwoRootLayout } from './rootLayoutTestHelpers'
+import { routeFamilyLanes } from './routeFamilyLanes'
 import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type RoutedFamilyEdge } from './types'
 
 describe('validateScene', () => {
@@ -91,6 +94,49 @@ describe('validateScene', () => {
       code: 'UNROUTABLE_PRIMARY_EDGE',
       ids: ['obstacle', 'parentage:blocked'],
       message: 'Route parentage:blocked intersects card obstacle',
+    })
+  })
+
+  it('reports a rooted gateway that drifts off its declared domain boundary', () => {
+    const prepared = preparedTwoRootLayout()
+    const geometry = placeRootDomains(prepared)
+    const routing = routeFamilyLanes({
+      geometry,
+      units: prepared.units,
+      parentageGroups: prepared.parentageGroups,
+      metrics: prepared.metrics,
+    })
+    const scene = {
+      ...geometry,
+      routes: routing.routes,
+      gateways: structuredClone(routing.gateways),
+      diagnostics: [],
+    }
+    const gateway = scene.gateways[0]
+    gateway.point.x += prepared.metrics.routeSubgrid
+
+    expect(validateScene(scene, prepared.metrics)).toContainEqual({
+      code: 'ROOT_DOMAIN_INTRUSION',
+      ids: [gateway.id, gateway.routeOwnerId].sort(),
+      message: `Gateway ${gateway.id} does not match its domain boundary and route owner`,
+    })
+  })
+
+  it('reports a rooted family unit assigned to a non-matching domain', () => {
+    const prepared = preparedTwoRootLayout()
+    const geometry = placeRootDomains(prepared)
+    const unit = geometry.units[0]
+    unit.domainId = 'domain:missing'
+
+    expect(validateScene({
+      ...geometry,
+      routes: [],
+      gateways: [],
+      diagnostics: [],
+    }, prepared.metrics)).toContainEqual({
+      code: 'ROOT_DOMAIN_INTRUSION',
+      ids: [unit.id, unit.domainId].sort(),
+      message: `Family unit ${unit.id} is not contained by exactly one matching layout domain`,
     })
   })
 

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { routeFamilyLanes } from './routeFamilyLanes'
 import { materializeSceneGeometry } from './materializeSceneGeometry'
+import { placeRootDomains } from './placeRootDomains'
 import { positiveCollinearOverlap } from './testHelpers'
+import {
+  preparedDenseRootLayout,
+  preparedTwoRootLayout,
+  preparedWideThreeFamiliesLayout,
+} from './rootLayoutTestHelpers'
 import { validateScene } from './validateScene'
 import {
   DEFAULT_LAYOUT_METRICS,
@@ -39,6 +45,101 @@ describe('routeFamilyLanes', () => {
         }
       }
     }
+  })
+
+  it('routes cross-domain parentage through deterministic boundary gateways', () => {
+    const prepared = preparedTwoRootLayout()
+    const geometry = placeRootDomains(prepared)
+    const result = routeFamilyLanes({
+      geometry,
+      units: prepared.units,
+      parentageGroups: prepared.parentageGroups,
+      metrics: prepared.metrics,
+    })
+    const ownerId = 'parentage:a1'
+    const sourceDomainId = 'domain:root:a0+a0-spouse'
+    const targetDomainId = [
+      'domain:bridge:root:a0+a0-spouse',
+      'root:b0+b0-spouse',
+    ].join('|')
+    const route = result.routes.find(value => value.routeOwnerId === ownerId)!
+
+    expect(result.diagnostics).toEqual([])
+    const gatewayIds = route.gatewayIds!
+    expect(gatewayIds).toEqual([
+      `gateway:${sourceDomainId}:right:${ownerId}`,
+      `gateway:${targetDomainId}:left:${ownerId}`,
+    ])
+    expect(gatewayIds.every(id => result.gateways.some(gateway => (
+      gateway.id === id && gateway.routeOwnerId === ownerId
+    )))).toBe(true)
+    const endpoints = route.segments.flatMap(segment => [
+      segment.points[0],
+      segment.points.at(-1)!,
+    ])
+    for (const gateway of result.gateways.filter(value => (
+      value.routeOwnerId === ownerId
+    ))) expect(endpoints).toContainEqual(gateway.point)
+    expect(validateScene({
+      ...geometry,
+      routes: result.routes,
+      gateways: result.gateways,
+      diagnostics: [],
+    }, prepared.metrics)).toEqual([])
+  })
+
+  it('keeps three neighboring families on independent child buses', () => {
+    const prepared = preparedWideThreeFamiliesLayout()
+    const geometry = placeRootDomains(prepared)
+    const result = routeFamilyLanes({
+      geometry,
+      units: prepared.units,
+      parentageGroups: prepared.parentageGroups,
+      metrics: prepared.metrics,
+    })
+    const branchOwnerIds = ['a', 'b', 'c'].map(branchId => (
+      `parentage:branch-${branchId}+branch-${branchId}-spouse`
+    ))
+    const branchRoutes = result.routes.filter(route => (
+      branchOwnerIds.includes(route.routeOwnerId)
+    ))
+
+    expect(result.diagnostics).toEqual([])
+    expect(branchRoutes).toHaveLength(3)
+    for (let left = 0; left < branchRoutes.length; left += 1) {
+      for (let right = left + 1; right < branchRoutes.length; right += 1) {
+        for (const leftSegment of branchRoutes[left].segments) {
+          for (const rightSegment of branchRoutes[right].segments) {
+            expect(positiveCollinearOverlap(leftSegment, rightSegment)).toBe(false)
+          }
+        }
+      }
+    }
+    expect(validateScene({
+      ...geometry,
+      routes: result.routes,
+      gateways: result.gateways,
+      diagnostics: [],
+    }, prepared.metrics)).toEqual([])
+  })
+
+  it('routes a dense multi-root island without crossing cards or sharing lanes', () => {
+    const prepared = preparedDenseRootLayout()
+    const geometry = placeRootDomains(prepared)
+    const result = routeFamilyLanes({
+      geometry,
+      units: prepared.units,
+      parentageGroups: prepared.parentageGroups,
+      metrics: prepared.metrics,
+    })
+
+    expect(result.diagnostics).toEqual([])
+    expect(validateScene({
+      ...geometry,
+      routes: result.routes,
+      gateways: result.gateways,
+      diagnostics: [],
+    }, prepared.metrics)).toEqual([])
   })
 
   it('allocates lanes from the complete horizontal footprint including a source connector', () => {

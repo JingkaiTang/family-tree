@@ -285,6 +285,7 @@ export interface RoutedFamilyEdge {
   kind: 'primary' | 'historical-partnership' | 'secondary-partnership' | 'secondary-parentage' | 'godparent'
   accent: string
   segments: RouteSegment[]
+  gatewayIds?: string[]
 }
 export interface RouteGateway {
   id: string
@@ -295,6 +296,7 @@ export interface RouteGateway {
 }
 export interface RouteFamilyLanesResult {
   routes: RoutedFamilyEdge[]
+  gateways: RouteGateway[]
   diagnostics: LayoutDiagnostic[]
 }
 export interface LayoutScene {

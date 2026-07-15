@@ -2,13 +2,19 @@ import type {
   LayoutDiagnostic,
   LayoutMetrics,
   LayoutScene,
+  PlacedLayoutDomain,
   Point,
   Rect,
+  RootLayoutScene,
+  RouteGateway,
   RoutedFamilyEdge,
   RouteSegment,
 } from './types'
 
-export function validateScene(scene: LayoutScene, metrics: LayoutMetrics): LayoutDiagnostic[] {
+export function validateScene(
+  scene: LayoutScene | RootLayoutScene,
+  metrics: LayoutMetrics,
+): LayoutDiagnostic[] {
   const diagnostics: LayoutDiagnostic[] = []
   forEachOverlap(scene.cards, (left, right) => diagnostics.push({
     code: 'NODE_OVERLAP',
@@ -20,6 +26,7 @@ export function validateScene(scene: LayoutScene, metrics: LayoutMetrics): Layou
     ids: sortedIds(left.id, right.id),
     message: `Family units ${sortedIds(left.id, right.id).join(' and ')} overlap`,
   }))
+  if (isRootLayoutScene(scene)) validateRootedGeometry(scene, diagnostics)
   const routeGeometry = scene.routes.map(route => ({
     bounds: routeBounds(route),
     segmentBounds: route.segments.map(segment => pointsBounds(segment.points)),
@@ -48,6 +55,127 @@ export function validateScene(scene: LayoutScene, metrics: LayoutMetrics): Layou
     || left.ids.join('+').localeCompare(right.ids.join('+'))
     || left.message.localeCompare(right.message)
   ))
+}
+
+function validateRootedGeometry(
+  scene: RootLayoutScene,
+  diagnostics: LayoutDiagnostic[],
+): void {
+  const domains = [...scene.rootDomains, ...scene.bridgeDomains]
+  const domainById = new Map(domains.map(domain => [domain.id, domain]))
+  const unitById = new Map(scene.units.map(unit => [unit.id, unit]))
+
+  for (const unit of scene.units) {
+    const containingDomains = domains.filter(domain => rectContains(domain.rect, unit.rect))
+    if (
+      containingDomains.length === 1
+      && containingDomains[0].id === unit.domainId
+      && domainById.has(unit.domainId)
+    ) continue
+    diagnostics.push({
+      code: 'ROOT_DOMAIN_INTRUSION',
+      ids: sortedIds(unit.id, unit.domainId),
+      message: `Family unit ${unit.id} is not contained by exactly one matching layout domain`,
+    })
+  }
+  for (const card of scene.cards) {
+    const unit = unitById.get(card.unitId)
+    const containingDomains = domains.filter(domain => rectContains(domain.rect, card.rect))
+    if (
+      unit !== undefined
+      && rectContains(unit.rect, card.rect)
+      && containingDomains.length === 1
+      && containingDomains[0].id === unit.domainId
+    ) continue
+    diagnostics.push({
+      code: 'ROOT_DOMAIN_INTRUSION',
+      ids: sortedIds(card.id, card.unitId),
+      message: `Person card ${card.id} is not contained by its family layout domain`,
+    })
+  }
+
+  const orderedRootDomains = [...scene.rootDomains].sort((left, right) => (
+    left.rect.x - right.rect.x || left.id.localeCompare(right.id)
+  ))
+  for (let index = 1; index < orderedRootDomains.length; index += 1) {
+    const previous = orderedRootDomains[index - 1]
+    const current = orderedRootDomains[index]
+    if (previous.rect.x + previous.rect.width <= current.rect.x) continue
+    const ids = sortedIds(previous.id, current.id)
+    diagnostics.push({
+      code: 'ROOT_DOMAIN_INTRUSION',
+      ids,
+      message: `Root domains ${ids.join(' and ')} have interleaving x intervals`,
+    })
+  }
+
+  const gatewayById = new Map(scene.gateways.map(gateway => [gateway.id, gateway]))
+  for (const gateway of scene.gateways) {
+    const domain = domainById.get(gateway.domainId)
+    const route = scene.routes.find(value => value.routeOwnerId === gateway.routeOwnerId)
+    if (
+      domain !== undefined
+      && gatewayLiesOnBoundary(gateway, domain)
+      && route?.gatewayIds?.includes(gateway.id) === true
+      && route.segments.some(segment => pointTopologicallyOnSegment(
+        gateway.point,
+        segment,
+      ))
+    ) continue
+    diagnostics.push({
+      code: 'ROOT_DOMAIN_INTRUSION',
+      ids: sortedIds(gateway.id, gateway.routeOwnerId),
+      message: `Gateway ${gateway.id} does not match its domain boundary and route owner`,
+    })
+  }
+  for (const route of scene.routes.filter(value => value.kind === 'primary')) {
+    for (const gatewayId of route.gatewayIds ?? []) {
+      const gateway = gatewayById.get(gatewayId)
+      if (gateway?.routeOwnerId === route.routeOwnerId) continue
+      diagnostics.push({
+        code: 'ROOT_DOMAIN_INTRUSION',
+        ids: sortedIds(gatewayId, route.routeOwnerId),
+        message: `Route ${route.routeOwnerId} references an invalid domain gateway`,
+      })
+    }
+  }
+}
+
+function gatewayLiesOnBoundary(
+  gateway: RouteGateway,
+  domain: PlacedLayoutDomain,
+): boolean {
+  const withinHorizontalSpan = gateway.point.x >= domain.rect.x
+    && gateway.point.x <= domain.rect.x + domain.rect.width
+  const withinVerticalSpan = gateway.point.y >= domain.rect.y
+    && gateway.point.y <= domain.rect.y + domain.rect.height
+  if (gateway.side === 'left') {
+    return gateway.point.x === domain.rect.x && withinVerticalSpan
+  }
+  if (gateway.side === 'right') {
+    return gateway.point.x === domain.rect.x + domain.rect.width
+      && withinVerticalSpan
+  }
+  if (gateway.side === 'top') {
+    return gateway.point.y === domain.rect.y && withinHorizontalSpan
+  }
+  return gateway.point.y === domain.rect.y + domain.rect.height
+    && withinHorizontalSpan
+}
+
+function rectContains(outer: Rect, inner: Rect): boolean {
+  return inner.x >= outer.x
+    && inner.y >= outer.y
+    && inner.x + inner.width <= outer.x + outer.width
+    && inner.y + inner.height <= outer.y + outer.height
+}
+
+function isRootLayoutScene(
+  scene: LayoutScene | RootLayoutScene,
+): scene is RootLayoutScene {
+  return 'rootDomains' in scene
+    && 'bridgeDomains' in scene
+    && 'gateways' in scene
 }
 
 function validateRouteTerminals(
