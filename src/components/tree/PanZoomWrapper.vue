@@ -49,6 +49,14 @@ function resetView() {
   pz?.reset()
 }
 
+function resetToDefaultView() {
+  pz?.reset({
+    startScale: 1,
+    startX: 0,
+    startY: 0,
+  })
+}
+
 function zoomIn() {
   zoomByStep(1)
 }
@@ -175,7 +183,15 @@ onBeforeUnmount(() => {
   pz = null
 })
 
-defineExpose({ resetView, zoomIn, zoomOut, getScale, focusStagePoint, snapshot })
+defineExpose({
+  resetView,
+  resetToDefaultView,
+  zoomIn,
+  zoomOut,
+  getScale,
+  focusStagePoint,
+  snapshot,
+})
 </script>
 
 <template>

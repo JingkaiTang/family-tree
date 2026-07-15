@@ -43,6 +43,24 @@ describe('PanZoomWrapper', () => {
     wrapper.unmount()
   })
 
+  it('resets to the product default instead of the mounted session view', () => {
+    const wrapper = mount(PanZoomWrapper, {
+      props: {
+        initialView: { x: 120, y: -80, scale: 1.75 },
+      },
+    })
+    const instance = panzoom.mock.results.at(-1)!.value
+
+    ;(wrapper.vm as unknown as { resetToDefaultView(): void }).resetToDefaultView()
+
+    expect(instance.reset).toHaveBeenCalledWith({
+      startScale: 1,
+      startX: 0,
+      startY: 0,
+    })
+    wrapper.unmount()
+  })
+
   it('keeps the viewport center fixed when toolbar buttons change scale', async () => {
     const wrapper = mount(PanZoomWrapper, { attachTo: document.body })
     const host = wrapper.get('.pz-stage').element.parentElement!
