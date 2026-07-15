@@ -1547,7 +1547,7 @@ git commit -m "feat: render implicit root lineage identity"
 - Modify: `src/pages/TreeView.vue`
 - Modify: `src/__tests__/pages/TreeView.test.ts`
 
-- [ ] **Step 1: 扩展拖拽状态类型并写失败测试**
+- [x] **Step 1: 扩展拖拽状态类型并写失败测试**
 
 拖拽状态使用判别联合：
 
@@ -1595,7 +1595,7 @@ it('moves every unit in a root domain when dragging its root family', async () =
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/__tests__/components/FamilyCanvas.test.ts src/__tests__/pages/TreeView.test.ts
@@ -1603,7 +1603,7 @@ npm test -- src/__tests__/components/FamilyCanvas.test.ts src/__tests__/pages/Tr
 
 Expected: FAIL，Canvas 只有全局同代 row drag。
 
-- [ ] **Step 3: 判定拖拽模式**
+- [x] **Step 3: 判定拖拽模式**
 
 pointer drag 开始时只根据 scene 元数据决定模式：
 
@@ -1613,7 +1613,7 @@ pointer drag 开始时只根据 scene 元数据决定模式：
 
 不得根据卡片性别、显示顺序、route 或 CSS class 推断。
 
-- [ ] **Step 4: 普通家庭和桥接家庭落点限制**
+- [x] **Step 4: 普通家庭和桥接家庭落点限制**
 
 row insertion 候选先过滤 `domainId` 和 `generation`，再按 x center 算 insertion index。拖到其他域或代的 preview 显示 invalid，但不 emit。有效 preview 只漂移同一候选行的邻居；父子重心的重新计算交给布局引擎完成。
 
@@ -1625,7 +1625,7 @@ row insertion 候选先过滤 `domainId` 和 `generation`，再按 x center 算 
 (event: 'root-order-change', componentId: string, rootIds: string[]): void
 ```
 
-- [ ] **Step 5: 根域整体拖拽预览**
+- [x] **Step 5: 根域整体拖拽预览**
 
 拖动 root family 时：
 
@@ -1636,11 +1636,11 @@ row insertion 候选先过滤 `domainId` 和 `generation`，再按 x center 算 
 - y 方向只跟手显示轻微视觉位移，不改变 generation；
 - pointer cancel、失焦、reset version 或新 layout request 必须取消整个预览。
 
-- [ ] **Step 6: TreeView 绑定新 Store actions**
+- [x] **Step 6: TreeView 绑定新 Store actions**
 
 将旧 `row-order-change` 绑定替换为三个新事件；页面不解释偏好内容，只转发到 Store。更新 Canvas stub 与页面测试。
 
-- [ ] **Step 7: 覆盖异步竞态**
+- [x] **Step 7: 覆盖异步竞态**
 
 沿用当前 `dragToken` 和 layout request ID：
 
@@ -1649,7 +1649,7 @@ row insertion 候选先过滤 `domainId` 和 `generation`，再按 x center 算 
 - bridge/root drop 后在新 scene 落地前保留 preview；
 - reset 优先级高于所有 pending drop。
 
-- [ ] **Step 8: 验证 GREEN**
+- [x] **Step 8: 验证 GREEN**
 
 ```bash
 npm test -- src/__tests__/components/FamilyCanvas.test.ts src/__tests__/pages/TreeView.test.ts
@@ -1658,7 +1658,7 @@ npm run typecheck
 
 Expected: PASS。
 
-- [ ] **Step 9: 提交域约束拖拽**
+- [x] **Step 9: 提交域约束拖拽**
 
 ```bash
 git add src/components/tree/FamilyCanvas.vue src/__tests__/components/FamilyCanvas.test.ts src/pages/TreeView.vue src/__tests__/pages/TreeView.test.ts

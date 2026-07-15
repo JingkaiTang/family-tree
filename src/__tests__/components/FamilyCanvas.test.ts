@@ -138,7 +138,7 @@ const sortableScene: LayoutScene = {
       domainId: 'domain:root:test',
       memberRootIds: { A: 'root:test' },
       rootAccent: '#111111',
-      isRootFamily: true,
+      isRootFamily: false,
       rect: { x: 0, y: 0, width: 168, height: 216 },
       order: 0,
     },
@@ -238,6 +238,138 @@ const sortableScene: LayoutScene = {
   diagnostics: [],
 }
 
+function twoRootDragScene(): LayoutScene {
+  return dragScene([
+    dragDomain('domain:root:a', 'root:a', 0, ['unit:a-root', 'unit:a-child']),
+    dragDomain('domain:root:b', 'root:b', 600, ['unit:b-root', 'unit:b-child']),
+  ], [
+    dragUnit('unit:a-root', 'a-root', 'domain:root:a', 'root:a', 0, 0, true),
+    dragUnit('unit:a-child', 'a-child', 'domain:root:a', 'root:a', 0, 360),
+    dragUnit('unit:b-root', 'b-root', 'domain:root:b', 'root:b', 600, 0, true),
+    dragUnit('unit:b-child', 'b-child', 'domain:root:b', 'root:b', 600, 360),
+  ])
+}
+
+function twoBridgeFamilyScene(): LayoutScene {
+  const units = [
+    dragUnit('unit:cross-1', 'cross-1', 'domain:bridge:a+b', 'root:a', 300, 360),
+    dragUnit('unit:cross-2', 'cross-2', 'domain:bridge:a+b', 'root:b', 540, 360),
+  ]
+  const scene = dragScene([
+    dragDomain('domain:root:a', 'root:a', 0, []),
+    dragDomain('domain:root:b', 'root:b', 900, []),
+  ], units)
+  scene.bridgeDomains = [{
+    id: 'domain:bridge:a+b',
+    kind: 'pair-bridge',
+    componentId: 'component:main',
+    rootIds: ['root:a', 'root:b'],
+    signature: ['root:a', 'root:b'],
+    personIds: ['cross-1', 'cross-2'],
+    unitIds: ['unit:cross-1', 'unit:cross-2'],
+    order: 1,
+    accent: '#4F7CAC',
+    rect: { x: 276, y: 0, width: 456, height: 576 },
+    columnStart: 11,
+    columnEnd: 29,
+  }]
+  scene.rows = [{
+    id: 'row:domain:bridge:a+b:2',
+    generation: 2,
+    unitIds: ['unit:cross-1', 'unit:cross-2'],
+  }]
+  return scene
+}
+
+function threeRootDragScene(): LayoutScene {
+  return dragScene([
+    dragDomain('domain:root:a', 'root:a', 0, ['unit:root:a', 'unit:a-child']),
+    dragDomain('domain:root:b', 'root:b', 480, ['unit:root:b']),
+    dragDomain('domain:root:c', 'root:c', 960, ['unit:root:c']),
+  ], [
+    dragUnit('unit:root:a', 'root-a', 'domain:root:a', 'root:a', 0, 0, true),
+    dragUnit('unit:a-child', 'a-child', 'domain:root:a', 'root:a', 0, 360),
+    dragUnit('unit:root:b', 'root-b', 'domain:root:b', 'root:b', 480, 0, true),
+    dragUnit('unit:root:c', 'root-c', 'domain:root:c', 'root:c', 960, 0, true),
+  ])
+}
+
+function dragScene(
+  rootDomains: LayoutScene['rootDomains'],
+  units: LayoutScene['units'],
+): LayoutScene {
+  return {
+    units,
+    cards: units.map(unit => ({
+      id: unit.memberIds[0],
+      unitId: unit.id,
+      generation: unit.generation,
+      rect: { ...unit.rect },
+    })),
+    hubs: [],
+    rows: units.map(unit => ({
+      id: `row:${unit.domainId}:${unit.generation}`,
+      generation: unit.generation,
+      unitIds: [unit.id],
+    })),
+    rootDomains,
+    bridgeDomains: [],
+    gateways: [],
+    routes: [],
+    bounds: { x: 0, y: 0, width: 1128, height: 576 },
+    diagnostics: [],
+  }
+}
+
+function dragDomain(
+  id: string,
+  rootId: string,
+  x: number,
+  unitIds: string[],
+): LayoutScene['rootDomains'][number] {
+  return {
+    id,
+    kind: 'root',
+    componentId: 'component:main',
+    rootIds: [rootId],
+    signature: [rootId],
+    personIds: [],
+    unitIds,
+    order: x,
+    accent: rootId === 'root:b' ? '#B56576' : '#4F7CAC',
+    rect: { x, y: 0, width: 168, height: 576 },
+    columnStart: x / 24,
+    columnEnd: x / 24 + 6,
+  }
+}
+
+function dragUnit(
+  id: string,
+  personId: string,
+  domainId: string,
+  rootId: string,
+  x: number,
+  y: number,
+  isRootFamily = false,
+): LayoutScene['units'][number] {
+  return {
+    id,
+    kind: 'single',
+    memberIds: [personId],
+    generation: y === 0 ? 0 : 2,
+    width: 168,
+    lineageAffinity: {},
+    accent: '#4F7CAC',
+    rootSignature: [rootId],
+    domainId,
+    memberRootIds: { [personId]: rootId },
+    rootAccent: '#4F7CAC',
+    isRootFamily,
+    rect: { x, y, width: 168, height: 216 },
+    order: 0,
+  }
+}
+
 function familyData(members: Member[]): FamilyData {
   return {
     ...createEmptyFamily(),
@@ -265,8 +397,16 @@ function mountStoreCanvas(data: FamilyData, props = {}) {
     props: {
       data: family.data,
       ...props,
-      onRowOrderChange(rowId: string, unitIds: string[]) {
-        family.setRowOrderPreference(rowId, unitIds)
+      onDomainRowOrderChange(preference: Parameters<typeof family.setDomainRowOrderPreference>[0]) {
+        family.setDomainRowOrderPreference(preference)
+        void wrapper.setProps({ data: family.data })
+      },
+      onBridgeOrderChange(preference: Parameters<typeof family.setBridgeOrderPreference>[0]) {
+        family.setBridgeOrderPreference(preference)
+        void wrapper.setProps({ data: family.data })
+      },
+      onRootOrderChange(componentId: string, rootIds: string[]) {
+        family.setRootOrderPreference(componentId, rootIds)
         void wrapper.setProps({ data: family.data })
       },
     },
@@ -773,7 +913,7 @@ describe('FamilyCanvas', () => {
     const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
     data.layoutPreferences.rowOrders = [{
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     }]
@@ -902,6 +1042,97 @@ describe('FamilyCanvas', () => {
     expect(getKinship).toHaveBeenCalledWith('A', 'B')
   })
 
+  it('rejects a normal family drag into another root domain', async () => {
+    const nextScene = twoRootDragScene()
+    layoutFamilyTree.mockResolvedValueOnce(structuredClone(nextScene))
+    const wrapper = mountCanvas(familyData(nextScene.cards.map(card => mk(card.id))))
+    await flushPromises()
+
+    await beginDrag(wrapper, 1, 620, 0)
+
+    expect(wrapper.emitted('domain-row-order-change')).toBeUndefined()
+    expect(wrapper.find('[data-testid="invalid-domain-drop"]').exists()).toBe(true)
+  })
+
+  it('reorders bridge families only inside the same bridge domain and generation', async () => {
+    const nextScene = twoBridgeFamilyScene()
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(nextScene))
+      .mockReturnValueOnce(pending.promise)
+    const wrapper = mountCanvas(familyData(nextScene.cards.map(card => mk(card.id))))
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 1, -400, 0)
+    await node.trigger('pointerup', { pointerId: 1, clientX: 200, clientY: 100 })
+    await nextTick()
+
+    expect(wrapper.emitted('bridge-order-change')).toEqual([[
+      {
+        id: 'row:domain:bridge:a+b:2',
+        domainId: 'domain:bridge:a+b',
+        generation: 2,
+        unitIds: ['unit:cross-2', 'unit:cross-1'],
+      },
+    ]])
+    expect(wrapper.emitted('domain-row-order-change')).toBeUndefined()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(true)
+
+    pending.resolve(structuredClone(nextScene))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('moves every unit in a root domain when dragging its root family', async () => {
+    const nextScene = threeRootDragScene()
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(nextScene))
+      .mockReturnValueOnce(pending.promise)
+    const wrapper = mountCanvas(familyData(nextScene.cards.map(card => mk(card.id))))
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 0, 600, 0)
+    const units = wrapper.findAll('[data-testid="family-unit"]')
+    expect(units[0].attributes('style')).toContain('translate(600px, 0px)')
+    expect(units[1].attributes('style')).toContain('translate(600px, 360px)')
+
+    await node.trigger('pointerup', { pointerId: 1, clientX: 1200, clientY: 100 })
+    await nextTick()
+
+    expect(wrapper.emitted('root-order-change')).toEqual([[
+      'component:main',
+      ['root:b', 'root:a', 'root:c'],
+    ]])
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(600px, 360px)')
+
+    pending.resolve(structuredClone(nextScene))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('cancels an active root-domain preview when a newer data layout starts', async () => {
+    const nextScene = threeRootDragScene()
+    layoutFamilyTree.mockResolvedValue(structuredClone(nextScene))
+    const data = familyData(nextScene.cards.map(card => mk(card.id)))
+    const wrapper = mountCanvas(data)
+    await flushPromises()
+
+    await beginDrag(wrapper, 0, 600, 0)
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(600px, 360px)')
+
+    const newerData = structuredClone(data)
+    newerData.members.X = mk('X')
+    await wrapper.setProps({ data: newerData })
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(0px, 360px)')
+  })
+
   it('previews a same-row insertion with a dragged overlay and only incident route fading', async () => {
     layoutFamilyTree.mockResolvedValueOnce(structuredClone(sortableScene))
     const { wrapper } = mountStoreCanvas(familyData([mk('A'), mk('B'), mk('C'), mk('D')]))
@@ -991,7 +1222,7 @@ describe('FamilyCanvas', () => {
 
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     })
@@ -1073,9 +1304,13 @@ describe('FamilyCanvas', () => {
     await node.trigger('pointerup', { pointerId: 1, clientX: 100, clientY: 100 })
     await flushPromises()
 
-    expect(wrapper.emitted('row-order-change')).toEqual([[
-      'row:0',
-      ['unit:person:C', 'unit:person:A', 'unit:person:B'],
+    expect(wrapper.emitted('domain-row-order-change')).toEqual([[
+      {
+        id: 'row:0',
+        domainId: 'domain:root:test',
+        generation: 0,
+        unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
+      },
     ]])
     expect(family.data.layoutPreferences.rowOrders).toEqual([])
     expect(externalData).toEqual(before)
@@ -1083,7 +1318,7 @@ describe('FamilyCanvas', () => {
     expect(options.data).not.toBe(externalData)
     expect(options.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     })
@@ -1092,7 +1327,7 @@ describe('FamilyCanvas', () => {
     laterData.members.X = mk('X')
     laterData.layoutPreferences.rowOrders = [{
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     }]
@@ -1190,7 +1425,7 @@ describe('FamilyCanvas', () => {
     await nextTick()
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     })
@@ -1265,14 +1500,14 @@ describe('FamilyCanvas', () => {
 
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:A', 'unit:person:C', 'unit:person:B'],
     })
     expect(layoutFamilyTree).toHaveBeenCalledTimes(3)
     expect(layoutFamilyTree.mock.calls[2][1].data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:A', 'unit:person:C', 'unit:person:B'],
     })
@@ -1322,7 +1557,7 @@ describe('FamilyCanvas', () => {
     const normalData = familyData([mk('A'), mk('B'), mk('C'), mk('D'), mk('X')])
     normalData.layoutPreferences.rowOrders = [{
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:C', 'unit:person:A', 'unit:person:B'],
     }]
@@ -1472,13 +1707,13 @@ describe('FamilyCanvas', () => {
     expect(layoutFamilyTree).toHaveBeenCalledTimes(4)
     expect(family.data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:B', 'unit:person:C', 'unit:person:A'],
     })
     expect(layoutFamilyTree.mock.calls[3][1].data.layoutPreferences.rowOrders).toContainEqual({
       id: 'row:0',
-      domainId: 'legacy',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:B', 'unit:person:C', 'unit:person:A'],
     })

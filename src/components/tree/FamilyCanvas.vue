@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { DEFAULT_LAYOUT_METRICS, type Point, type RootLayoutScene } from '@/core/family-layout/types'
-import type { FamilyData } from '@/core/schema'
-import { withRowOrderPreference } from '@/core/family-layout/reconcilePreferences'
+import type { BridgeOrderPreference, FamilyData, RowOrderPreference } from '@/core/schema'
+import {
+  withBridgeOrderPreference,
+  withDomainRowOrderPreference,
+  withRootOrderPreference,
+} from '@/core/family-layout/reconcilePreferences'
 import { layoutFamilyTree } from '@/core/treeLayout'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import FamilyUnit, { type FamilyUnitDragPayload } from './FamilyUnit.vue'
@@ -24,7 +28,9 @@ const emit = defineEmits<{
   (event: 'select', id: string): void
   (event: 'open', id: string): void
   (event: 'view-change', value: PanzoomView): void
-  (event: 'row-order-change', rowId: string, unitIds: string[]): void
+  (event: 'domain-row-order-change', preference: RowOrderPreference): void
+  (event: 'bridge-order-change', preference: BridgeOrderPreference): void
+  (event: 'root-order-change', componentId: string, rootIds: string[]): void
 }>()
 
 const PADDING = 40
@@ -48,9 +54,17 @@ const scene = ref<RootLayoutScene>(EMPTY_SCENE)
 const members = computed(() => Object.values(props.data.members))
 let layoutRequestId = 0
 let suppressInitialSceneFocus = !!props.initialView
-let expectedRowUpdate: { rowId: string; unitIds: string[] } | null = null
+type LayoutPreferenceExpectation =
+  | { kind: 'root-row' | 'bridge-row'; id: string; unitIds: string[] }
+  | { kind: 'root-domain'; componentId: string; rootIds: string[] }
+
+let expectedPreferenceUpdate: LayoutPreferenceExpectation | null = null
 let pendingDropToken: number | null = null
 let pendingSceneRecovery: { data: FamilyData; changedIds: string[] } | null = null
+const dragState = ref<FamilyDragState | null>(null)
+const dragCanDrop = ref(false)
+const dragInvalid = ref(false)
+let dragToken = 0
 let auxiliaryRefreshQueued = false
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 let observedLayoutResetVersion = props.layoutResetVersion ?? 0
@@ -171,11 +185,15 @@ watch(
       void updateLayout({ resetViewport: true })
       return
     }
-    if (expectedRowUpdate && hasExpectedRowOrder(props.data, expectedRowUpdate)) {
-      expectedRowUpdate = null
+    if (
+      expectedPreferenceUpdate
+      && hasExpectedLayoutPreference(props.data, expectedPreferenceUpdate)
+    ) {
+      expectedPreferenceUpdate = null
       return
     }
-    expectedRowUpdate = null
+    expectedPreferenceUpdate = null
+    cancelActiveDragPreview()
     void updateLayout()
   },
   { immediate: true, deep: true },
@@ -272,25 +290,38 @@ watch(
 
 defineExpose({ focusMember })
 
-interface FamilyDragState {
+interface RowDragState {
+  mode: 'root-row' | 'bridge-row'
   unitId: string
+  domainId: string
   rowId: string
+  generation: number
   sourceIndex: number
   targetIndex: number
   dx: number
   dy: number
 }
 
-const dragState = ref<FamilyDragState | null>(null)
-const dragCanDrop = ref(false)
-let dragToken = 0
+interface RootDomainDragState {
+  mode: 'root-domain'
+  unitId: string
+  domainId: string
+  componentId: string
+  sourceIndex: number
+  targetIndex: number
+  dx: number
+  dy: number
+}
+
+type FamilyDragState = RowDragState | RootDomainDragState
 
 function cancelPendingLayoutInteraction() {
   layoutRequestId += 1
   dragToken += 1
   dragState.value = null
   dragCanDrop.value = false
-  expectedRowUpdate = null
+  dragInvalid.value = false
+  expectedPreferenceUpdate = null
   pendingDropToken = null
   pendingSceneRecovery = null
   auxiliaryRefreshQueued = false
@@ -301,6 +332,14 @@ function cancelPendingLayoutInteraction() {
   }
 }
 
+function cancelActiveDragPreview() {
+  if (dragState.value === null || pendingDropToken !== null) return
+  dragToken += 1
+  dragState.value = null
+  dragCanDrop.value = false
+  dragInvalid.value = false
+}
+
 function screenToStageScale(): number {
   return panzoomRef.value?.getScale() ?? 1
 }
@@ -308,16 +347,11 @@ function screenToStageScale(): number {
 function onUnitDrag(payload: FamilyUnitDragPayload) {
   const scale = screenToStageScale()
   const unit = scene.value.units.find(value => value.id === payload.unitId)
+  const domain = allDomains().find(value => value.id === unit?.domainId)
   const sourceRow = scene.value.rows.find(row => row.unitIds.includes(payload.unitId))
-  if (!unit || !sourceRow) return
-  const sourceIndex = sourceRow.unitIds.indexOf(payload.unitId)
+  if (!unit || !domain || !sourceRow) return
   const dx = payload.dx / scale
   const dy = payload.dy / scale
-  const row = closestRow(unit.rect.y + unit.rect.height / 2 + dy)
-  const sameGeneration = row?.generation === sourceRow.generation
-  const targetIndex = sameGeneration
-    ? insertionIndex(sourceRow.unitIds, payload.unitId, unit.rect.x + unit.rect.width / 2 + dx)
-    : sourceIndex
 
   if (
     !dragState.value
@@ -328,15 +362,55 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     dragToken += 1
     pendingDropToken = null
   }
+
+  if (unit.isRootFamily && domain.kind === 'root') {
+    const candidates = rootDomainsForComponent(domain.componentId)
+    const sourceIndex = candidates.findIndex(value => value.id === domain.id)
+    const targetIndex = rootInsertionIndex(
+      candidates,
+      domain.id,
+      unit.rect.x + unit.rect.width / 2 + dx,
+    )
+    dragState.value = {
+      mode: 'root-domain',
+      unitId: unit.id,
+      domainId: domain.id,
+      componentId: domain.componentId,
+      sourceIndex,
+      targetIndex,
+      dx,
+      dy,
+    }
+    dragInvalid.value = false
+    dragCanDrop.value = sourceIndex >= 0 && targetIndex !== sourceIndex
+    return
+  }
+
+  const sourceIndex = sourceRow.unitIds.indexOf(payload.unitId)
+  const centerX = unit.rect.x + unit.rect.width / 2 + dx
+  const centerY = unit.rect.y + unit.rect.height / 2 + dy
+  const targetDomain = closestDomain(centerX)
+  const targetRow = targetDomain === undefined
+    ? undefined
+    : closestRowInDomain(targetDomain.id, centerY)
+  const validScope = targetDomain?.id === domain.id
+    && targetRow?.generation === sourceRow.generation
+  const targetIndex = validScope
+    ? insertionIndex(sourceRow.unitIds, payload.unitId, centerX)
+    : sourceIndex
   dragState.value = {
-    unitId: payload.unitId,
+    mode: domain.kind === 'root' ? 'root-row' : 'bridge-row',
+    unitId: unit.id,
+    domainId: domain.id,
     rowId: sourceRow.id,
+    generation: sourceRow.generation,
     sourceIndex,
     targetIndex,
     dx,
     dy,
   }
-  dragCanDrop.value = sameGeneration && targetIndex !== sourceIndex
+  dragInvalid.value = !validScope
+  dragCanDrop.value = validScope && targetIndex !== sourceIndex
 }
 
 async function onUnitDrop(payload: FamilyUnitDragPayload) {
@@ -346,22 +420,58 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
     clearDrag(payload.unitId)
     return
   }
-  const rowOrder = previewUnitIds.value
-  if (!rowOrder) {
-    clearDrag(payload.unitId)
-    return
-  }
-
   const previousScene = scene.value
-  const nextData = withRowOrderPreference(props.data, state.rowId, rowOrder)
-  const changedIds = affectedMemberIds(payload.memberIds)
+  let nextData: FamilyData
+  let changedIds: string[]
+  let expectation: LayoutPreferenceExpectation
+  if (state.mode === 'root-domain') {
+    const rootIds = previewRootIds.value
+    if (rootIds === null) {
+      clearDrag(payload.unitId)
+      return
+    }
+    nextData = withRootOrderPreference(props.data, state.componentId, rootIds)
+    const domainMemberIds = scene.value.units
+      .filter(unit => unit.domainId === state.domainId)
+      .flatMap(unit => unit.memberIds)
+    changedIds = affectedMemberIds(domainMemberIds)
+    expectation = {
+      kind: 'root-domain',
+      componentId: state.componentId,
+      rootIds: [...rootIds],
+    }
+    emit('root-order-change', state.componentId, [...rootIds])
+  } else {
+    const rowOrder = previewUnitIds.value
+    if (rowOrder === null) {
+      clearDrag(payload.unitId)
+      return
+    }
+    const preference = {
+      id: state.rowId,
+      domainId: state.domainId,
+      generation: state.generation,
+      unitIds: [...rowOrder],
+    }
+    if (state.mode === 'root-row') {
+      nextData = withDomainRowOrderPreference(props.data, preference)
+      emit('domain-row-order-change', preference)
+    } else {
+      nextData = withBridgeOrderPreference(props.data, preference)
+      emit('bridge-order-change', preference)
+    }
+    changedIds = affectedMemberIds(payload.memberIds)
+    expectation = {
+      kind: state.mode,
+      id: state.rowId,
+      unitIds: [...rowOrder],
+    }
+  }
   pendingSceneRecovery = { data: nextData, changedIds }
   pendingDropToken = dragToken
-  const expectation = { rowId: state.rowId, unitIds: [...rowOrder] }
-  expectedRowUpdate = expectation
-  emit('row-order-change', state.rowId, [...rowOrder])
+  expectedPreferenceUpdate = expectation
   void nextTick(() => {
-    if (expectedRowUpdate === expectation) expectedRowUpdate = null
+    if (expectedPreferenceUpdate === expectation) expectedPreferenceUpdate = null
   })
   await updateLayout({
     data: nextData,
@@ -371,13 +481,23 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
   })
 }
 
-function hasExpectedRowOrder(
+function hasExpectedLayoutPreference(
   data: FamilyData,
-  expected: { rowId: string; unitIds: string[] },
+  expected: LayoutPreferenceExpectation,
 ): boolean {
-  const row = data.layoutPreferences.rowOrders.find(value => value.id === expected.rowId)
-  return row?.unitIds.length === expected.unitIds.length
-    && row.unitIds.every((unitId, index) => unitId === expected.unitIds[index])
+  if (expected.kind === 'root-domain') {
+    const rootOrder = data.layoutPreferences.rootOrders.find(value => (
+      value.componentId === expected.componentId
+    ))
+    return equalOrder(rootOrder?.rootIds, expected.rootIds)
+  }
+  const rows = expected.kind === 'root-row'
+    ? data.layoutPreferences.rowOrders
+    : data.layoutPreferences.bridgeOrders
+  return equalOrder(
+    rows.find(value => value.id === expected.id)?.unitIds,
+    expected.unitIds,
+  )
 }
 
 function onUnitCancel(payload: FamilyUnitDragPayload) {
@@ -388,6 +508,7 @@ function clearDrag(unitId: string) {
   if (dragState.value?.unitId !== unitId) return
   dragState.value = null
   dragCanDrop.value = false
+  dragInvalid.value = false
   pendingDropToken = null
   const recovery = pendingSceneRecovery
   if (!recovery) {
@@ -402,8 +523,36 @@ function clearDrag(unitId: string) {
   })
 }
 
-function closestRow(centerY: number) {
+function allDomains() {
+  return [...scene.value.rootDomains, ...scene.value.bridgeDomains]
+}
+
+function closestDomain(centerX: number) {
+  return allDomains()
+    .map(domain => ({
+      domain,
+      distance: centerX < domain.rect.x
+        ? domain.rect.x - centerX
+        : centerX > domain.rect.x + domain.rect.width
+          ? centerX - domain.rect.x - domain.rect.width
+          : 0,
+    }))
+    .sort((left, right) => (
+      left.distance - right.distance
+      || Math.abs(
+        left.domain.rect.x + left.domain.rect.width / 2 - centerX,
+      ) - Math.abs(
+        right.domain.rect.x + right.domain.rect.width / 2 - centerX,
+      )
+      || left.domain.id.localeCompare(right.domain.id)
+    ))[0]?.domain
+}
+
+function closestRowInDomain(domainId: string, centerY: number) {
   return scene.value.rows
+    .filter(row => row.unitIds.some(unitId => (
+      scene.value.units.find(unit => unit.id === unitId)?.domainId === domainId
+    )))
     .map(row => {
       const rowUnits = row.unitIds
         .map(unitId => scene.value.units.find(unit => unit.id === unitId))
@@ -414,6 +563,24 @@ function closestRow(centerY: number) {
       return { ...row, distance: Math.abs(rowCenterY - centerY) }
     })
     .sort((left, right) => left.distance - right.distance || left.generation - right.generation)[0]
+}
+
+function rootDomainsForComponent(componentId: string) {
+  return scene.value.rootDomains
+    .filter(domain => domain.componentId === componentId)
+    .sort((left, right) => left.rect.x - right.rect.x || left.id.localeCompare(right.id))
+}
+
+function rootInsertionIndex(
+  domains: RootLayoutScene['rootDomains'],
+  draggedDomainId: string,
+  centerX: number,
+): number {
+  const remaining = domains.filter(domain => domain.id !== draggedDomainId)
+  const index = remaining.findIndex(domain => (
+    centerX <= domain.rect.x + domain.rect.width / 2
+  ))
+  return index < 0 ? remaining.length : index
 }
 
 function insertionIndex(unitIds: string[], draggedUnitId: string, centerX: number): number {
@@ -435,16 +602,26 @@ function arrayMove<T>(values: T[], from: number, to: number): T[] {
 
 const previewUnitIds = computed(() => {
   const state = dragState.value
-  if (!state || !dragCanDrop.value) return null
+  if (!state || state.mode === 'root-domain' || !dragCanDrop.value) return null
   const row = scene.value.rows.find(value => value.id === state.rowId)
   if (!row) return null
   return arrayMove(row.unitIds, state.sourceIndex, state.targetIndex)
 })
 
+const previewRootIds = computed(() => {
+  const state = dragState.value
+  if (!state || state.mode !== 'root-domain' || !dragCanDrop.value) return null
+  const domains = rootDomainsForComponent(state.componentId)
+  const rootIds = domains.map(domain => domain.rootIds[0]).filter(Boolean)
+  return arrayMove(rootIds, state.sourceIndex, state.targetIndex)
+})
+
 const previewOffsetByUnitId = computed<Record<string, Point>>(() => {
   const state = dragState.value
+  if (!state) return {}
+  if (state.mode === 'root-domain') return rootDomainPreviewOffsets(state)
   const order = previewUnitIds.value
-  if (!state || !order) return {}
+  if (!order) return {}
   const row = scene.value.rows.find(value => value.id === state.rowId)
   if (!row) return {}
   const rowUnits = row.unitIds
@@ -473,6 +650,75 @@ const previewOffsetByUnitId = computed<Record<string, Point>>(() => {
       : []
   }))
 })
+
+function rootDomainPreviewOffsets(state: RootDomainDragState): Record<string, Point> {
+  const rootIds = previewRootIds.value
+  if (rootIds === null) return {}
+  const domains = rootDomainsForComponent(state.componentId)
+  const domainByRootId = new Map(domains.flatMap(domain => (
+    domain.rootIds[0] ? [[domain.rootIds[0], domain] as const] : []
+  )))
+  const slotXs = domains.map(domain => domain.rect.x)
+  const targetXByRootId = new Map<string, number>()
+  let nextX = slotXs[0] ?? 0
+  rootIds.forEach((rootId, index) => {
+    const domain = domainByRootId.get(rootId)
+    if (domain === undefined) return
+    const targetX = Math.max(slotXs[index] ?? nextX, nextX)
+    targetXByRootId.set(rootId, targetX)
+    nextX = targetX + domain.rect.width + DEFAULT_LAYOUT_METRICS.rootGap
+  })
+  const offsetByDomainId = new Map<string, number>()
+  for (const [rootId, domain] of domainByRootId) {
+    if (domain.id === state.domainId) continue
+    const targetX = targetXByRootId.get(rootId)
+    if (targetX !== undefined) offsetByDomainId.set(domain.id, targetX - domain.rect.x)
+  }
+  for (const bridge of scene.value.bridgeDomains.filter(value => (
+    value.componentId === state.componentId
+  ))) {
+    const offsets = bridge.rootIds.flatMap(rootId => {
+      const domain = domainByRootId.get(rootId)
+      const targetX = targetXByRootId.get(rootId)
+      return domain === undefined || targetX === undefined
+        ? []
+        : [targetX - domain.rect.x]
+    })
+    if (offsets.length > 0) {
+      offsetByDomainId.set(
+        bridge.id,
+        offsets.reduce((sum, value) => sum + value, 0) / offsets.length,
+      )
+    }
+  }
+  return Object.fromEntries(scene.value.units.flatMap(unit => {
+    const offset = offsetByDomainId.get(unit.domainId)
+    return offset === undefined ? [] : [[unit.id, { x: offset, y: 0 }]]
+  }))
+}
+
+function dragOffsetForUnit(unit: RootLayoutScene['units'][number]): Point | undefined {
+  const state = dragState.value
+  if (state === null) return undefined
+  if (state.mode === 'root-domain') {
+    return unit.domainId === state.domainId
+      ? { x: state.dx, y: Math.max(-24, Math.min(24, state.dy)) }
+      : undefined
+  }
+  return state.unitId === unit.id ? { x: state.dx, y: state.dy } : undefined
+}
+
+function isUnitDragging(unit: RootLayoutScene['units'][number]): boolean {
+  const state = dragState.value
+  return state?.mode === 'root-domain'
+    ? unit.domainId === state.domainId
+    : state?.unitId === unit.id
+}
+
+function equalOrder(left: string[] | undefined, right: string[]): boolean {
+  return left?.length === right.length
+    && left.every((value, index) => value === right[index])
+}
 
 const draggedUnit = computed(() => {
   const unitId = dragState.value?.unitId
@@ -525,7 +771,10 @@ function affectedMemberIds(memberIds: string[]): string[] {
 
 onBeforeUnmount(() => {
   if (settleTimer !== null) clearTimeout(settleTimer)
+  window.removeEventListener('blur', cancelActiveDragPreview)
 })
+
+onMounted(() => window.addEventListener('blur', cancelActiveDragPreview))
 
 function dismissDiagnostics() {
   dismissedDiagnosticKey.value = diagnosticKey.value
@@ -576,6 +825,17 @@ function dismissDiagnostics() {
             }"
           />
 
+          <div
+            v-if="dragInvalid && draggedUnit"
+            data-testid="invalid-domain-drop"
+            class="pointer-events-none absolute z-50 rounded-md bg-rose-600 px-2 py-1 text-xs text-white shadow"
+            :style="{
+              transform: `translate(${draggedUnit.rect.x + (dragState?.dx ?? 0)}px, ${Math.max(0, draggedUnit.rect.y + (dragState?.dy ?? 0) - 34)}px)`,
+            }"
+          >
+            只能在同一布局域和同一代内移动
+          </div>
+
           <FamilyUnit
             v-for="unit in scene.units"
             :key="unit.id"
@@ -585,9 +845,9 @@ function dismissDiagnostics() {
             :hubs="hubsByUnitId.get(unit.id) ?? []"
             :selected-id="selectedId"
             :viewpoint-id="viewpointId"
-            :drag-offset="dragState?.unitId === unit.id ? { x: dragState.dx, y: dragState.dy } : undefined"
+            :drag-offset="dragOffsetForUnit(unit)"
             :preview-offset="previewOffsetByUnitId[unit.id]"
-            :is-dragging="dragState?.unitId === unit.id"
+            :is-dragging="isUnitDragging(unit)"
             :animate-position="animatePositions"
             :kinship-by-member-id="kinshipByMemberId"
             :root-accent-by-id="rootAccentById"

@@ -20,15 +20,35 @@ vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
 const FamilyCanvasStub = defineComponent({
   name: 'FamilyCanvas',
   props: ['selectedId', 'viewpointId', 'showAuxiliaryRelations', 'layoutResetVersion'],
-  emits: ['row-order-change'],
+  emits: ['domain-row-order-change', 'bridge-order-change', 'root-order-change'],
   setup(_, { emit }) {
-    return () => h('button', {
-      'data-testid': 'reorder-row',
-      onClick: () => emit('row-order-change', 'row:0', [
-        'unit:person:b',
-        'unit:person:a',
-      ]),
-    })
+    return () => h('div', [
+      h('button', {
+        'data-testid': 'reorder-row',
+        onClick: () => emit('domain-row-order-change', {
+          id: 'row:domain:root:test:0',
+          domainId: 'domain:root:test',
+          generation: 0,
+          unitIds: ['unit:person:b', 'unit:person:a'],
+        }),
+      }),
+      h('button', {
+        'data-testid': 'reorder-bridge',
+        onClick: () => emit('bridge-order-change', {
+          id: 'row:domain:bridge:a+b:1',
+          domainId: 'domain:bridge:a+b',
+          generation: 1,
+          unitIds: ['unit:cross-2', 'unit:cross-1'],
+        }),
+      }),
+      h('button', {
+        'data-testid': 'reorder-roots',
+        onClick: () => emit('root-order-change', 'component:main', [
+          'root:b',
+          'root:a',
+        ]),
+      }),
+    ])
   },
 })
 
@@ -57,13 +77,42 @@ describe('TreeView row order integration', () => {
     await wrapper.get('[data-testid="reorder-row"]').trigger('click')
 
     expect(family.data.layoutPreferences.rowOrders).toEqual([{
-      id: 'row:0',
-      domainId: 'legacy',
+      id: 'row:domain:root:test:0',
+      domainId: 'domain:root:test',
       generation: 0,
       unitIds: ['unit:person:b', 'unit:person:a'],
     }])
     expect(wrapper.get('[data-testid="restore-default-layout"]')
       .attributes('disabled')).toBeUndefined()
+  })
+
+  it('forwards bridge and root order changes to their dedicated store actions', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          FamilyCanvas: FamilyCanvasStub,
+          SearchBar: true,
+        },
+      },
+    })
+
+    await wrapper.get('[data-testid="reorder-bridge"]').trigger('click')
+    await wrapper.get('[data-testid="reorder-roots"]').trigger('click')
+
+    expect(family.data.layoutPreferences.bridgeOrders).toEqual([{
+      id: 'row:domain:bridge:a+b:1',
+      domainId: 'domain:bridge:a+b',
+      generation: 1,
+      unitIds: ['unit:cross-2', 'unit:cross-1'],
+    }])
+    expect(family.data.layoutPreferences.rootOrders).toEqual([{
+      componentId: 'component:main',
+      rootIds: ['root:b', 'root:a'],
+    }])
   })
 
   it('restores the algorithm layout and the default canvas view without changing semantic state', async () => {

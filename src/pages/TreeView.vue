@@ -266,7 +266,9 @@ function seedFixture() {
         @select="onSelect"
         @open="onOpen"
         @view-change="ui.setCanvasView"
-        @row-order-change="family.setRowOrderPreference"
+        @domain-row-order-change="family.setDomainRowOrderPreference"
+        @bridge-order-change="family.setBridgeOrderPreference"
+        @root-order-change="family.setRootOrderPreference"
       />
     </main>
 

@@ -163,6 +163,7 @@ function onMemberDrop(payload: { dx: number; dy: number }) {
     data-testid="family-unit"
     :data-root-family="unit.isRootFamily ? 'true' : undefined"
     :data-root-signature="unit.rootSignature.join(',')"
+    :data-domain-id="unit.domainId"
     class="absolute left-0 top-0 rounded-2xl border motion-reduce:!transition-none"
     :class="isDragging ? 'z-30 shadow-xl' : ''"
     :style="unitStyle"
