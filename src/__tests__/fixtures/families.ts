@@ -1,7 +1,7 @@
 /**
  * 共享测试 fixture — 多套预定义家族结构，供 L2/L3 测试复用
  */
-import type { Member } from '@/core/schema'
+import { createEmptyFamily, type FamilyData, type Member } from '@/core/schema'
 
 /** 快速构造最小 Member 对象 */
 export function mk(
@@ -187,6 +187,46 @@ export function denseBridgeFamily(): Record<string, Member> {
   addSpouse(m['a-child-2'], m['b-child-2'])
   addSpouse(m['a-child-3'], m['b-child-3'])
   return m
+}
+
+export function twoRootMarriageFamilyData(): FamilyData {
+  const members: Record<string, Member> = {
+    'a-root-a': mk('a-root-a'),
+    'a-root-b': mk('a-root-b'),
+    'a-child': mk('a-child'),
+    'b-root-a': mk('b-root-a'),
+    'b-root-b': mk('b-root-b'),
+    'b-child': mk('b-child'),
+    'joint-child': mk('joint-child'),
+  }
+  addSpouse(members['a-root-a'], members['a-root-b'])
+  addParent(members['a-child'], members['a-root-a'])
+  addParent(members['a-child'], members['a-root-b'])
+  addSpouse(members['b-root-a'], members['b-root-b'])
+  addParent(members['b-child'], members['b-root-a'])
+  addParent(members['b-child'], members['b-root-b'])
+  addSpouse(members['a-child'], members['b-child'])
+  addParent(members['joint-child'], members['a-child'])
+  addParent(members['joint-child'], members['b-child'])
+  return { ...createEmptyFamily(), members }
+}
+
+export function twoDisconnectedRootComponents(): FamilyData {
+  const members: Record<string, Member> = {
+    a: mk('a'),
+    'a-root-a': mk('a-root-a'),
+    'a-root-b': mk('a-root-b'),
+    b: mk('b'),
+    'b-root-a': mk('b-root-a'),
+    'b-root-b': mk('b-root-b'),
+  }
+  addSpouse(members['a-root-a'], members['a-root-b'])
+  addParent(members.a, members['a-root-a'])
+  addParent(members.a, members['a-root-b'])
+  addSpouse(members['b-root-a'], members['b-root-b'])
+  addParent(members.b, members['b-root-a'])
+  addParent(members.b, members['b-root-b'])
+  return { ...createEmptyFamily(), members }
 }
 
 /** 同一祖先经两条合法血缘路径到达同一后代，但不存在亲子环。 */

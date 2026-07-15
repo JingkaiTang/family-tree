@@ -77,6 +77,27 @@ describe('placeRootDomains', () => {
       .toEqual({ id: `row:${domain.id}:${generation}`, generation, unitIds })
   })
 
+  it('merges overlapping sibling groups without duplicating a family unit', () => {
+    const input = preparedWideThreeFamiliesLayout()
+    const scene = placeRootDomains({
+      ...input,
+      parentageGroups: [{
+        id: 'parentage:overlap-left',
+        sourceUnitId: 'unit:partnership:current:branch-a+branch-a-spouse',
+        childPersonIds: ['branch-a-child-1', 'branch-b-child-1'],
+      }, {
+        id: 'parentage:overlap-right',
+        sourceUnitId: 'unit:partnership:current:branch-b+branch-b-spouse',
+        childPersonIds: ['branch-b-child-1', 'branch-c-child-1'],
+      }],
+    })
+
+    expect(scene.units).toHaveLength(input.units.length)
+    expect(new Set(scene.units.map(unit => unit.id)).size).toBe(scene.units.length)
+    expect(scene.cards).toHaveLength(input.units.flatMap(unit => unit.memberIds).length)
+    expect(new Set(scene.cards.map(card => card.id)).size).toBe(scene.cards.length)
+  })
+
   it.each([
     ['asymmetric single root', preparedAsymmetricRootLayout],
     ['two-root bridge', preparedTwoRootLayout],

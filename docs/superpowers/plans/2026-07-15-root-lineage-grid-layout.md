@@ -1311,7 +1311,7 @@ git commit -m "feat: route families through root domain gateways"
 - Modify: `src/components/tree/FamilyCanvas.vue`
 - Modify: `src/__tests__/components/FamilyCanvas.test.ts`
 
-- [ ] **Step 1: 写公开流水线失败测试**
+- [x] **Step 1: 写公开流水线失败测试**
 
 先在 `src/__tests__/fixtures/families.ts` 导出 `twoRootMarriageFamilyData()` 和 `twoDisconnectedRootComponents()`；两者复用现有 fixture member/link helpers，并使用固定 ID。`expectedRootDomainIds()` 作为 `treeLayout.test.ts` 内的固定数组 helper。
 
@@ -1337,7 +1337,7 @@ it('does not let rootMemberId redefine visible roots', async () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/core/family-layout/layoutFamilyScene.test.ts src/core/treeLayout.test.ts
@@ -1345,7 +1345,7 @@ npm test -- src/core/family-layout/layoutFamilyScene.test.ts src/core/treeLayout
 
 Expected: FAIL，公开流水线仍调用旧 cluster/order/compact。
 
-- [ ] **Step 3: 用新流水线替换编排**
+- [x] **Step 3: 用新流水线替换编排**
 
 `layoutFamilyScene` 固定顺序改为：
 
@@ -1398,7 +1398,7 @@ const geometry = placeRootDomains({
 
 `FamilyCanvas.vue` 改为导入 `RootLayoutScene` 并用于 `EMPTY_SCENE`/scene ref；测试中的三个基础 scene 一次性补齐 rooted unit 字段、空/真实 domains 和 gateways。这里只做类型与新 scene 数据适配，视觉和拖拽仍留给 Task 10–11。
 
-- [ ] **Step 4: 更新 unsafe fallback**
+- [x] **Step 4: 更新 unsafe fallback**
 
 fallback 继续保证每个人恰好一次和卡片不重叠，并保留：
 
@@ -1409,7 +1409,7 @@ fallback 继续保证每个人恰好一次和卡片不重叠，并保留：
 
 fallback 不尝试伪造主关系线，因为断线比穿卡、重线和错接更可诊断。
 
-- [ ] **Step 5: 传递 rootMemberId 提示**
+- [x] **Step 5: 传递 rootMemberId 提示**
 
 `LayoutRequest` 增加：
 
@@ -1419,7 +1419,7 @@ preferredComponentPersonId?: string
 
 `treeLayout.ts` 将 `data.rootMemberId` 只映射到该字段；`viewpointId` 不进入 core layout request。更新测试证明两者都不改变 root signature/domain 归属。
 
-- [ ] **Step 6: 验证 Gate B 核心流水线**
+- [x] **Step 6: 验证 Gate B 核心流水线**
 
 ```bash
 npm test -- src/core/family-layout/layoutFamilyScene.test.ts src/core/treeLayout.test.ts src/__tests__/e2e/scenarios/layout-verification.test.ts
@@ -1436,7 +1436,7 @@ Expected:
 - 没有 `NODE_OVERLAP`、`ROOT_DOMAIN_INTRUSION`、`CROSS_FAMILY_SEGMENT_OVERLAP` 或 `UNROUTABLE_PRIMARY_EDGE`；
 - 同一 person 只出现一次。
 
-- [ ] **Step 7: 提交公开流水线切换**
+- [x] **Step 7: 提交公开流水线切换**
 
 ```bash
 git add src/core/family-layout/layoutFamilyScene.ts src/core/family-layout/layoutFamilyScene.test.ts src/core/family-layout/buildSafeFallbackScene.ts src/core/family-layout/buildSafeFallbackScene.test.ts src/core/treeLayout.ts src/core/treeLayout.test.ts src/core/family-layout/types.ts src/__tests__/fixtures/families.ts src/components/tree/FamilyCanvas.vue src/__tests__/components/FamilyCanvas.test.ts

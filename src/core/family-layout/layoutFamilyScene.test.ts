@@ -7,7 +7,7 @@ import {
   DEFAULT_LAYOUT_METRICS,
   EMPTY_LAYOUT_PREFERENCES,
 } from './types'
-import type { FamilyFacts, LayoutRequest, LayoutScene, Rect } from './types'
+import type { FamilyFacts, LayoutRequest, Rect, RootLayoutScene } from './types'
 
 describe('layoutFamilyScene', () => {
   it('returns an empty zero-sized scene for empty input', () => {
@@ -18,6 +18,9 @@ describe('layoutFamilyScene', () => {
       cards: [],
       hubs: [],
       rows: [],
+      rootDomains: [],
+      bridgeDomains: [],
+      gateways: [],
       routes: [],
       bounds: { x: 0, y: 0, width: 0, height: 0 },
       diagnostics: [],
@@ -42,6 +45,7 @@ describe('layoutFamilyScene', () => {
     expect(scene.cards).toHaveLength(5)
     expect(scene.rows.map(row => row.generation)).toEqual([0, 1, 2])
     expect(scene.routes).toHaveLength(2)
+    expect(scene.rootDomains).toHaveLength(1)
     expect(unsafeDiagnostics(scene)).toEqual([])
     expectNoOverlap(scene)
   })
@@ -72,6 +76,7 @@ describe('layoutFamilyScene', () => {
       'second-mother',
     ])
     expect(scene.routes).toHaveLength(2)
+    expect(scene.rootDomains).toHaveLength(2)
     expect(unsafeDiagnostics(scene)).toEqual([])
     expectNoOverlap(scene)
   })
@@ -181,16 +186,18 @@ function couple(leftId: string, rightId: string) {
   return [left, right] as const
 }
 
-function unsafeDiagnostics(scene: LayoutScene) {
+function unsafeDiagnostics(scene: RootLayoutScene) {
   const unsafeCodes = new Set([
     'NODE_OVERLAP',
     'CROSS_FAMILY_SEGMENT_OVERLAP',
+    'INVALID_ROOT_DOMAIN_ASSIGNMENT',
+    'ROOT_DOMAIN_INTRUSION',
     'UNROUTABLE_PRIMARY_EDGE',
   ])
   return scene.diagnostics.filter(value => unsafeCodes.has(value.code))
 }
 
-function expectNoOverlap(scene: LayoutScene) {
+function expectNoOverlap(scene: RootLayoutScene) {
   expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
   expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
 }

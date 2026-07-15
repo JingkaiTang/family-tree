@@ -100,9 +100,10 @@ export interface LayoutRequest {
   preferences: LayoutPreferences
   metrics: LayoutMetrics
   inputDiagnostics: LayoutDiagnostic[]
-  previousScene?: LayoutScene
+  previousScene?: RootLayoutScene
   changedIds?: string[]
   auxiliaryFocusPersonId?: string
+  preferredComponentPersonId?: string
 }
 
 export interface FamilyUnit {

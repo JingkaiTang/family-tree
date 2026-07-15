@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { buildSafeFallbackScene } from './buildSafeFallbackScene'
 import { DEFAULT_LAYOUT_METRICS } from './types'
-import type { FamilyUnit, LayoutDiagnostic, ParentageGroup, Rect } from './types'
+import type {
+  LayoutDiagnostic,
+  LayoutDomain,
+  ParentageGroup,
+  Rect,
+  RootedFamilyUnit,
+} from './types'
 
 describe('buildSafeFallbackScene', () => {
   it('renders malformed cyclic units once without overlap or routes', () => {
@@ -23,18 +29,23 @@ describe('buildSafeFallbackScene', () => {
 
     const scene = buildSafeFallbackScene(
       units,
+      domainsFor(units),
       parentageGroups,
       DEFAULT_LAYOUT_METRICS,
       [inputDiagnostic],
     )
 
     expect(scene.routes).toEqual([])
+    expect(scene.gateways).toEqual([])
+    expect(scene.rootDomains).toHaveLength(1)
+    expect(scene.bridgeDomains).toEqual([])
+    expect(scene.rootDomains[0].unitIds).toEqual(['a-parent', 'z-parent'])
     expect(scene.cards.map(card => card.id).sort()).toEqual(['person-a', 'person-z'])
     expect(new Set(scene.cards.map(card => card.id)).size).toBe(scene.cards.length)
     expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
     expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
     expect(scene.rows).toEqual([{
-      id: 'row:0',
+      id: 'row:domain:test:0',
       generation: 0,
       unitIds: ['a-parent', 'z-parent'],
     }])
@@ -61,12 +72,14 @@ describe('buildSafeFallbackScene', () => {
 
     const first = buildSafeFallbackScene(
       units,
+      domainsFor(units),
       groups,
       DEFAULT_LAYOUT_METRICS,
       [],
     )
     const second = buildSafeFallbackScene(
       structuredClone(units),
+      domainsFor(units),
       structuredClone(groups),
       structuredClone(DEFAULT_LAYOUT_METRICS),
       [],
@@ -85,6 +98,8 @@ describe('buildSafeFallbackScene', () => {
       DEFAULT_LAYOUT_METRICS.cardHeight + DEFAULT_LAYOUT_METRICS.generationGap,
     )
     expect(JSON.stringify(second)).toBe(JSON.stringify(first))
+    expect(first.units.every(unit => unit.domainId === 'domain:test')).toBe(true)
+    expect(first.rootDomains[0].rect).toEqual(first.bounds)
   })
 
   it('preserves an existing unroutable owner diagnostic without duplicating it', () => {
@@ -103,6 +118,7 @@ describe('buildSafeFallbackScene', () => {
 
     const scene = buildSafeFallbackScene(
       units,
+      domainsFor(units),
       groups,
       DEFAULT_LAYOUT_METRICS,
       diagnostics,
@@ -132,6 +148,7 @@ describe('buildSafeFallbackScene', () => {
 
     const scene = buildSafeFallbackScene(
       units,
+      domainsFor(units),
       groups,
       DEFAULT_LAYOUT_METRICS,
       [],
@@ -165,7 +182,7 @@ describe('buildSafeFallbackScene', () => {
   })
 })
 
-function single(id: string, memberIds: string[], generation = 0): FamilyUnit {
+function single(id: string, memberIds: string[], generation = 0): RootedFamilyUnit {
   return {
     id,
     kind: 'single',
@@ -174,15 +191,36 @@ function single(id: string, memberIds: string[], generation = 0): FamilyUnit {
     width: DEFAULT_LAYOUT_METRICS.cardWidth,
     lineageAffinity: {},
     accent: '#111111',
+    rootSignature: ['root:test'],
+    domainId: 'domain:test',
+    memberRootIds: Object.fromEntries(memberIds.map(memberId => (
+      [memberId, 'root:test']
+    ))),
+    rootAccent: '#111111',
+    isRootFamily: generation === 0,
   }
 }
 
-function couple(id: string, memberIds: string[], generation: number): FamilyUnit {
+function couple(id: string, memberIds: string[], generation: number): RootedFamilyUnit {
   return {
     ...single(id, memberIds, generation),
     kind: 'couple',
     width: DEFAULT_LAYOUT_METRICS.cardWidth * 2 + DEFAULT_LAYOUT_METRICS.spouseGap,
   }
+}
+
+function domainsFor(units: RootedFamilyUnit[]): LayoutDomain[] {
+  return [{
+    id: 'domain:test',
+    kind: 'root',
+    componentId: 'component:test',
+    rootIds: ['root:test'],
+    signature: ['root:test'],
+    personIds: units.flatMap(unit => unit.memberIds).sort(),
+    unitIds: units.map(unit => unit.id).sort(),
+    order: 0,
+    accent: '#111111',
+  }]
 }
 
 function hasOverlappingRects(rects: Rect[]): boolean {

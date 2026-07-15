@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyFamily, type FamilyData, type Member } from './schema'
 import { layoutFamilyTree } from './treeLayout'
+import {
+  twoDisconnectedRootComponents,
+  twoRootMarriageFamilyData,
+} from '@/__tests__/fixtures/families'
+import { positiveCollinearOverlap } from './family-layout/testHelpers'
 
 function member(id: string, patch: Partial<Member> = {}): Member {
   return {
@@ -66,6 +71,57 @@ function familyData(members: Member[]): FamilyData {
 }
 
 describe('layoutFamilyTree', () => {
+  it('returns continuous root and bridge domains through the public facade', async () => {
+    const data = twoRootMarriageFamilyData()
+    const scene = await layoutFamilyTree(Object.values(data.members), { data })
+
+    expect(scene.rootDomains).toHaveLength(2)
+    expect(scene.bridgeDomains).toHaveLength(1)
+    const orderedRoots = [...scene.rootDomains].sort((left, right) => (
+      left.rect.x - right.rect.x
+    ))
+    expect(orderedRoots[0].rect.x + orderedRoots[0].rect.width)
+      .toBeLessThan(orderedRoots[1].rect.x)
+    expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
+    for (let left = 0; left < scene.routes.length; left += 1) {
+      for (let right = left + 1; right < scene.routes.length; right += 1) {
+        if (scene.routes[left].routeOwnerId === scene.routes[right].routeOwnerId) continue
+        for (const leftSegment of scene.routes[left].segments) {
+          for (const rightSegment of scene.routes[right].segments) {
+            expect(positiveCollinearOverlap(leftSegment, rightSegment)).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
+  it('does not let rootMemberId redefine visible roots', async () => {
+    const data = twoDisconnectedRootComponents()
+    data.rootMemberId = 'b'
+    const scene = await layoutFamilyTree(Object.values(data.members), { data })
+
+    expect(scene.rootDomains.map(domain => domain.id).sort()).toEqual([
+      'domain:root:a-root-a+a-root-b',
+      'domain:root:b-root-a+b-root-b',
+    ])
+    expect(scene.rootDomains[0].componentId).toBe('component:b')
+  })
+
+  it('does not let defaultViewpointId change root domains or geometry', async () => {
+    const baselineData = twoRootMarriageFamilyData()
+    const viewpointData = structuredClone(baselineData)
+    viewpointData.defaultViewpointId = 'cross-child'
+
+    const baseline = await layoutFamilyTree(Object.values(baselineData.members), {
+      data: baselineData,
+    })
+    const withViewpoint = await layoutFamilyTree(Object.values(viewpointData.members), {
+      data: viewpointData,
+    })
+
+    expect(withViewpoint).toEqual(baseline)
+  })
+
   it('returns one card per member and safe family-unit geometry', async () => {
     const members = buildUserFixture()
 
@@ -137,3 +193,15 @@ describe('layoutFamilyTree', () => {
     ))).toEqual([])
   })
 })
+
+function hasOverlappingRects(
+  rects: Array<{ x: number; y: number; width: number; height: number }>,
+): boolean {
+  return rects.some((left, leftIndex) => rects.some((right, rightIndex) => (
+    leftIndex < rightIndex
+    && left.x < right.x + right.width
+    && left.x + left.width > right.x
+    && left.y < right.y + right.height
+    && left.y + left.height > right.y
+  )))
+}

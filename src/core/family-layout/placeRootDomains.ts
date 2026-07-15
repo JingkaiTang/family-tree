@@ -481,23 +481,36 @@ function contiguateSiblingUnits(
 }
 
 function siblingBlocks(unitIds: string[], edges: ParentageEdge[]): string[][] {
-  const groupByChildId = new Map<string, Set<string>>()
+  const parentByUnitId = new Map(unitIds.map(unitId => [unitId, unitId]))
+  const findRoot = (unitId: string): string => {
+    const parentId = parentByUnitId.get(unitId) ?? unitId
+    if (parentId === unitId) return unitId
+    const rootId = findRoot(parentId)
+    parentByUnitId.set(unitId, rootId)
+    return rootId
+  }
+  const union = (leftId: string, rightId: string): void => {
+    const leftRootId = findRoot(leftId)
+    const rightRootId = findRoot(rightId)
+    if (leftRootId === rightRootId) return
+    parentByUnitId.set(rightRootId, leftRootId)
+  }
+
   for (const childIds of childrenBySource(edges).values()) {
     const rowChildren = childIds.filter(unitId => unitIds.includes(unitId))
     if (rowChildren.length < 2) continue
-    const group = new Set(rowChildren)
-    rowChildren.forEach(unitId => groupByChildId.set(unitId, group))
+    for (let index = 1; index < rowChildren.length; index += 1) {
+      union(rowChildren[0], rowChildren[index])
+    }
   }
-  const visited = new Set<string>()
-  return unitIds.flatMap(unitId => {
-    if (visited.has(unitId)) return []
-    const group = groupByChildId.get(unitId)
-    const block = group === undefined
-      ? [unitId]
-      : unitIds.filter(value => group.has(value))
-    block.forEach(value => visited.add(value))
-    return [block]
-  })
+  const blocksByRootId = new Map<string, string[]>()
+  for (const unitId of unitIds) {
+    const rootId = findRoot(unitId)
+    const block = blocksByRootId.get(rootId) ?? []
+    block.push(unitId)
+    blocksByRootId.set(rootId, block)
+  }
+  return [...blocksByRootId.values()]
 }
 
 function childrenBySource(edges: ParentageEdge[]): Map<string, string[]> {
