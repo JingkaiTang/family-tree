@@ -25,13 +25,16 @@ const saveStatus = computed(() => {
 
 const rootId = computed(() => data.value.rootMemberId)
 const layoutResetVersion = ref(0)
-const canRestoreDefaultLayout = computed(() => (
-  data.value.layoutPreferences.rowOrders.length > 0
-))
+const canRestoreDefaultLayout = computed(() => {
+  const preferences = data.value.layoutPreferences
+  return preferences.rootOrders.length > 0
+    || preferences.rowOrders.length > 0
+    || preferences.bridgeOrders.length > 0
+})
 
 function restoreDefaultLayout() {
   if (!canRestoreDefaultLayout.value) return
-  family.clearRowOrderPreferences()
+  family.clearAllLayoutOrderPreferences()
   ui.setCanvasView(null)
   layoutResetVersion.value += 1
 }

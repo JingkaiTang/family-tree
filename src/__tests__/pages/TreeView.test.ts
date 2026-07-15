@@ -127,14 +127,22 @@ describe('TreeView row order integration', () => {
         viewpoint: mk('viewpoint'),
       }
       state.data.layoutPreferences = {
-        rootOrders: [],
+        rootOrders: [{
+          componentId: 'component:main',
+          rootIds: ['root:b', 'root:a'],
+        }],
         rowOrders: [{
           id: 'row:0',
           domainId: 'legacy',
           generation: 0,
           unitIds: ['unit:person:viewpoint', 'unit:person:parent'],
         }],
-        bridgeOrders: [],
+        bridgeOrders: [{
+          id: 'row:domain:bridge:a+b:1',
+          domainId: 'domain:bridge:a+b',
+          generation: 1,
+          unitIds: ['unit:cross-2', 'unit:cross-1'],
+        }],
         rootAccentAssignments: {},
         familyAccentAssignments: {
           'unit:person:parent': '#123456',
@@ -158,9 +166,11 @@ describe('TreeView row order integration', () => {
     })
 
     const button = wrapper.get('[data-testid="restore-default-layout"]')
+    const clearAll = vi.spyOn(family, 'clearAllLayoutOrderPreferences')
     expect(button.attributes('disabled')).toBeUndefined()
     await button.trigger('click')
 
+    expect(clearAll).toHaveBeenCalledOnce()
     expect(family.data.layoutPreferences).toEqual({
       rootOrders: [],
       rowOrders: [],
@@ -178,6 +188,62 @@ describe('TreeView row order integration', () => {
     expect(ui.canvasView).toBeNull()
     expect(wrapper.getComponent(FamilyCanvasStub).props('layoutResetVersion')).toBe(1)
     expect(button.attributes('disabled')).toBeDefined()
+  })
+
+  it.each([
+    ['root order', {
+      rootOrders: [{ componentId: 'component:main', rootIds: ['root:b', 'root:a'] }],
+      rowOrders: [],
+      bridgeOrders: [],
+    }],
+    ['bridge order', {
+      rootOrders: [],
+      rowOrders: [],
+      bridgeOrders: [{
+        id: 'row:domain:bridge:a+b:1',
+        domainId: 'domain:bridge:a+b',
+        generation: 1,
+        unitIds: ['unit:cross-2', 'unit:cross-1'],
+      }],
+    }],
+  ])('enables restore for a persisted %s', (_label, orders) => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.$patch(state => {
+      state.data.layoutPreferences = {
+        ...state.data.layoutPreferences,
+        ...orders,
+      }
+    })
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { FamilyCanvas: FamilyCanvasStub, SearchBar: true },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="restore-default-layout"]')
+      .attributes('disabled')).toBeUndefined()
+  })
+
+  it('does not enable restore for accent assignments alone', () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.$patch(state => {
+      state.data.layoutPreferences.rootAccentAssignments = { 'root:a': '#345678' }
+      state.data.layoutPreferences.familyAccentAssignments = { 'unit:a': '#123456' }
+    })
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { FamilyCanvas: FamilyCanvasStub, SearchBar: true },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="restore-default-layout"]')
+      .attributes('disabled')).toBeDefined()
   })
 
   it('toggles auxiliary relations without using selection as viewpoint', async () => {

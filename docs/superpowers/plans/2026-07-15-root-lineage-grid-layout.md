@@ -1677,7 +1677,7 @@ git commit -m "feat: constrain dragging to root layout domains"
 - Modify: `src/components/tree/FamilyCanvas.vue`
 - Modify: `src/__tests__/components/FamilyCanvas.test.ts`
 
-- [ ] **Step 1: 写页面全量重置失败测试**
+- [x] **Step 1: 写页面全量重置失败测试**
 
 ```ts
 it('clears root, row and bridge order preferences with one reset', async () => {
@@ -1696,7 +1696,7 @@ it('clears root, row and bridge order preferences with one reset', async () => {
 
 补充：只有 rootOrders、只有 bridgeOrders 时按钮也可用；只有颜色 assignment 时按钮不可用，因为恢复默认布局不清除稳定颜色。
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 npm test -- src/stores/family.test.ts src/__tests__/pages/TreeView.test.ts src/__tests__/components/FamilyCanvas.test.ts
@@ -1704,7 +1704,7 @@ npm test -- src/stores/family.test.ts src/__tests__/pages/TreeView.test.ts src/_
 
 Expected: FAIL，页面仍只检查/清除 rowOrders。
 
-- [ ] **Step 3: 更新页面恢复逻辑**
+- [x] **Step 3: 更新页面恢复逻辑**
 
 ```ts
 const canRestoreDefaultLayout = computed(() => {
@@ -1723,7 +1723,7 @@ function restoreDefaultLayout() {
 
 删除 `clearRowOrderPreferences` 兼容包装及其所有调用。
 
-- [ ] **Step 4: 保持现有完整视图重置语义**
+- [x] **Step 4: 保持现有完整视图重置语义**
 
 Canvas 收到新的 reset version 时必须：
 
@@ -1737,7 +1737,7 @@ Canvas 收到新的 reset version 时必须：
 
 这一步复用已经实现的 reset/focus 管道，只扩展取消状态和全量偏好，不另写第二套 pan/zoom 算法。
 
-- [ ] **Step 5: 验证视角与竞态**
+- [x] **Step 5: 验证视角与竞态**
 
 ```bash
 npm test -- src/stores/family.test.ts src/__tests__/pages/TreeView.test.ts src/__tests__/components/FamilyCanvas.test.ts
@@ -1746,7 +1746,7 @@ npm run typecheck
 
 Expected: PASS；有效/失效 viewpoint、无 viewpoint、空树和 reset 期间旧请求返回均有测试。
 
-- [ ] **Step 6: 提交全量恢复默认**
+- [x] **Step 6: 提交全量恢复默认**
 
 ```bash
 git add src/stores/family.ts src/stores/family.test.ts src/pages/TreeView.vue src/__tests__/pages/TreeView.test.ts src/components/tree/FamilyCanvas.vue src/__tests__/components/FamilyCanvas.test.ts

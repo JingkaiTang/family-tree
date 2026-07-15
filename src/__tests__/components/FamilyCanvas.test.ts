@@ -969,6 +969,45 @@ describe('FamilyCanvas', () => {
     expect(focusStagePoint).toHaveBeenCalledWith(364, 328)
   })
 
+  it('keeps the default origin after resetting an empty tree', async () => {
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(emptyScene))
+      .mockResolvedValueOnce(structuredClone(emptyScene))
+    const wrapper = mountCanvas(familyData([]), { layoutResetVersion: 0 })
+    await flushPromises()
+    focusStagePoint.mockClear()
+
+    await wrapper.setProps({
+      data: familyData([]),
+      layoutResetVersion: 1,
+    })
+    await flushPromises()
+
+    expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+    expect(focusStagePoint).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the tree center when the reset viewpoint is missing', async () => {
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+      .mockResolvedValueOnce(structuredClone(sortableScene))
+    const data = familyData([mk('A'), mk('B'), mk('C'), mk('D')])
+    const wrapper = mountCanvas(data, {
+      viewpointId: 'missing',
+      layoutResetVersion: 0,
+    })
+    await flushPromises()
+    focusStagePoint.mockClear()
+
+    await wrapper.setProps({
+      data: structuredClone(data),
+      layoutResetVersion: 1,
+    })
+    await flushPromises()
+
+    expect(focusStagePoint).toHaveBeenCalledWith(364, 328)
+  })
+
   it('cancels an active drag before recomputing the default layout', async () => {
     const resetLayout = deferred<LayoutScene>()
     layoutFamilyTree
@@ -991,6 +1030,43 @@ describe('FamilyCanvas', () => {
     resetLayout.resolve(structuredClone(sortableScene))
     await flushPromises()
     expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets reset supersede a pending root-domain drop', async () => {
+    const nextScene = threeRootDragScene()
+    const staleDrop = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(nextScene))
+      .mockReturnValueOnce(staleDrop.promise)
+      .mockResolvedValueOnce(structuredClone(nextScene))
+    const data = familyData(nextScene.cards.map(card => mk(card.id)))
+    const wrapper = mountCanvas(data, { layoutResetVersion: 0 })
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 0, 600, 0)
+    await node.trigger('pointerup', { pointerId: 1, clientX: 1200, clientY: 100 })
+    await nextTick()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(true)
+
+    await wrapper.setProps({
+      data: structuredClone(data),
+      layoutResetVersion: 1,
+    })
+    await flushPromises()
+
+    expect(resetToDefaultView).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(0px, 360px)')
+
+    const staleScene = structuredClone(nextScene)
+    staleScene.units[1].rect.x = 900
+    staleScene.cards[1].rect.x = 900
+    staleDrop.resolve(staleScene)
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(0px, 360px)')
   })
 
   it('does not reset the viewport from a reset request superseded by newer data', async () => {

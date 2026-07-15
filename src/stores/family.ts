@@ -322,10 +322,6 @@ export const useFamilyStore = defineStore('family', () => {
     applyLayoutPreferenceUpdate(withoutManualLayoutOrders(data.value))
   }
 
-  function clearRowOrderPreferences() {
-    clearAllLayoutOrderPreferences()
-  }
-
   function setFamilyAccentAssignment(unitId: string, accent: string | null) {
     if (accent === null) delete data.value.layoutPreferences.familyAccentAssignments[unitId]
     else data.value.layoutPreferences.familyAccentAssignments[unitId] = accent
@@ -405,7 +401,6 @@ export const useFamilyStore = defineStore('family', () => {
     setDomainRowOrderPreference,
     setBridgeOrderPreference,
     clearAllLayoutOrderPreferences,
-    clearRowOrderPreferences,
     setFamilyAccentAssignment,
     setManualPosition,
     clearManualPosition,

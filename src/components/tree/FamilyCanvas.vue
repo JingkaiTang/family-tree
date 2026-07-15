@@ -138,7 +138,10 @@ async function updateLayout(options: {
   const viewpointId = props.viewpointId
   if (options.resetViewport) {
     panzoomRef.value?.resetToDefaultView()
-    if (!viewpointId || !focusMember(viewpointId)) {
+    if (
+      nextScene.cards.length > 0
+      && (!viewpointId || !focusMember(viewpointId))
+    ) {
       focusSceneCenter()
     }
   } else if (

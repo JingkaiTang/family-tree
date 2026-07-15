@@ -100,7 +100,7 @@ describe('family store relation invariants', () => {
     expect(family.isDirty).toBe(true)
   })
 
-  it('keeps the legacy clear action as an all-order reset and no-op when clear', () => {
+  it('keeps the all-order reset idempotent when only a row order exists', () => {
     const family = useFamilyStore()
     family.$patch(state => {
       state.data.members.child = mk('child')
@@ -124,7 +124,7 @@ describe('family store relation invariants', () => {
     })
     family.markClean()
 
-    family.clearRowOrderPreferences()
+    family.clearAllLayoutOrderPreferences()
 
     expect(family.data.layoutPreferences).toEqual({
       rootOrders: [],
@@ -141,7 +141,7 @@ describe('family store relation invariants', () => {
     expect(family.isDirty).toBe(true)
 
     family.markClean()
-    family.clearRowOrderPreferences()
+    family.clearAllLayoutOrderPreferences()
     expect(family.isDirty).toBe(false)
   })
 
