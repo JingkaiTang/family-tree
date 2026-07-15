@@ -33,7 +33,15 @@ function onWheel(e: WheelEvent) {
   // 不按修饰键时，把滚轮用作上下平移（自然）；按下 Ctrl/Meta 时缩放。
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault()
-    pz.zoomWithWheel(e)
+    const delta = e.deltaY === 0 && e.deltaX ? e.deltaX : e.deltaY
+    const direction = delta < 0 ? 1 : -1
+    const step = pz.getOptions().step ?? 0.3
+    zoomAtClientPoint(
+      pz.getScale() * Math.exp(direction * step / 3),
+      e.clientX,
+      e.clientY,
+      false,
+    )
   }
 }
 
@@ -42,11 +50,45 @@ function resetView() {
 }
 
 function zoomIn() {
-  pz?.zoomIn()
+  zoomByStep(1)
 }
 
 function zoomOut() {
-  pz?.zoomOut()
+  zoomByStep(-1)
+}
+
+function zoomByStep(direction: 1 | -1) {
+  if (!pz || !stageRef.value?.parentElement) return
+  const hostRect = stageRef.value.parentElement.getBoundingClientRect()
+  const step = pz.getOptions().step ?? 0.3
+  zoomAtClientPoint(
+    pz.getScale() * Math.exp(direction * step),
+    hostRect.left + hostRect.width / 2,
+    hostRect.top + hostRect.height / 2,
+    true,
+  )
+}
+
+function zoomAtClientPoint(
+  targetScale: number,
+  clientX: number,
+  clientY: number,
+  animate: boolean,
+) {
+  if (!pz || !stageRef.value?.parentElement) return
+  const hostRect = stageRef.value.parentElement.getBoundingClientRect()
+  const options = pz.getOptions()
+  const scale = Math.min(
+    options.maxScale ?? Number.POSITIVE_INFINITY,
+    Math.max(options.minScale ?? 0, targetScale),
+  )
+  pz.zoom(scale, {
+    animate,
+    focal: {
+      x: (clientX - hostRect.left) * scale,
+      y: (clientY - hostRect.top) * scale,
+    },
+  })
 }
 
 /** 当前缩放倍率。拖动逻辑需要用它把屏幕 px 反算回 stage 坐标 */
