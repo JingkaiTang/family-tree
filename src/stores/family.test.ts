@@ -98,6 +98,43 @@ describe('family store relation invariants', () => {
     expect(family.isDirty).toBe(true)
   })
 
+  it('clears only row order preferences and does nothing when already clear', () => {
+    const family = useFamilyStore()
+    family.$patch(state => {
+      state.data.members.child = mk('child')
+      state.data.layoutPreferences = {
+        rowOrders: [{
+          id: 'row:0',
+          unitIds: ['unit:person:b', 'unit:person:a'],
+        }],
+        familyAccentAssignments: {
+          'unit:person:a': '#123456',
+        },
+      }
+      state.data.childLayoutAssignments.child = {
+        primaryParentId: 'parent',
+      }
+    })
+    family.markClean()
+
+    family.clearRowOrderPreferences()
+
+    expect(family.data.layoutPreferences).toEqual({
+      rowOrders: [],
+      familyAccentAssignments: {
+        'unit:person:a': '#123456',
+      },
+    })
+    expect(family.data.childLayoutAssignments.child).toEqual({
+      primaryParentId: 'parent',
+    })
+    expect(family.isDirty).toBe(true)
+
+    family.markClean()
+    family.clearRowOrderPreferences()
+    expect(family.isDirty).toBe(false)
+  })
+
   it('persists and clears family accent assignments', () => {
     const family = useFamilyStore()
 

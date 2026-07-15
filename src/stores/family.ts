@@ -295,6 +295,12 @@ export const useFamilyStore = defineStore('family', () => {
     markDirty()
   }
 
+  function clearRowOrderPreferences() {
+    if (data.value.layoutPreferences.rowOrders.length === 0) return
+    data.value.layoutPreferences.rowOrders = []
+    markDirty()
+  }
+
   function setFamilyAccentAssignment(unitId: string, accent: string | null) {
     if (accent === null) delete data.value.layoutPreferences.familyAccentAssignments[unitId]
     else data.value.layoutPreferences.familyAccentAssignments[unitId] = accent
@@ -361,6 +367,7 @@ export const useFamilyStore = defineStore('family', () => {
     setChildLayoutAssignment,
     setGridLayoutOverride,
     setRowOrderPreference,
+    clearRowOrderPreferences,
     setFamilyAccentAssignment,
     setManualPosition,
     clearManualPosition,
