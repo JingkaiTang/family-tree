@@ -100,6 +100,8 @@ describe('buildSafeFallbackScene', () => {
     expect(JSON.stringify(second)).toBe(JSON.stringify(first))
     expect(first.units.every(unit => unit.domainId === 'domain:test')).toBe(true)
     expect(first.rootDomains[0].rect).toEqual(first.bounds)
+    expect(first.routes.map(route => route.routeOwnerId)).toEqual(['parentage:parents'])
+    expect(first.diagnostics).toEqual([])
   })
 
   it('preserves an existing unroutable owner diagnostic without duplicating it', () => {
@@ -126,6 +128,36 @@ describe('buildSafeFallbackScene', () => {
 
     expect(scene.diagnostics).toEqual([existing])
     expect(diagnostics).toEqual([existing])
+  })
+
+  it('keeps a safe route when another parentage is unroutable', () => {
+    const units = [
+      couple('valid-parents', ['valid-parent-a', 'valid-parent-b'], 0),
+      single('broken-parent', ['broken-parent-person']),
+      single('valid-child', ['valid-child-person'], 1),
+    ]
+    const groups: ParentageGroup[] = [{
+      id: 'parentage:valid',
+      sourceUnitId: 'valid-parents',
+      childPersonIds: ['valid-child-person'],
+    }, {
+      id: 'parentage:broken',
+      sourceUnitId: 'broken-parent',
+      childPersonIds: ['missing-child-person'],
+    }]
+
+    const scene = buildSafeFallbackScene(
+      units,
+      domainsFor(units),
+      groups,
+      DEFAULT_LAYOUT_METRICS,
+      [],
+    )
+
+    expect(scene.routes.map(route => route.routeOwnerId)).toEqual(['parentage:valid'])
+    expect(scene.diagnostics.filter(value => (
+      value.code === 'UNROUTABLE_PRIMARY_EDGE'
+    )).map(value => value.ids)).toEqual([['parentage:broken']])
   })
 
   it('keeps stable ID order and one family gap across disconnected generations', () => {
@@ -177,7 +209,11 @@ describe('buildSafeFallbackScene', () => {
     expect(new Set(scene.cards.map(card => card.id)).size).toBe(scene.cards.length)
     expect(hasOverlappingRects(scene.cards.map(card => card.rect))).toBe(false)
     expect(hasOverlappingRects(scene.units.map(unit => unit.rect))).toBe(false)
-    expect(scene.routes).toEqual([])
+    expect(scene.routes.map(route => route.routeOwnerId).sort()).toEqual([
+      'parentage:a-parent',
+      'parentage:z-parent',
+    ])
+    expect(scene.diagnostics).toEqual([])
     expect(JSON.stringify({ units, groups })).toBe(before)
   })
 })

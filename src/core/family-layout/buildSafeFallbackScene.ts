@@ -2,6 +2,7 @@ import {
   familyUnitWidth,
   materializeSceneGeometry,
 } from './materializeSceneGeometry'
+import { routeFamilyLanes } from './routeFamilyLanes'
 import type {
   LayoutDiagnostic,
   LayoutDomain,
@@ -13,6 +14,7 @@ import type {
   RootedFamilyUnit,
   LayoutScene,
 } from './types'
+import { validateScene } from './validateScene'
 
 export function buildSafeFallbackScene(
   inputUnits: RootedFamilyUnit[],
@@ -127,15 +129,47 @@ export function buildSafeFallbackScene(
     parentageGroups,
     metrics,
   })
+  const routing = routeFamilyLanes({
+    geometry,
+    units,
+    parentageGroups,
+    metrics,
+  })
+  const routedScene: LayoutScene = {
+    ...geometry,
+    gateways: routing.gateways,
+    routes: routing.routes,
+    diagnostics: [],
+  }
+  const invalidRouteOwnerIds = routeOwnerIdsFromDiagnostics(
+    validateScene(routedScene, metrics),
+    routing.routes.map(route => route.routeOwnerId),
+  )
+  const routes = routing.routes.filter(route => (
+    !invalidRouteOwnerIds.has(route.routeOwnerId)
+  ))
+  const routedOwnerIds = new Set(routes.map(route => route.routeOwnerId))
+  const gateways = routing.gateways.filter(gateway => (
+    routedOwnerIds.has(gateway.routeOwnerId)
+  ))
+  const safeScene: LayoutScene = {
+    ...geometry,
+    gateways,
+    routes,
+    diagnostics: [],
+  }
   const fallbackDiagnostics = fallbackRouteDiagnostics(
     parentageGroups,
-    diagnostics,
+    [
+      ...diagnostics,
+      ...routing.diagnostics,
+      ...validateScene(safeScene, metrics),
+    ],
+    routedOwnerIds,
   )
 
   return {
-    ...geometry,
-    gateways: [],
-    routes: [],
+    ...safeScene,
     diagnostics: fallbackDiagnostics,
   }
 }
@@ -200,6 +234,7 @@ function reconcileFallbackDomains(
 function fallbackRouteDiagnostics(
   parentageGroups: ParentageGroup[],
   diagnostics: LayoutDiagnostic[],
+  routedOwnerIds: ReadonlySet<string>,
 ): LayoutDiagnostic[] {
   const fallbackDiagnostics = [...diagnostics]
   const alreadyUnroutableOwnerIds = new Set(
@@ -212,14 +247,32 @@ function fallbackRouteDiagnostics(
   for (const group of [...parentageGroups].sort((left, right) => (
     left.id.localeCompare(right.id)
   ))) {
-    if (alreadyUnroutableOwnerIds.has(group.id)) continue
+    if (routedOwnerIds.has(group.id) || alreadyUnroutableOwnerIds.has(group.id)) continue
     fallbackDiagnostics.push({
       code: 'UNROUTABLE_PRIMARY_EDGE',
       ids: [group.id],
       message: `Primary family edge ${group.id} omitted from safe fallback`,
     })
   }
-  return fallbackDiagnostics.sort(compareDiagnostics)
+  const diagnosticByOwner = new Map<string, LayoutDiagnostic>()
+  for (const diagnostic of fallbackDiagnostics) {
+    const key = `${diagnostic.code}\0${[...diagnostic.ids].sort().join('\0')}`
+    if (!diagnosticByOwner.has(key)) diagnosticByOwner.set(key, diagnostic)
+  }
+  return [...diagnosticByOwner.values()].sort(compareDiagnostics)
+}
+
+function routeOwnerIdsFromDiagnostics(
+  diagnostics: LayoutDiagnostic[],
+  routeOwnerIds: string[],
+): Set<string> {
+  const knownOwnerIds = new Set(routeOwnerIds)
+  return new Set(diagnostics
+    .filter(value => (
+      value.code === 'UNROUTABLE_PRIMARY_EDGE'
+      || value.code === 'CROSS_FAMILY_SEGMENT_OVERLAP'
+    ))
+    .flatMap(value => value.ids.filter(id => knownOwnerIds.has(id))))
 }
 
 function snapUp(value: number, gridSize: number): number {

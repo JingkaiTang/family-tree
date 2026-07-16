@@ -18,6 +18,7 @@ import {
   twoRootMarriageFamilyData,
   unequalDepthRootsFamily,
 } from '@/__tests__/fixtures/families'
+import { syntheticFamily200 } from '@/__tests__/fixtures/syntheticFamily200'
 import { layoutFamilyTree, type LayoutScene } from '@/core/treeLayout'
 import type { Member } from '@/core/schema'
 import { positiveCollinearOverlap } from '@/core/family-layout/testHelpers'
@@ -240,6 +241,31 @@ describe('public family layout invariants', () => {
       'secondary-parentage',
       'godparent',
     ]))
+  })
+
+  it('renders the synthetic 200-person stress project without unsafe fallback', async () => {
+    const family = syntheticFamily200()
+    const members = Object.values(family.members)
+    const scene = await layoutFamilyTree(members, { data: family })
+
+    expectValidRootLayout(scene, members.map(member => member.id))
+    expect(scene.rootDomains).toHaveLength(6)
+    expect(scene.bridgeDomains).toHaveLength(3)
+    expect(scene.routes.filter(route => route.kind === 'primary')).toHaveLength(84)
+  })
+
+  it('keeps the synthetic 200-person layout deterministic under member permutations', async () => {
+    const family = syntheticFamily200()
+    const baseline = await layoutFamilyTree(Object.values(family.members), { data: family })
+    const reversed = {
+      ...family,
+      members: Object.fromEntries(Object.values(family.members)
+        .reverse()
+        .map(member => [member.id, member])),
+    }
+
+    expect(await layoutFamilyTree(Object.values(reversed.members), { data: reversed }))
+      .toEqual(baseline)
   })
 })
 

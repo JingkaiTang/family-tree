@@ -1,0 +1,544 @@
+{
+  "kind": "synthetic-avatar-pool",
+  "source": "AI-generated fictional portrait atlas",
+  "columns": 8,
+  "rows": 6,
+  "avatars": [
+    {
+      "photoId": "synthetic-avatar-g1-01",
+      "generation": 1,
+      "slot": 1,
+      "memberIds": [
+        "synthetic-g1-001",
+        "synthetic-g1-009"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-02",
+      "generation": 1,
+      "slot": 2,
+      "memberIds": [
+        "synthetic-g1-002",
+        "synthetic-g1-010"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-03",
+      "generation": 1,
+      "slot": 3,
+      "memberIds": [
+        "synthetic-g1-003",
+        "synthetic-g1-011"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-04",
+      "generation": 1,
+      "slot": 4,
+      "memberIds": [
+        "synthetic-g1-004",
+        "synthetic-g1-012"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-05",
+      "generation": 1,
+      "slot": 5,
+      "memberIds": [
+        "synthetic-g1-005"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-06",
+      "generation": 1,
+      "slot": 6,
+      "memberIds": [
+        "synthetic-g1-006"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-07",
+      "generation": 1,
+      "slot": 7,
+      "memberIds": [
+        "synthetic-g1-007"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g1-08",
+      "generation": 1,
+      "slot": 8,
+      "memberIds": [
+        "synthetic-g1-008"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-01",
+      "generation": 2,
+      "slot": 1,
+      "memberIds": [
+        "synthetic-g2-001",
+        "synthetic-g2-009",
+        "synthetic-g2-017"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-02",
+      "generation": 2,
+      "slot": 2,
+      "memberIds": [
+        "synthetic-g2-002",
+        "synthetic-g2-010",
+        "synthetic-g2-018"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-03",
+      "generation": 2,
+      "slot": 3,
+      "memberIds": [
+        "synthetic-g2-003",
+        "synthetic-g2-011",
+        "synthetic-g2-019"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-04",
+      "generation": 2,
+      "slot": 4,
+      "memberIds": [
+        "synthetic-g2-004",
+        "synthetic-g2-012",
+        "synthetic-g2-020"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-05",
+      "generation": 2,
+      "slot": 5,
+      "memberIds": [
+        "synthetic-g2-005",
+        "synthetic-g2-013",
+        "synthetic-g2-021"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-06",
+      "generation": 2,
+      "slot": 6,
+      "memberIds": [
+        "synthetic-g2-006",
+        "synthetic-g2-014",
+        "synthetic-g2-022"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-07",
+      "generation": 2,
+      "slot": 7,
+      "memberIds": [
+        "synthetic-g2-007",
+        "synthetic-g2-015",
+        "synthetic-g2-023"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g2-08",
+      "generation": 2,
+      "slot": 8,
+      "memberIds": [
+        "synthetic-g2-008",
+        "synthetic-g2-016",
+        "synthetic-g2-024"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-01",
+      "generation": 3,
+      "slot": 1,
+      "memberIds": [
+        "synthetic-g3-001",
+        "synthetic-g3-009",
+        "synthetic-g3-017",
+        "synthetic-g3-025",
+        "synthetic-g3-033"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-02",
+      "generation": 3,
+      "slot": 2,
+      "memberIds": [
+        "synthetic-g3-002",
+        "synthetic-g3-010",
+        "synthetic-g3-018",
+        "synthetic-g3-026",
+        "synthetic-g3-034"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-03",
+      "generation": 3,
+      "slot": 3,
+      "memberIds": [
+        "synthetic-g3-003",
+        "synthetic-g3-011",
+        "synthetic-g3-019",
+        "synthetic-g3-027",
+        "synthetic-g3-035"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-04",
+      "generation": 3,
+      "slot": 4,
+      "memberIds": [
+        "synthetic-g3-004",
+        "synthetic-g3-012",
+        "synthetic-g3-020",
+        "synthetic-g3-028",
+        "synthetic-g3-036"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-05",
+      "generation": 3,
+      "slot": 5,
+      "memberIds": [
+        "synthetic-g3-005",
+        "synthetic-g3-013",
+        "synthetic-g3-021",
+        "synthetic-g3-029"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-06",
+      "generation": 3,
+      "slot": 6,
+      "memberIds": [
+        "synthetic-g3-006",
+        "synthetic-g3-014",
+        "synthetic-g3-022",
+        "synthetic-g3-030"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-07",
+      "generation": 3,
+      "slot": 7,
+      "memberIds": [
+        "synthetic-g3-007",
+        "synthetic-g3-015",
+        "synthetic-g3-023",
+        "synthetic-g3-031"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g3-08",
+      "generation": 3,
+      "slot": 8,
+      "memberIds": [
+        "synthetic-g3-008",
+        "synthetic-g3-016",
+        "synthetic-g3-024",
+        "synthetic-g3-032"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-01",
+      "generation": 4,
+      "slot": 1,
+      "memberIds": [
+        "synthetic-g4-001",
+        "synthetic-g4-009",
+        "synthetic-g4-017",
+        "synthetic-g4-025",
+        "synthetic-g4-033",
+        "synthetic-g4-041"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-02",
+      "generation": 4,
+      "slot": 2,
+      "memberIds": [
+        "synthetic-g4-002",
+        "synthetic-g4-010",
+        "synthetic-g4-018",
+        "synthetic-g4-026",
+        "synthetic-g4-034",
+        "synthetic-g4-042"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-03",
+      "generation": 4,
+      "slot": 3,
+      "memberIds": [
+        "synthetic-g4-003",
+        "synthetic-g4-011",
+        "synthetic-g4-019",
+        "synthetic-g4-027",
+        "synthetic-g4-035",
+        "synthetic-g4-043"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-04",
+      "generation": 4,
+      "slot": 4,
+      "memberIds": [
+        "synthetic-g4-004",
+        "synthetic-g4-013",
+        "synthetic-g4-020",
+        "synthetic-g4-029",
+        "synthetic-g4-036",
+        "synthetic-g4-045"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-05",
+      "generation": 4,
+      "slot": 5,
+      "memberIds": [
+        "synthetic-g4-005",
+        "synthetic-g4-012",
+        "synthetic-g4-021",
+        "synthetic-g4-028",
+        "synthetic-g4-037",
+        "synthetic-g4-044"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-06",
+      "generation": 4,
+      "slot": 6,
+      "memberIds": [
+        "synthetic-g4-006",
+        "synthetic-g4-014",
+        "synthetic-g4-022",
+        "synthetic-g4-030",
+        "synthetic-g4-038",
+        "synthetic-g4-046"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-07",
+      "generation": 4,
+      "slot": 7,
+      "memberIds": [
+        "synthetic-g4-007",
+        "synthetic-g4-015",
+        "synthetic-g4-023",
+        "synthetic-g4-031",
+        "synthetic-g4-039",
+        "synthetic-g4-047"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g4-08",
+      "generation": 4,
+      "slot": 8,
+      "memberIds": [
+        "synthetic-g4-008",
+        "synthetic-g4-016",
+        "synthetic-g4-024",
+        "synthetic-g4-032",
+        "synthetic-g4-040",
+        "synthetic-g4-048"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-01",
+      "generation": 5,
+      "slot": 1,
+      "memberIds": [
+        "synthetic-g5-001",
+        "synthetic-g5-009",
+        "synthetic-g5-017",
+        "synthetic-g5-026",
+        "synthetic-g5-034",
+        "synthetic-g5-042"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-02",
+      "generation": 5,
+      "slot": 2,
+      "memberIds": [
+        "synthetic-g5-002",
+        "synthetic-g5-010",
+        "synthetic-g5-018",
+        "synthetic-g5-025",
+        "synthetic-g5-033",
+        "synthetic-g5-041"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-03",
+      "generation": 5,
+      "slot": 3,
+      "memberIds": [
+        "synthetic-g5-003",
+        "synthetic-g5-011",
+        "synthetic-g5-019",
+        "synthetic-g5-028",
+        "synthetic-g5-036",
+        "synthetic-g5-044"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-04",
+      "generation": 5,
+      "slot": 4,
+      "memberIds": [
+        "synthetic-g5-004",
+        "synthetic-g5-012",
+        "synthetic-g5-020",
+        "synthetic-g5-027",
+        "synthetic-g5-035",
+        "synthetic-g5-043"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-05",
+      "generation": 5,
+      "slot": 5,
+      "memberIds": [
+        "synthetic-g5-005",
+        "synthetic-g5-013",
+        "synthetic-g5-021",
+        "synthetic-g5-030",
+        "synthetic-g5-038",
+        "synthetic-g5-046"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-06",
+      "generation": 5,
+      "slot": 6,
+      "memberIds": [
+        "synthetic-g5-006",
+        "synthetic-g5-014",
+        "synthetic-g5-022",
+        "synthetic-g5-029",
+        "synthetic-g5-037",
+        "synthetic-g5-045"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-07",
+      "generation": 5,
+      "slot": 7,
+      "memberIds": [
+        "synthetic-g5-007",
+        "synthetic-g5-015",
+        "synthetic-g5-023",
+        "synthetic-g5-032",
+        "synthetic-g5-040",
+        "synthetic-g5-048"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g5-08",
+      "generation": 5,
+      "slot": 8,
+      "memberIds": [
+        "synthetic-g5-008",
+        "synthetic-g5-016",
+        "synthetic-g5-024",
+        "synthetic-g5-031",
+        "synthetic-g5-039",
+        "synthetic-g5-047"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-01",
+      "generation": 6,
+      "slot": 1,
+      "memberIds": [
+        "synthetic-g6-001",
+        "synthetic-g6-009",
+        "synthetic-g6-017",
+        "synthetic-g6-025"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-02",
+      "generation": 6,
+      "slot": 2,
+      "memberIds": [
+        "synthetic-g6-002",
+        "synthetic-g6-010",
+        "synthetic-g6-018",
+        "synthetic-g6-026"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-03",
+      "generation": 6,
+      "slot": 3,
+      "memberIds": [
+        "synthetic-g6-003",
+        "synthetic-g6-011",
+        "synthetic-g6-019",
+        "synthetic-g6-027"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-04",
+      "generation": 6,
+      "slot": 4,
+      "memberIds": [
+        "synthetic-g6-004",
+        "synthetic-g6-012",
+        "synthetic-g6-020",
+        "synthetic-g6-028"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-05",
+      "generation": 6,
+      "slot": 5,
+      "memberIds": [
+        "synthetic-g6-005",
+        "synthetic-g6-013",
+        "synthetic-g6-021",
+        "synthetic-g6-029"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-06",
+      "generation": 6,
+      "slot": 6,
+      "memberIds": [
+        "synthetic-g6-006",
+        "synthetic-g6-014",
+        "synthetic-g6-022",
+        "synthetic-g6-030"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-07",
+      "generation": 6,
+      "slot": 7,
+      "memberIds": [
+        "synthetic-g6-007",
+        "synthetic-g6-015",
+        "synthetic-g6-023",
+        "synthetic-g6-031"
+      ]
+    },
+    {
+      "photoId": "synthetic-avatar-g6-08",
+      "generation": 6,
+      "slot": 8,
+      "memberIds": [
+        "synthetic-g6-008",
+        "synthetic-g6-016",
+        "synthetic-g6-024",
+        "synthetic-g6-032"
+      ]
+    }
+  ]
+}

@@ -103,7 +103,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
           domainModel.domains,
           built.parentageGroups,
           request.metrics,
-          first.scene.diagnostics,
+          retainedDiagnostics,
         )
       : first.scene
   }
@@ -128,7 +128,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
         domainModel.domains,
         built.parentageGroups,
         request.metrics,
-        retry.scene.diagnostics,
+        retainedDiagnostics,
       )
     : retry.scene
 }

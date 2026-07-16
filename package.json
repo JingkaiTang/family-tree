@@ -13,7 +13,9 @@
     "tauri:build": "tauri build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:layout-perf": "node scripts/run-layout-perf.mjs"
+    "test:layout-perf": "node scripts/run-layout-perf.mjs",
+    "generate:test-family": "node scripts/generate-synthetic-family.mjs",
+    "slice:test-avatars": "node scripts/slice-synthetic-avatar-atlas.mjs"
   },
   "dependencies": {
     "@panzoom/panzoom": "^4.6.2",

@@ -1,0 +1,7552 @@
+{
+  "schemaVersion": 4,
+  "members": {
+    "synthetic-g1-001": {
+      "id": "synthetic-g1-001",
+      "firstName": "明远",
+      "lastName": "钱",
+      "gender": "male",
+      "birthDate": "1886-07-19",
+      "birthPlace": "苏州",
+      "occupation": "教师",
+      "education": "家庭教育",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-002",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-01",
+      "deathDate": "1969-07-19",
+      "photoId": "synthetic-avatar-g1-01"
+    },
+    "synthetic-g1-002": {
+      "id": "synthetic-g1-002",
+      "firstName": "浩然",
+      "lastName": "孙",
+      "gender": "female",
+      "birthDate": "1889-02-07",
+      "birthPlace": "杭州",
+      "occupation": "设计师",
+      "education": "家庭教育",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-001",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-01",
+      "deathDate": "1971-02-07",
+      "photoId": "synthetic-avatar-g1-02"
+    },
+    "synthetic-g1-003": {
+      "id": "synthetic-g1-003",
+      "firstName": "新月",
+      "lastName": "李",
+      "gender": "male",
+      "birthDate": "1886-03-09",
+      "birthPlace": "南京",
+      "occupation": "编辑",
+      "education": "家庭教育",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-006",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-004",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-02",
+      "deathDate": "1968-03-09",
+      "photoId": "synthetic-avatar-g1-03"
+    },
+    "synthetic-g1-004": {
+      "id": "synthetic-g1-004",
+      "firstName": "晨曦",
+      "lastName": "周",
+      "gender": "female",
+      "birthDate": "1888-06-01",
+      "birthPlace": "成都",
+      "occupation": "医生",
+      "education": "家庭教育",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-006",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-003",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-02",
+      "deathDate": "1968-06-01",
+      "photoId": "synthetic-avatar-g1-04"
+    },
+    "synthetic-g1-005": {
+      "id": "synthetic-g1-005",
+      "firstName": "明远",
+      "lastName": "吴",
+      "gender": "male",
+      "birthDate": "1888-07-09",
+      "birthPlace": "西安",
+      "occupation": "会计",
+      "education": "家庭教育",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-006",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-03",
+      "deathDate": "1965-07-09",
+      "photoId": "synthetic-avatar-g1-05"
+    },
+    "synthetic-g1-006": {
+      "id": "synthetic-g1-006",
+      "firstName": "浩然",
+      "lastName": "郑",
+      "gender": "female",
+      "birthDate": "1888-10-18",
+      "birthPlace": "武汉",
+      "occupation": "研究员",
+      "education": "家庭教育",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-005",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-03",
+      "deathDate": "1967-10-18",
+      "photoId": "synthetic-avatar-g1-06"
+    },
+    "synthetic-g1-007": {
+      "id": "synthetic-g1-007",
+      "firstName": "新月",
+      "lastName": "王",
+      "gender": "male",
+      "birthDate": "1889-03-01",
+      "birthPlace": "长沙",
+      "occupation": "工程师",
+      "education": "家庭教育",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-008",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-04",
+      "deathDate": "1974-03-01",
+      "photoId": "synthetic-avatar-g1-07"
+    },
+    "synthetic-g1-008": {
+      "id": "synthetic-g1-008",
+      "firstName": "晨曦",
+      "lastName": "冯",
+      "gender": "female",
+      "birthDate": "1888-04-10",
+      "birthPlace": "青岛",
+      "occupation": "农艺师",
+      "education": "家庭教育",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-007",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-04",
+      "deathDate": "1964-04-10",
+      "photoId": "synthetic-avatar-g1-08"
+    },
+    "synthetic-g1-009": {
+      "id": "synthetic-g1-009",
+      "firstName": "明远",
+      "lastName": "陈",
+      "gender": "male",
+      "birthDate": "1888-08-10",
+      "birthPlace": "苏州",
+      "occupation": "教师",
+      "education": "家庭教育",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-010",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-05",
+      "deathDate": "1973-08-10",
+      "photoId": "synthetic-avatar-g1-01"
+    },
+    "synthetic-g1-010": {
+      "id": "synthetic-g1-010",
+      "firstName": "浩然",
+      "lastName": "褚",
+      "gender": "female",
+      "birthDate": "1889-04-08",
+      "birthPlace": "杭州",
+      "occupation": "设计师",
+      "education": "家庭教育",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-009",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-05",
+      "deathDate": "1967-04-08",
+      "photoId": "synthetic-avatar-g1-02"
+    },
+    "synthetic-g1-011": {
+      "id": "synthetic-g1-011",
+      "firstName": "新月",
+      "lastName": "卫",
+      "gender": "male",
+      "birthDate": "1885-07-08",
+      "birthPlace": "南京",
+      "occupation": "编辑",
+      "education": "家庭教育",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-022",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-012",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-06",
+      "deathDate": "1963-07-08",
+      "photoId": "synthetic-avatar-g1-03"
+    },
+    "synthetic-g1-012": {
+      "id": "synthetic-g1-012",
+      "firstName": "晨曦",
+      "lastName": "蒋",
+      "gender": "female",
+      "birthDate": "1889-08-04",
+      "birthPlace": "成都",
+      "occupation": "医生",
+      "education": "家庭教育",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g2-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-022",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g1-011",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 0,
+      "syntheticRole": "founder",
+      "syntheticRootId": "root-family-06",
+      "deathDate": "1969-08-04",
+      "photoId": "synthetic-avatar-g1-04"
+    },
+    "synthetic-g2-001": {
+      "id": "synthetic-g2-001",
+      "firstName": "延年",
+      "lastName": "孙",
+      "gender": "male",
+      "birthDate": "1912-02-02",
+      "birthPlace": "南京",
+      "occupation": "医生",
+      "education": "家庭教育",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-002",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-003",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "deathDate": "1990-02-02",
+      "photoId": "synthetic-avatar-g2-01"
+    },
+    "synthetic-g2-002": {
+      "id": "synthetic-g2-002",
+      "firstName": "诗涵",
+      "lastName": "钱",
+      "gender": "female",
+      "birthDate": "1915-05-02",
+      "birthPlace": "成都",
+      "occupation": "会计",
+      "education": "家庭教育",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-002",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-003",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-004",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g2-02"
+    },
+    "synthetic-g2-003": {
+      "id": "synthetic-g2-003",
+      "firstName": "亦辰",
+      "lastName": "尤",
+      "gender": "male",
+      "birthDate": "1915-08-04",
+      "birthPlace": "西安",
+      "occupation": "研究员",
+      "education": "家庭教育",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-001",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g2-03"
+    },
+    "synthetic-g2-004": {
+      "id": "synthetic-g2-004",
+      "firstName": "嘉树",
+      "lastName": "许",
+      "gender": "female",
+      "birthDate": "1915-10-10",
+      "birthPlace": "武汉",
+      "occupation": "工程师",
+      "education": "家庭教育",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-003",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-002",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "deathDate": "1993-10-10",
+      "photoId": "synthetic-avatar-g2-04"
+    },
+    "synthetic-g2-005": {
+      "id": "synthetic-g2-005",
+      "firstName": "延年",
+      "lastName": "周",
+      "gender": "male",
+      "birthDate": "1913-07-19",
+      "birthPlace": "长沙",
+      "occupation": "农艺师",
+      "education": "家庭教育",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-004",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-009",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-007",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g2-05"
+    },
+    "synthetic-g2-006": {
+      "id": "synthetic-g2-006",
+      "firstName": "诗涵",
+      "lastName": "李",
+      "gender": "female",
+      "birthDate": "1915-09-24",
+      "birthPlace": "青岛",
+      "occupation": "教师",
+      "education": "家庭教育",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-004",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-008",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-008",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g2-06"
+    },
+    "synthetic-g2-007": {
+      "id": "synthetic-g2-007",
+      "firstName": "亦辰",
+      "lastName": "施",
+      "gender": "male",
+      "birthDate": "1913-06-20",
+      "birthPlace": "苏州",
+      "occupation": "设计师",
+      "education": "家庭教育",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-009",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-005",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "deathDate": "1987-06-20",
+      "photoId": "synthetic-avatar-g2-07"
+    },
+    "synthetic-g2-008": {
+      "id": "synthetic-g2-008",
+      "firstName": "嘉树",
+      "lastName": "张",
+      "gender": "female",
+      "birthDate": "1912-11-17",
+      "birthPlace": "杭州",
+      "occupation": "编辑",
+      "education": "家庭教育",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-008",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-006",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g2-08"
+    },
+    "synthetic-g2-009": {
+      "id": "synthetic-g2-009",
+      "firstName": "延年",
+      "lastName": "郑",
+      "gender": "male",
+      "birthDate": "1913-08-14",
+      "birthPlace": "南京",
+      "occupation": "医生",
+      "education": "家庭教育",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-006",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-015",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-011",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g2-01"
+    },
+    "synthetic-g2-010": {
+      "id": "synthetic-g2-010",
+      "firstName": "诗涵",
+      "lastName": "吴",
+      "gender": "female",
+      "birthDate": "1914-09-17",
+      "birthPlace": "成都",
+      "occupation": "会计",
+      "education": "家庭教育",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-006",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-012",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "deathDate": "1990-09-17",
+      "photoId": "synthetic-avatar-g2-02"
+    },
+    "synthetic-g2-011": {
+      "id": "synthetic-g2-011",
+      "firstName": "亦辰",
+      "lastName": "孙",
+      "gender": "male",
+      "birthDate": "1914-05-04",
+      "birthPlace": "西安",
+      "occupation": "研究员",
+      "education": "家庭教育",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-015",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-009",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g2-03"
+    },
+    "synthetic-g2-012": {
+      "id": "synthetic-g2-012",
+      "firstName": "嘉树",
+      "lastName": "李",
+      "gender": "female",
+      "birthDate": "1914-05-22",
+      "birthPlace": "武汉",
+      "occupation": "工程师",
+      "education": "家庭教育",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-010",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g2-04"
+    },
+    "synthetic-g2-013": {
+      "id": "synthetic-g2-013",
+      "firstName": "延年",
+      "lastName": "冯",
+      "gender": "male",
+      "birthDate": "1913-12-07",
+      "birthPlace": "长沙",
+      "occupation": "农艺师",
+      "education": "家庭教育",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-008",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-015",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "deathDate": "1989-12-07",
+      "photoId": "synthetic-avatar-g2-05"
+    },
+    "synthetic-g2-014": {
+      "id": "synthetic-g2-014",
+      "firstName": "诗涵",
+      "lastName": "王",
+      "gender": "female",
+      "birthDate": "1914-06-09",
+      "birthPlace": "青岛",
+      "occupation": "教师",
+      "education": "家庭教育",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-008",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-016",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g2-06"
+    },
+    "synthetic-g2-015": {
+      "id": "synthetic-g2-015",
+      "firstName": "亦辰",
+      "lastName": "郑",
+      "gender": "male",
+      "birthDate": "1911-05-26",
+      "birthPlace": "苏州",
+      "occupation": "设计师",
+      "education": "家庭教育",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-013",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g2-07"
+    },
+    "synthetic-g2-016": {
+      "id": "synthetic-g2-016",
+      "firstName": "嘉树",
+      "lastName": "王",
+      "gender": "female",
+      "birthDate": "1914-03-17",
+      "birthPlace": "杭州",
+      "occupation": "编辑",
+      "education": "家庭教育",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-014",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "deathDate": "1994-03-17",
+      "photoId": "synthetic-avatar-g2-08"
+    },
+    "synthetic-g2-017": {
+      "id": "synthetic-g2-017",
+      "firstName": "延年",
+      "lastName": "褚",
+      "gender": "male",
+      "birthDate": "1911-06-04",
+      "birthPlace": "南京",
+      "occupation": "医生",
+      "education": "家庭教育",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-010",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-026",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-019",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g2-01"
+    },
+    "synthetic-g2-018": {
+      "id": "synthetic-g2-018",
+      "firstName": "诗涵",
+      "lastName": "陈",
+      "gender": "female",
+      "birthDate": "1911-07-12",
+      "birthPlace": "成都",
+      "occupation": "会计",
+      "education": "家庭教育",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-010",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-027",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-020",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g2-02"
+    },
+    "synthetic-g2-019": {
+      "id": "synthetic-g2-019",
+      "firstName": "亦辰",
+      "lastName": "褚",
+      "gender": "male",
+      "birthDate": "1914-09-09",
+      "birthPlace": "西安",
+      "occupation": "研究员",
+      "education": "家庭教育",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-026",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-017",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "deathDate": "1990-09-09",
+      "photoId": "synthetic-avatar-g2-03"
+    },
+    "synthetic-g2-020": {
+      "id": "synthetic-g2-020",
+      "firstName": "嘉树",
+      "lastName": "卫",
+      "gender": "female",
+      "birthDate": "1915-06-23",
+      "birthPlace": "武汉",
+      "occupation": "工程师",
+      "education": "家庭教育",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-027",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-018",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g2-04"
+    },
+    "synthetic-g2-021": {
+      "id": "synthetic-g2-021",
+      "firstName": "延年",
+      "lastName": "蒋",
+      "gender": "male",
+      "birthDate": "1912-06-24",
+      "birthPlace": "长沙",
+      "occupation": "农艺师",
+      "education": "家庭教育",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-031",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-032",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-023",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g2-05"
+    },
+    "synthetic-g2-022": {
+      "id": "synthetic-g2-022",
+      "firstName": "诗涵",
+      "lastName": "卫",
+      "gender": "female",
+      "birthDate": "1913-03-02",
+      "birthPlace": "青岛",
+      "occupation": "教师",
+      "education": "家庭教育",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g1-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g1-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g3-033",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-024",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "deathDate": "1986-03-02",
+      "photoId": "synthetic-avatar-g2-06"
+    },
+    "synthetic-g2-023": {
+      "id": "synthetic-g2-023",
+      "firstName": "亦辰",
+      "lastName": "韩",
+      "gender": "male",
+      "birthDate": "1911-08-23",
+      "birthPlace": "苏州",
+      "occupation": "设计师",
+      "education": "家庭教育",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-031",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-032",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-021",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g2-07"
+    },
+    "synthetic-g2-024": {
+      "id": "synthetic-g2-024",
+      "firstName": "嘉树",
+      "lastName": "杨",
+      "gender": "female",
+      "birthDate": "1912-10-11",
+      "birthPlace": "杭州",
+      "occupation": "编辑",
+      "education": "家庭教育",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g3-033",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g2-022",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 1,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g2-08"
+    },
+    "synthetic-g3-001": {
+      "id": "synthetic-g3-001",
+      "firstName": "诗涵",
+      "lastName": "孙",
+      "gender": "male",
+      "birthDate": "1938-11-27",
+      "birthPlace": "西安",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-003",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-005",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-004",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [
+        {
+          "id": "synthetic-g5-005",
+          "type": "godchild"
+        }
+      ],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g3-01"
+    },
+    "synthetic-g3-002": {
+      "id": "synthetic-g3-002",
+      "firstName": "亦辰",
+      "lastName": "尤",
+      "gender": "female",
+      "birthDate": "1939-09-06",
+      "birthPlace": "武汉",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-003",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-005",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g3-02"
+    },
+    "synthetic-g3-003": {
+      "id": "synthetic-g3-003",
+      "firstName": "嘉树",
+      "lastName": "钱",
+      "gender": "male",
+      "birthDate": "1940-01-20",
+      "birthPlace": "长沙",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-002",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-004",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-004",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-006",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g3-03"
+    },
+    "synthetic-g3-004": {
+      "id": "synthetic-g3-004",
+      "firstName": "延年",
+      "lastName": "施",
+      "gender": "female",
+      "birthDate": "1941-09-07",
+      "birthPlace": "青岛",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-005",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-001",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g3-04"
+    },
+    "synthetic-g3-005": {
+      "id": "synthetic-g3-005",
+      "firstName": "诗涵",
+      "lastName": "张",
+      "gender": "male",
+      "birthDate": "1940-08-19",
+      "birthPlace": "苏州",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-002",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g3-05"
+    },
+    "synthetic-g3-006": {
+      "id": "synthetic-g3-006",
+      "firstName": "亦辰",
+      "lastName": "赵",
+      "gender": "female",
+      "birthDate": "1937-09-23",
+      "birthPlace": "杭州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-004",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-003",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g3-06"
+    },
+    "synthetic-g3-007": {
+      "id": "synthetic-g3-007",
+      "firstName": "嘉树",
+      "lastName": "李",
+      "gender": "male",
+      "birthDate": "1938-08-20",
+      "birthPlace": "南京",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-006",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-008",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-013",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-010",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g3-07"
+    },
+    "synthetic-g3-008": {
+      "id": "synthetic-g3-008",
+      "firstName": "延年",
+      "lastName": "张",
+      "gender": "female",
+      "birthDate": "1938-08-07",
+      "birthPlace": "成都",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-006",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-008",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-011",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g3-08"
+    },
+    "synthetic-g3-009": {
+      "id": "synthetic-g3-009",
+      "firstName": "诗涵",
+      "lastName": "周",
+      "gender": "male",
+      "birthDate": "1940-04-05",
+      "birthPlace": "西安",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-007",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-012",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-012",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g3-01"
+    },
+    "synthetic-g3-010": {
+      "id": "synthetic-g3-010",
+      "firstName": "亦辰",
+      "lastName": "周",
+      "gender": "female",
+      "birthDate": "1939-04-02",
+      "birthPlace": "武汉",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-013",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-007",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g3-02"
+    },
+    "synthetic-g3-011": {
+      "id": "synthetic-g3-011",
+      "firstName": "嘉树",
+      "lastName": "吴",
+      "gender": "other",
+      "birthDate": "1941-05-12",
+      "birthPlace": "长沙",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-008",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g3-03"
+    },
+    "synthetic-g3-012": {
+      "id": "synthetic-g3-012",
+      "firstName": "延年",
+      "lastName": "郑",
+      "gender": "female",
+      "birthDate": "1939-10-05",
+      "birthPlace": "青岛",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-012",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-009",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g3-04"
+    },
+    "synthetic-g3-013": {
+      "id": "synthetic-g3-013",
+      "firstName": "诗涵",
+      "lastName": "吴",
+      "gender": "male",
+      "birthDate": "1937-03-27",
+      "birthPlace": "苏州",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-010",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-016",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g3-05"
+    },
+    "synthetic-g3-014": {
+      "id": "synthetic-g3-014",
+      "firstName": "亦辰",
+      "lastName": "李",
+      "gender": "female",
+      "birthDate": "1937-02-10",
+      "birthPlace": "杭州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-010",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-017",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g3-06"
+    },
+    "synthetic-g3-015": {
+      "id": "synthetic-g3-015",
+      "firstName": "嘉树",
+      "lastName": "郑",
+      "gender": "male",
+      "birthDate": "1941-01-23",
+      "birthPlace": "南京",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-011",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-018",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g3-07"
+    },
+    "synthetic-g3-016": {
+      "id": "synthetic-g3-016",
+      "firstName": "延年",
+      "lastName": "褚",
+      "gender": "female",
+      "birthDate": "1938-08-12",
+      "birthPlace": "成都",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-013",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g3-08"
+    },
+    "synthetic-g3-017": {
+      "id": "synthetic-g3-017",
+      "firstName": "诗涵",
+      "lastName": "卫",
+      "gender": "male",
+      "birthDate": "1938-03-24",
+      "birthPlace": "西安",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-014",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g3-01"
+    },
+    "synthetic-g3-018": {
+      "id": "synthetic-g3-018",
+      "firstName": "亦辰",
+      "lastName": "蒋",
+      "gender": "female",
+      "birthDate": "1941-03-25",
+      "birthPlace": "武汉",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-015",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g3-02"
+    },
+    "synthetic-g3-019": {
+      "id": "synthetic-g3-019",
+      "firstName": "嘉树",
+      "lastName": "王",
+      "gender": "male",
+      "birthDate": "1938-09-11",
+      "birthPlace": "长沙",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-014",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-016",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-027",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-028",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-022",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g3-03"
+    },
+    "synthetic-g3-020": {
+      "id": "synthetic-g3-020",
+      "firstName": "延年",
+      "lastName": "王",
+      "gender": "female",
+      "birthDate": "1940-12-22",
+      "birthPlace": "青岛",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-014",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-016",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-029",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-023",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g3-04"
+    },
+    "synthetic-g3-021": {
+      "id": "synthetic-g3-021",
+      "firstName": "诗涵",
+      "lastName": "冯",
+      "gender": "male",
+      "birthDate": "1941-01-24",
+      "birthPlace": "苏州",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-015",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-026",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-024",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g3-05"
+    },
+    "synthetic-g3-022": {
+      "id": "synthetic-g3-022",
+      "firstName": "亦辰",
+      "lastName": "朱",
+      "gender": "female",
+      "birthDate": "1939-01-08",
+      "birthPlace": "杭州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-027",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-028",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-019",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g3-06"
+    },
+    "synthetic-g3-023": {
+      "id": "synthetic-g3-023",
+      "firstName": "嘉树",
+      "lastName": "秦",
+      "gender": "male",
+      "birthDate": "1939-01-23",
+      "birthPlace": "南京",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-029",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-020",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g3-07"
+    },
+    "synthetic-g3-024": {
+      "id": "synthetic-g3-024",
+      "firstName": "延年",
+      "lastName": "尤",
+      "gender": "female",
+      "birthDate": "1939-05-28",
+      "birthPlace": "成都",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-026",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-021",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g3-08"
+    },
+    "synthetic-g3-025": {
+      "id": "synthetic-g3-025",
+      "firstName": "诗涵",
+      "lastName": "褚",
+      "gender": "male",
+      "birthDate": "1939-12-27",
+      "birthPlace": "西安",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-019",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-033",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-034",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-028",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g3-01"
+    },
+    "synthetic-g3-026": {
+      "id": "synthetic-g3-026",
+      "firstName": "亦辰",
+      "lastName": "褚",
+      "gender": "female",
+      "birthDate": "1939-03-15",
+      "birthPlace": "武汉",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-019",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-035",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-036",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-029",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g3-02"
+    },
+    "synthetic-g3-027": {
+      "id": "synthetic-g3-027",
+      "firstName": "嘉树",
+      "lastName": "陈",
+      "gender": "male",
+      "birthDate": "1940-02-11",
+      "birthPlace": "长沙",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-018",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-020",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-037",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-030",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g3-03"
+    },
+    "synthetic-g3-028": {
+      "id": "synthetic-g3-028",
+      "firstName": "延年",
+      "lastName": "施",
+      "gender": "female",
+      "birthDate": "1941-02-06",
+      "birthPlace": "青岛",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-033",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-034",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-025",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g3-04"
+    },
+    "synthetic-g3-029": {
+      "id": "synthetic-g3-029",
+      "firstName": "诗涵",
+      "lastName": "张",
+      "gender": "male",
+      "birthDate": "1940-06-14",
+      "birthPlace": "苏州",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-035",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-036",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-026",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g3-05"
+    },
+    "synthetic-g3-030": {
+      "id": "synthetic-g3-030",
+      "firstName": "亦辰",
+      "lastName": "赵",
+      "gender": "female",
+      "birthDate": "1938-12-24",
+      "birthPlace": "杭州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-037",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-027",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g3-06"
+    },
+    "synthetic-g3-031": {
+      "id": "synthetic-g3-031",
+      "firstName": "嘉树",
+      "lastName": "蒋",
+      "gender": "male",
+      "birthDate": "1941-10-23",
+      "birthPlace": "南京",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-023",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-045",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-034",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g3-07"
+    },
+    "synthetic-g3-032": {
+      "id": "synthetic-g3-032",
+      "firstName": "延年",
+      "lastName": "韩",
+      "gender": "female",
+      "birthDate": "1937-08-03",
+      "birthPlace": "成都",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-023",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-043",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-044",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-035",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g3-08"
+    },
+    "synthetic-g3-033": {
+      "id": "synthetic-g3-033",
+      "firstName": "诗涵",
+      "lastName": "卫",
+      "gender": "male",
+      "birthDate": "1938-05-07",
+      "birthPlace": "西安",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g2-022",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g2-024",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g4-041",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-042",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-036",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g3-01"
+    },
+    "synthetic-g3-034": {
+      "id": "synthetic-g3-034",
+      "firstName": "亦辰",
+      "lastName": "周",
+      "gender": "female",
+      "birthDate": "1939-06-21",
+      "birthPlace": "武汉",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-045",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-031",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g3-02"
+    },
+    "synthetic-g3-035": {
+      "id": "synthetic-g3-035",
+      "firstName": "嘉树",
+      "lastName": "吴",
+      "gender": "male",
+      "birthDate": "1941-05-16",
+      "birthPlace": "长沙",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-043",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-044",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-032",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g3-03"
+    },
+    "synthetic-g3-036": {
+      "id": "synthetic-g3-036",
+      "firstName": "延年",
+      "lastName": "郑",
+      "gender": "female",
+      "birthDate": "1940-12-05",
+      "birthPlace": "青岛",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g4-041",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-042",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g3-033",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 2,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g3-04"
+    },
+    "synthetic-g4-001": {
+      "id": "synthetic-g4-001",
+      "firstName": "晨曦",
+      "lastName": "张",
+      "gender": "male",
+      "birthDate": "1964-01-18",
+      "birthPlace": "长沙",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-002",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-005",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-002",
+          "type": "step"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-006",
+          "type": "married"
+        },
+        {
+          "id": "synthetic-g4-008",
+          "type": "divorced"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-01"
+    },
+    "synthetic-g4-002": {
+      "id": "synthetic-g4-002",
+      "firstName": "明远",
+      "lastName": "尤",
+      "gender": "female",
+      "birthDate": "1966-03-12",
+      "birthPlace": "青岛",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-002",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-005",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-012",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-007",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-02"
+    },
+    "synthetic-g4-003": {
+      "id": "synthetic-g4-003",
+      "firstName": "浩然",
+      "lastName": "赵",
+      "gender": "male",
+      "birthDate": "1965-07-09",
+      "birthPlace": "苏州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-006",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-011",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-008",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-03"
+    },
+    "synthetic-g4-004": {
+      "id": "synthetic-g4-004",
+      "firstName": "新月",
+      "lastName": "钱",
+      "gender": "female",
+      "birthDate": "1967-11-08",
+      "birthPlace": "杭州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-006",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-006",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-012",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [
+        {
+          "id": "synthetic-g6-008",
+          "type": "godchild"
+        }
+      ],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-04"
+    },
+    "synthetic-g4-005": {
+      "id": "synthetic-g4-005",
+      "firstName": "晨曦",
+      "lastName": "施",
+      "gender": "male",
+      "birthDate": "1966-02-05",
+      "birthPlace": "南京",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-004",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-001",
+          "type": "adopted"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-013",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-05"
+    },
+    "synthetic-g4-006": {
+      "id": "synthetic-g4-006",
+      "firstName": "明远",
+      "lastName": "杨",
+      "gender": "female",
+      "birthDate": "1965-07-18",
+      "birthPlace": "成都",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-003",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-001",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-06"
+    },
+    "synthetic-g4-007": {
+      "id": "synthetic-g4-007",
+      "firstName": "浩然",
+      "lastName": "朱",
+      "gender": "male",
+      "birthDate": "1965-08-21",
+      "birthPlace": "西安",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-012",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-002",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-07"
+    },
+    "synthetic-g4-008": {
+      "id": "synthetic-g4-008",
+      "firstName": "新月",
+      "lastName": "秦",
+      "gender": "female",
+      "birthDate": "1965-08-08",
+      "birthPlace": "武汉",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-011",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-003",
+          "type": "married"
+        },
+        {
+          "id": "synthetic-g4-001",
+          "type": "divorced"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g4-08"
+    },
+    "synthetic-g4-009": {
+      "id": "synthetic-g4-009",
+      "firstName": "晨曦",
+      "lastName": "吴",
+      "gender": "male",
+      "birthDate": "1967-05-17",
+      "birthPlace": "长沙",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-008",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-011",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-008",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-014",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-01"
+    },
+    "synthetic-g4-010": {
+      "id": "synthetic-g4-010",
+      "firstName": "明远",
+      "lastName": "张",
+      "gender": "female",
+      "birthDate": "1967-03-17",
+      "birthPlace": "青岛",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-008",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-011",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-004",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-015",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-02"
+    },
+    "synthetic-g4-011": {
+      "id": "synthetic-g4-011",
+      "firstName": "浩然",
+      "lastName": "郑",
+      "gender": "male",
+      "birthDate": "1963-07-20",
+      "birthPlace": "苏州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-016",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-03"
+    },
+    "synthetic-g4-012": {
+      "id": "synthetic-g4-012",
+      "firstName": "新月",
+      "lastName": "周",
+      "gender": "female",
+      "birthDate": "1967-06-15",
+      "birthPlace": "杭州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-006",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-004",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-05"
+    },
+    "synthetic-g4-013": {
+      "id": "synthetic-g4-013",
+      "firstName": "晨曦",
+      "lastName": "周",
+      "gender": "male",
+      "birthDate": "1964-03-19",
+      "birthPlace": "南京",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-010",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-001",
+          "type": "adopted"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-005",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-04"
+    },
+    "synthetic-g4-014": {
+      "id": "synthetic-g4-014",
+      "firstName": "明远",
+      "lastName": "张",
+      "gender": "female",
+      "birthDate": "1965-10-01",
+      "birthPlace": "成都",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-008",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-009",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-06"
+    },
+    "synthetic-g4-015": {
+      "id": "synthetic-g4-015",
+      "firstName": "浩然",
+      "lastName": "赵",
+      "gender": "male",
+      "birthDate": "1967-01-24",
+      "birthPlace": "西安",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-004",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-010",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [
+        {
+          "id": "synthetic-g6-020",
+          "type": "godchild"
+        }
+      ],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-07"
+    },
+    "synthetic-g4-016": {
+      "id": "synthetic-g4-016",
+      "firstName": "新月",
+      "lastName": "钱",
+      "gender": "female",
+      "birthDate": "1964-08-24",
+      "birthPlace": "武汉",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-011",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g4-08"
+    },
+    "synthetic-g4-017": {
+      "id": "synthetic-g4-017",
+      "firstName": "晨曦",
+      "lastName": "褚",
+      "gender": "male",
+      "birthDate": "1966-05-01",
+      "birthPlace": "长沙",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-016",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-009",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-022",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-01"
+    },
+    "synthetic-g4-018": {
+      "id": "synthetic-g4-018",
+      "firstName": "明远",
+      "lastName": "吴",
+      "gender": "female",
+      "birthDate": "1966-09-26",
+      "birthPlace": "青岛",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-016",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-022",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-023",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-02"
+    },
+    "synthetic-g4-019": {
+      "id": "synthetic-g4-019",
+      "firstName": "浩然",
+      "lastName": "卫",
+      "gender": "male",
+      "birthDate": "1963-10-23",
+      "birthPlace": "苏州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-014",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-017",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-019",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-024",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-03"
+    },
+    "synthetic-g4-020": {
+      "id": "synthetic-g4-020",
+      "firstName": "新月",
+      "lastName": "李",
+      "gender": "female",
+      "birthDate": "1966-02-11",
+      "birthPlace": "杭州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-014",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-017",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-017",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-028",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-04"
+    },
+    "synthetic-g4-021": {
+      "id": "synthetic-g4-021",
+      "firstName": "晨曦",
+      "lastName": "蒋",
+      "gender": "male",
+      "birthDate": "1965-07-14",
+      "birthPlace": "南京",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-015",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-018",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-029",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-05"
+    },
+    "synthetic-g4-022": {
+      "id": "synthetic-g4-022",
+      "firstName": "明远",
+      "lastName": "王",
+      "gender": "other",
+      "birthDate": "1966-07-20",
+      "birthPlace": "成都",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-009",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-017",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-06"
+    },
+    "synthetic-g4-023": {
+      "id": "synthetic-g4-023",
+      "firstName": "浩然",
+      "lastName": "冯",
+      "gender": "male",
+      "birthDate": "1966-12-05",
+      "birthPlace": "西安",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-022",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-018",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-07"
+    },
+    "synthetic-g4-024": {
+      "id": "synthetic-g4-024",
+      "firstName": "新月",
+      "lastName": "陈",
+      "gender": "female",
+      "birthDate": "1965-05-20",
+      "birthPlace": "武汉",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-019",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-019",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g4-08"
+    },
+    "synthetic-g4-025": {
+      "id": "synthetic-g4-025",
+      "firstName": "晨曦",
+      "lastName": "尤",
+      "gender": "male",
+      "birthDate": "1967-08-16",
+      "birthPlace": "长沙",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-024",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-030",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-01"
+    },
+    "synthetic-g4-026": {
+      "id": "synthetic-g4-026",
+      "firstName": "明远",
+      "lastName": "冯",
+      "gender": "female",
+      "birthDate": "1966-06-25",
+      "birthPlace": "青岛",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-024",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-007",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-031",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-02"
+    },
+    "synthetic-g4-027": {
+      "id": "synthetic-g4-027",
+      "firstName": "浩然",
+      "lastName": "朱",
+      "gender": "male",
+      "birthDate": "1964-03-10",
+      "birthPlace": "苏州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-022",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-013",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-032",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-03"
+    },
+    "synthetic-g4-028": {
+      "id": "synthetic-g4-028",
+      "firstName": "新月",
+      "lastName": "王",
+      "gender": "female",
+      "birthDate": "1966-04-03",
+      "birthPlace": "杭州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-022",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-017",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-020",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-05"
+    },
+    "synthetic-g4-029": {
+      "id": "synthetic-g4-029",
+      "firstName": "晨曦",
+      "lastName": "秦",
+      "gender": "male",
+      "birthDate": "1967-03-14",
+      "birthPlace": "南京",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-020",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-023",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-021",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-04"
+    },
+    "synthetic-g4-030": {
+      "id": "synthetic-g4-030",
+      "firstName": "明远",
+      "lastName": "杨",
+      "gender": "female",
+      "birthDate": "1964-04-10",
+      "birthPlace": "成都",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-025",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-06"
+    },
+    "synthetic-g4-031": {
+      "id": "synthetic-g4-031",
+      "firstName": "浩然",
+      "lastName": "朱",
+      "gender": "male",
+      "birthDate": "1967-09-19",
+      "birthPlace": "西安",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-007",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-026",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-07"
+    },
+    "synthetic-g4-032": {
+      "id": "synthetic-g4-032",
+      "firstName": "新月",
+      "lastName": "秦",
+      "gender": "female",
+      "birthDate": "1964-01-21",
+      "birthPlace": "武汉",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-013",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-027",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g4-08"
+    },
+    "synthetic-g4-033": {
+      "id": "synthetic-g4-033",
+      "firstName": "晨曦",
+      "lastName": "施",
+      "gender": "male",
+      "birthDate": "1966-05-07",
+      "birthPlace": "长沙",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-028",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-038",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-01"
+    },
+    "synthetic-g4-034": {
+      "id": "synthetic-g4-034",
+      "firstName": "明远",
+      "lastName": "褚",
+      "gender": "female",
+      "birthDate": "1966-05-02",
+      "birthPlace": "青岛",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-028",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-039",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-02"
+    },
+    "synthetic-g4-035": {
+      "id": "synthetic-g4-035",
+      "firstName": "浩然",
+      "lastName": "张",
+      "gender": "male",
+      "birthDate": "1965-10-16",
+      "birthPlace": "苏州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-026",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-029",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-016",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-040",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-03"
+    },
+    "synthetic-g4-036": {
+      "id": "synthetic-g4-036",
+      "firstName": "新月",
+      "lastName": "褚",
+      "gender": "female",
+      "birthDate": "1967-02-14",
+      "birthPlace": "杭州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-026",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-029",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-024",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-044",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-04"
+    },
+    "synthetic-g4-037": {
+      "id": "synthetic-g4-037",
+      "firstName": "晨曦",
+      "lastName": "赵",
+      "gender": "male",
+      "birthDate": "1967-10-23",
+      "birthPlace": "南京",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-027",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-030",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-045",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-05"
+    },
+    "synthetic-g4-038": {
+      "id": "synthetic-g4-038",
+      "firstName": "明远",
+      "lastName": "张",
+      "gender": "female",
+      "birthDate": "1967-09-09",
+      "birthPlace": "成都",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-033",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-06"
+    },
+    "synthetic-g4-039": {
+      "id": "synthetic-g4-039",
+      "firstName": "浩然",
+      "lastName": "赵",
+      "gender": "male",
+      "birthDate": "1964-09-01",
+      "birthPlace": "西安",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-034",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-07"
+    },
+    "synthetic-g4-040": {
+      "id": "synthetic-g4-040",
+      "firstName": "新月",
+      "lastName": "钱",
+      "gender": "female",
+      "birthDate": "1963-04-05",
+      "birthPlace": "武汉",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-016",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-035",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g4-08"
+    },
+    "synthetic-g4-041": {
+      "id": "synthetic-g4-041",
+      "firstName": "晨曦",
+      "lastName": "郑",
+      "gender": "male",
+      "birthDate": "1964-10-14",
+      "birthPlace": "长沙",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-033",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-036",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-023",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-046",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-01"
+    },
+    "synthetic-g4-042": {
+      "id": "synthetic-g4-042",
+      "firstName": "明远",
+      "lastName": "卫",
+      "gender": "female",
+      "birthDate": "1966-05-03",
+      "birthPlace": "青岛",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-033",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-036",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-005",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-047",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-02"
+    },
+    "synthetic-g4-043": {
+      "id": "synthetic-g4-043",
+      "firstName": "浩然",
+      "lastName": "吴",
+      "gender": "male",
+      "birthDate": "1966-11-23",
+      "birthPlace": "苏州",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-032",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-035",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-015",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-048",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-03"
+    },
+    "synthetic-g4-044": {
+      "id": "synthetic-g4-044",
+      "firstName": "新月",
+      "lastName": "韩",
+      "gender": "female",
+      "birthDate": "1963-11-24",
+      "birthPlace": "杭州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-032",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-035",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-024",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-036",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-05"
+    },
+    "synthetic-g4-045": {
+      "id": "synthetic-g4-045",
+      "firstName": "晨曦",
+      "lastName": "周",
+      "gender": "male",
+      "birthDate": "1963-04-23",
+      "birthPlace": "南京",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g3-031",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g3-034",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g5-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-037",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-04"
+    },
+    "synthetic-g4-046": {
+      "id": "synthetic-g4-046",
+      "firstName": "明远",
+      "lastName": "王",
+      "gender": "female",
+      "birthDate": "1964-11-11",
+      "birthPlace": "成都",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-023",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-041",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-06"
+    },
+    "synthetic-g4-047": {
+      "id": "synthetic-g4-047",
+      "firstName": "浩然",
+      "lastName": "冯",
+      "gender": "male",
+      "birthDate": "1963-01-14",
+      "birthPlace": "西安",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-005",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-042",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-07"
+    },
+    "synthetic-g4-048": {
+      "id": "synthetic-g4-048",
+      "firstName": "新月",
+      "lastName": "陈",
+      "gender": "female",
+      "birthDate": "1966-01-11",
+      "birthPlace": "武汉",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g5-015",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g4-043",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 3,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g4-08"
+    },
+    "synthetic-g5-001": {
+      "id": "synthetic-g5-001",
+      "firstName": "浩然",
+      "lastName": "施",
+      "nickname": "小程",
+      "gender": "male",
+      "birthDate": "1993-01-17",
+      "birthPlace": "苏州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-005",
+          "type": "adopted"
+        },
+        {
+          "id": "synthetic-g4-013",
+          "type": "adopted"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-006",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-025",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g5-01"
+    },
+    "synthetic-g5-002": {
+      "id": "synthetic-g5-002",
+      "firstName": "新月",
+      "lastName": "尤",
+      "nickname": "小雪",
+      "gender": "female",
+      "birthDate": "1993-01-25",
+      "birthPlace": "杭州",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-025",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-030",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-001",
+          "type": "step"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-026",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g5-02"
+    },
+    "synthetic-g5-003": {
+      "id": "synthetic-g5-003",
+      "firstName": "晨曦",
+      "lastName": "张",
+      "nickname": "小年",
+      "gender": "male",
+      "birthDate": "1990-09-18",
+      "birthPlace": "南京",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-006",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-025",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-027",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g5-03"
+    },
+    "synthetic-g5-004": {
+      "id": "synthetic-g5-004",
+      "firstName": "明远",
+      "lastName": "张",
+      "nickname": "小言",
+      "gender": "female",
+      "birthDate": "1990-05-25",
+      "birthPlace": "成都",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-010",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-015",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-012",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-028",
+          "type": "married"
+        },
+        {
+          "id": "synthetic-g5-015",
+          "type": "divorced"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g5-04"
+    },
+    "synthetic-g5-005": {
+      "id": "synthetic-g5-005",
+      "firstName": "浩然",
+      "lastName": "卫",
+      "nickname": "小星",
+      "gender": "male",
+      "birthDate": "1992-05-18",
+      "birthPlace": "西安",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-042",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-047",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-019",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-029",
+          "type": "married"
+        }
+      ],
+      "godparents": [
+        {
+          "id": "synthetic-g3-001",
+          "type": "godparent"
+        }
+      ],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g5-05"
+    },
+    "synthetic-g5-006": {
+      "id": "synthetic-g5-006",
+      "firstName": "新月",
+      "lastName": "钱",
+      "nickname": "小扬",
+      "gender": "female",
+      "birthDate": "1992-09-10",
+      "birthPlace": "武汉",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-004",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-012",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-022",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-030",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g5-06"
+    },
+    "synthetic-g5-007": {
+      "id": "synthetic-g5-007",
+      "firstName": "晨曦",
+      "lastName": "冯",
+      "nickname": "小曦",
+      "gender": "male",
+      "birthDate": "1991-11-17",
+      "birthPlace": "长沙",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-026",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-031",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-024",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-031",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g5-07"
+    },
+    "synthetic-g5-008": {
+      "id": "synthetic-g5-008",
+      "firstName": "明远",
+      "lastName": "吴",
+      "nickname": "小然",
+      "gender": "female",
+      "birthDate": "1990-04-28",
+      "birthPlace": "青岛",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-014",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-032",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-032",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g5-08"
+    },
+    "synthetic-g5-009": {
+      "id": "synthetic-g5-009",
+      "firstName": "浩然",
+      "lastName": "褚",
+      "nickname": "小文",
+      "gender": "male",
+      "birthDate": "1990-07-21",
+      "birthPlace": "苏州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-022",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-027",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-033",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g5-01"
+    },
+    "synthetic-g5-010": {
+      "id": "synthetic-g5-010",
+      "firstName": "新月",
+      "lastName": "郑",
+      "nickname": "小宇",
+      "gender": "female",
+      "birthDate": "1992-03-15",
+      "birthPlace": "杭州",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-016",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-034",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g5-02"
+    },
+    "synthetic-g5-011": {
+      "id": "synthetic-g5-011",
+      "firstName": "晨曦",
+      "lastName": "赵",
+      "nickname": "小涵",
+      "gender": "male",
+      "birthDate": "1993-05-06",
+      "birthPlace": "南京",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-008",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-015",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-016",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-035",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g5-03"
+    },
+    "synthetic-g5-012": {
+      "id": "synthetic-g5-012",
+      "firstName": "明远",
+      "lastName": "尤",
+      "nickname": "小峰",
+      "gender": "female",
+      "birthDate": "1991-03-02",
+      "birthPlace": "成都",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-002",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-007",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-028",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-036",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g5-04"
+    },
+    "synthetic-g5-013": {
+      "id": "synthetic-g5-013",
+      "firstName": "浩然",
+      "lastName": "朱",
+      "nickname": "小桐",
+      "gender": "male",
+      "birthDate": "1989-04-24",
+      "birthPlace": "西安",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-027",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-032",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-037",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g5-05"
+    },
+    "synthetic-g5-014": {
+      "id": "synthetic-g5-014",
+      "firstName": "新月",
+      "lastName": "赵",
+      "nickname": "小宁",
+      "gender": "female",
+      "birthDate": "1991-11-22",
+      "birthPlace": "武汉",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-037",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-045",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-023",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-038",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05+root-family-06",
+      "photoId": "synthetic-avatar-g5-06"
+    },
+    "synthetic-g5-015": {
+      "id": "synthetic-g5-015",
+      "firstName": "晨曦",
+      "lastName": "吴",
+      "nickname": "小远",
+      "gender": "male",
+      "birthDate": "1991-08-26",
+      "birthPlace": "长沙",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-043",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-048",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-004",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-039",
+          "type": "married"
+        },
+        {
+          "id": "synthetic-g5-004",
+          "type": "divorced"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g5-07"
+    },
+    "synthetic-g5-016": {
+      "id": "synthetic-g5-016",
+      "firstName": "明远",
+      "lastName": "张",
+      "nickname": "小衡",
+      "gender": "female",
+      "birthDate": "1990-11-18",
+      "birthPlace": "青岛",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-035",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-040",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-008",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-040",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g5-08"
+    },
+    "synthetic-g5-017": {
+      "id": "synthetic-g5-017",
+      "firstName": "浩然",
+      "lastName": "李",
+      "nickname": "小和",
+      "gender": "male",
+      "birthDate": "1993-10-18",
+      "birthPlace": "苏州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-020",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-028",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-031",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-041",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g5-01"
+    },
+    "synthetic-g5-018": {
+      "id": "synthetic-g5-018",
+      "firstName": "新月",
+      "lastName": "蒋",
+      "nickname": "小雅",
+      "gender": "female",
+      "birthDate": "1989-08-13",
+      "birthPlace": "杭州",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-029",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-042",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g5-02"
+    },
+    "synthetic-g5-019": {
+      "id": "synthetic-g5-019",
+      "firstName": "晨曦",
+      "lastName": "卫",
+      "nickname": "小辰",
+      "gender": "male",
+      "birthDate": "1990-02-03",
+      "birthPlace": "南京",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-024",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-030",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-043",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g5-03"
+    },
+    "synthetic-g5-020": {
+      "id": "synthetic-g5-020",
+      "firstName": "明远",
+      "lastName": "褚",
+      "nickname": "小源",
+      "gender": "female",
+      "birthDate": "1989-12-12",
+      "birthPlace": "成都",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-034",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-039",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-017",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-044",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g5-04"
+    },
+    "synthetic-g5-021": {
+      "id": "synthetic-g5-021",
+      "firstName": "浩然",
+      "lastName": "施",
+      "nickname": "小行",
+      "gender": "other",
+      "birthDate": "1991-08-03",
+      "birthPlace": "西安",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-033",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-038",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-029",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-045",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g5-05"
+    },
+    "synthetic-g5-022": {
+      "id": "synthetic-g5-022",
+      "firstName": "新月",
+      "lastName": "吴",
+      "nickname": "小宁",
+      "gender": "female",
+      "birthDate": "1993-11-08",
+      "birthPlace": "武汉",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-018",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-023",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-026",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-046",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g5-06"
+    },
+    "synthetic-g5-023": {
+      "id": "synthetic-g5-023",
+      "firstName": "晨曦",
+      "lastName": "郑",
+      "nickname": "小然",
+      "gender": "male",
+      "birthDate": "1990-10-17",
+      "birthPlace": "长沙",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-041",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-046",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-047",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g5-07"
+    },
+    "synthetic-g5-024": {
+      "id": "synthetic-g5-024",
+      "firstName": "明远",
+      "lastName": "褚",
+      "nickname": "小兰",
+      "gender": "female",
+      "birthDate": "1992-04-03",
+      "birthPlace": "青岛",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g4-036",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g4-044",
+          "type": "blood"
+        }
+      ],
+      "children": [
+        {
+          "id": "synthetic-g6-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-048",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05+root-family-06",
+      "photoId": "synthetic-avatar-g5-08"
+    },
+    "synthetic-g5-025": {
+      "id": "synthetic-g5-025",
+      "firstName": "浩然",
+      "lastName": "沈",
+      "nickname": "小阳",
+      "gender": "male",
+      "birthDate": "1990-11-06",
+      "birthPlace": "苏州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-006",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-001",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g5-02"
+    },
+    "synthetic-g5-026": {
+      "id": "synthetic-g5-026",
+      "firstName": "新月",
+      "lastName": "韩",
+      "nickname": "小姝",
+      "gender": "female",
+      "birthDate": "1989-09-16",
+      "birthPlace": "杭州",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-020",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-002",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g5-01"
+    },
+    "synthetic-g5-027": {
+      "id": "synthetic-g5-027",
+      "firstName": "晨曦",
+      "lastName": "杨",
+      "nickname": "小树",
+      "gender": "male",
+      "birthDate": "1989-12-17",
+      "birthPlace": "南京",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-025",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-003",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g5-04"
+    },
+    "synthetic-g5-028": {
+      "id": "synthetic-g5-028",
+      "firstName": "明远",
+      "lastName": "朱",
+      "nickname": "小夏",
+      "gender": "female",
+      "birthDate": "1993-10-26",
+      "birthPlace": "成都",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-012",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-004",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g5-03"
+    },
+    "synthetic-g5-029": {
+      "id": "synthetic-g5-029",
+      "firstName": "浩然",
+      "lastName": "秦",
+      "nickname": "小恒",
+      "gender": "male",
+      "birthDate": "1992-03-04",
+      "birthPlace": "西安",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-019",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-005",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g5-06"
+    },
+    "synthetic-g5-030": {
+      "id": "synthetic-g5-030",
+      "firstName": "新月",
+      "lastName": "尤",
+      "nickname": "小舒",
+      "gender": "female",
+      "birthDate": "1990-07-07",
+      "birthPlace": "武汉",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-022",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-006",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g5-05"
+    },
+    "synthetic-g5-031": {
+      "id": "synthetic-g5-031",
+      "firstName": "晨曦",
+      "lastName": "许",
+      "nickname": "小月",
+      "gender": "male",
+      "birthDate": "1990-06-14",
+      "birthPlace": "长沙",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-024",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-007",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g5-08"
+    },
+    "synthetic-g5-032": {
+      "id": "synthetic-g5-032",
+      "firstName": "明远",
+      "lastName": "何",
+      "nickname": "小谨",
+      "gender": "female",
+      "birthDate": "1991-06-19",
+      "birthPlace": "青岛",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-032",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-008",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g5-07"
+    },
+    "synthetic-g5-033": {
+      "id": "synthetic-g5-033",
+      "firstName": "浩然",
+      "lastName": "吕",
+      "nickname": "小程",
+      "gender": "male",
+      "birthDate": "1992-02-13",
+      "birthPlace": "苏州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-027",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-009",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g5-02"
+    },
+    "synthetic-g5-034": {
+      "id": "synthetic-g5-034",
+      "firstName": "新月",
+      "lastName": "施",
+      "nickname": "小雪",
+      "gender": "female",
+      "birthDate": "1991-05-10",
+      "birthPlace": "杭州",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-010",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-010",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g5-01"
+    },
+    "synthetic-g5-035": {
+      "id": "synthetic-g5-035",
+      "firstName": "晨曦",
+      "lastName": "张",
+      "nickname": "小年",
+      "gender": "male",
+      "birthDate": "1989-11-17",
+      "birthPlace": "南京",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-015",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-016",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-011",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g5-04"
+    },
+    "synthetic-g5-036": {
+      "id": "synthetic-g5-036",
+      "firstName": "明远",
+      "lastName": "赵",
+      "nickname": "小言",
+      "gender": "female",
+      "birthDate": "1992-05-03",
+      "birthPlace": "成都",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-028",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-012",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g5-03"
+    },
+    "synthetic-g5-037": {
+      "id": "synthetic-g5-037",
+      "firstName": "浩然",
+      "lastName": "钱",
+      "nickname": "小星",
+      "gender": "male",
+      "birthDate": "1990-06-15",
+      "birthPlace": "西安",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-002",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-013",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g5-06"
+    },
+    "synthetic-g5-038": {
+      "id": "synthetic-g5-038",
+      "firstName": "新月",
+      "lastName": "孙",
+      "nickname": "小扬",
+      "gender": "female",
+      "birthDate": "1989-04-21",
+      "birthPlace": "武汉",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-023",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-014",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05+root-family-06",
+      "photoId": "synthetic-avatar-g5-05"
+    },
+    "synthetic-g5-039": {
+      "id": "synthetic-g5-039",
+      "firstName": "晨曦",
+      "lastName": "李",
+      "nickname": "小曦",
+      "gender": "male",
+      "birthDate": "1989-12-26",
+      "birthPlace": "长沙",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-004",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-015",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g5-08"
+    },
+    "synthetic-g5-040": {
+      "id": "synthetic-g5-040",
+      "firstName": "明远",
+      "lastName": "周",
+      "nickname": "小然",
+      "gender": "female",
+      "birthDate": "1992-05-01",
+      "birthPlace": "青岛",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-008",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-016",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g5-07"
+    },
+    "synthetic-g5-041": {
+      "id": "synthetic-g5-041",
+      "firstName": "浩然",
+      "lastName": "吴",
+      "nickname": "小文",
+      "gender": "male",
+      "birthDate": "1990-11-16",
+      "birthPlace": "苏州",
+      "occupation": "会计",
+      "education": "大专及以上",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-031",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-017",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g5-02"
+    },
+    "synthetic-g5-042": {
+      "id": "synthetic-g5-042",
+      "firstName": "新月",
+      "lastName": "郑",
+      "nickname": "小宇",
+      "gender": "female",
+      "birthDate": "1991-07-13",
+      "birthPlace": "杭州",
+      "occupation": "研究员",
+      "education": "大专及以上",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g6-014",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-018",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g5-01"
+    },
+    "synthetic-g5-043": {
+      "id": "synthetic-g5-043",
+      "firstName": "晨曦",
+      "lastName": "王",
+      "nickname": "小涵",
+      "gender": "male",
+      "birthDate": "1991-11-01",
+      "birthPlace": "南京",
+      "occupation": "工程师",
+      "education": "大专及以上",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-030",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-019",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g5-04"
+    },
+    "synthetic-g5-044": {
+      "id": "synthetic-g5-044",
+      "firstName": "明远",
+      "lastName": "冯",
+      "nickname": "小峰",
+      "gender": "female",
+      "birthDate": "1989-09-22",
+      "birthPlace": "成都",
+      "occupation": "农艺师",
+      "education": "大专及以上",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-017",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-020",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g5-03"
+    },
+    "synthetic-g5-045": {
+      "id": "synthetic-g5-045",
+      "firstName": "浩然",
+      "lastName": "陈",
+      "nickname": "小桐",
+      "gender": "male",
+      "birthDate": "1990-08-07",
+      "birthPlace": "西安",
+      "occupation": "教师",
+      "education": "大专及以上",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-029",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-021",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g5-06"
+    },
+    "synthetic-g5-046": {
+      "id": "synthetic-g5-046",
+      "firstName": "新月",
+      "lastName": "褚",
+      "nickname": "小宁",
+      "gender": "female",
+      "birthDate": "1990-11-17",
+      "birthPlace": "武汉",
+      "occupation": "设计师",
+      "education": "大专及以上",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-026",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-022",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g5-05"
+    },
+    "synthetic-g5-047": {
+      "id": "synthetic-g5-047",
+      "firstName": "晨曦",
+      "lastName": "卫",
+      "nickname": "小远",
+      "gender": "male",
+      "birthDate": "1991-04-02",
+      "birthPlace": "长沙",
+      "occupation": "编辑",
+      "education": "大专及以上",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-021",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-023",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g5-08"
+    },
+    "synthetic-g5-048": {
+      "id": "synthetic-g5-048",
+      "firstName": "明远",
+      "lastName": "蒋",
+      "nickname": "小衡",
+      "gender": "female",
+      "birthDate": "1990-07-23",
+      "birthPlace": "青岛",
+      "occupation": "医生",
+      "education": "大专及以上",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [],
+      "children": [
+        {
+          "id": "synthetic-g6-018",
+          "type": "blood"
+        }
+      ],
+      "siblings": [],
+      "spouses": [
+        {
+          "id": "synthetic-g5-024",
+          "type": "married"
+        }
+      ],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 4,
+      "syntheticRole": "incoming-spouse",
+      "syntheticRootId": "root-family-05+root-family-06",
+      "photoId": "synthetic-avatar-g5-07"
+    },
+    "synthetic-g6-001": {
+      "id": "synthetic-g6-001",
+      "firstName": "晨曦",
+      "lastName": "钱",
+      "nickname": "小和",
+      "gender": "male",
+      "birthDate": "2019-10-11",
+      "birthPlace": "南京",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-037",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g6-01"
+    },
+    "synthetic-g6-002": {
+      "id": "synthetic-g6-002",
+      "firstName": "明远",
+      "lastName": "朱",
+      "nickname": "小雅",
+      "gender": "female",
+      "birthDate": "2018-09-23",
+      "birthPlace": "成都",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-013",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-037",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g6-02"
+    },
+    "synthetic-g6-003": {
+      "id": "synthetic-g6-003",
+      "firstName": "浩然",
+      "lastName": "李",
+      "nickname": "小辰",
+      "gender": "male",
+      "birthDate": "2018-10-05",
+      "birthPlace": "西安",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-015",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-039",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g6-03"
+    },
+    "synthetic-g6-004": {
+      "id": "synthetic-g6-004",
+      "firstName": "新月",
+      "lastName": "吴",
+      "nickname": "小源",
+      "gender": "female",
+      "birthDate": "2019-08-01",
+      "birthPlace": "武汉",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-015",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-039",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g6-04"
+    },
+    "synthetic-g6-005": {
+      "id": "synthetic-g6-005",
+      "firstName": "晨曦",
+      "lastName": "沈",
+      "nickname": "小行",
+      "gender": "male",
+      "birthDate": "2018-01-02",
+      "birthPlace": "长沙",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-025",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g6-05"
+    },
+    "synthetic-g6-006": {
+      "id": "synthetic-g6-006",
+      "firstName": "明远",
+      "lastName": "施",
+      "nickname": "小宁",
+      "gender": "female",
+      "birthDate": "2019-10-12",
+      "birthPlace": "青岛",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-001",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-025",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g6-06"
+    },
+    "synthetic-g6-007": {
+      "id": "synthetic-g6-007",
+      "firstName": "浩然",
+      "lastName": "周",
+      "nickname": "小然",
+      "gender": "male",
+      "birthDate": "2019-09-10",
+      "birthPlace": "苏州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-016",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-040",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g6-07"
+    },
+    "synthetic-g6-008": {
+      "id": "synthetic-g6-008",
+      "firstName": "新月",
+      "lastName": "张",
+      "nickname": "小兰",
+      "gender": "female",
+      "birthDate": "2016-10-06",
+      "birthPlace": "杭州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-016",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-040",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [
+        {
+          "id": "synthetic-g4-004",
+          "type": "godparent"
+        }
+      ],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g6-08"
+    },
+    "synthetic-g6-009": {
+      "id": "synthetic-g6-009",
+      "firstName": "晨曦",
+      "lastName": "施",
+      "nickname": "小阳",
+      "gender": "male",
+      "birthDate": "2019-09-17",
+      "birthPlace": "南京",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-010",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-034",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g6-01"
+    },
+    "synthetic-g6-010": {
+      "id": "synthetic-g6-010",
+      "firstName": "明远",
+      "lastName": "郑",
+      "nickname": "小姝",
+      "gender": "female",
+      "birthDate": "2018-07-28",
+      "birthPlace": "成都",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-010",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-034",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g6-02"
+    },
+    "synthetic-g6-011": {
+      "id": "synthetic-g6-011",
+      "firstName": "浩然",
+      "lastName": "朱",
+      "nickname": "小树",
+      "gender": "male",
+      "birthDate": "2018-01-23",
+      "birthPlace": "西安",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-004",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-028",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g6-03"
+    },
+    "synthetic-g6-012": {
+      "id": "synthetic-g6-012",
+      "firstName": "新月",
+      "lastName": "张",
+      "nickname": "小夏",
+      "gender": "female",
+      "birthDate": "2016-01-06",
+      "birthPlace": "武汉",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-004",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-028",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g6-04"
+    },
+    "synthetic-g6-013": {
+      "id": "synthetic-g6-013",
+      "firstName": "晨曦",
+      "lastName": "郑",
+      "nickname": "小恒",
+      "gender": "male",
+      "birthDate": "2019-07-05",
+      "birthPlace": "长沙",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-018",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-042",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g6-05"
+    },
+    "synthetic-g6-014": {
+      "id": "synthetic-g6-014",
+      "firstName": "明远",
+      "lastName": "蒋",
+      "nickname": "小舒",
+      "gender": "female",
+      "birthDate": "2018-10-04",
+      "birthPlace": "青岛",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-018",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-042",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g6-06"
+    },
+    "synthetic-g6-015": {
+      "id": "synthetic-g6-015",
+      "firstName": "浩然",
+      "lastName": "张",
+      "nickname": "小月",
+      "gender": "male",
+      "birthDate": "2018-12-20",
+      "birthPlace": "苏州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-035",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g6-07"
+    },
+    "synthetic-g6-016": {
+      "id": "synthetic-g6-016",
+      "firstName": "新月",
+      "lastName": "赵",
+      "nickname": "小谨",
+      "gender": "female",
+      "birthDate": "2015-06-11",
+      "birthPlace": "杭州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-011",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-035",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g6-08"
+    },
+    "synthetic-g6-017": {
+      "id": "synthetic-g6-017",
+      "firstName": "晨曦",
+      "lastName": "冯",
+      "nickname": "小程",
+      "gender": "male",
+      "birthDate": "2016-05-19",
+      "birthPlace": "南京",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-020",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-044",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g6-01"
+    },
+    "synthetic-g6-018": {
+      "id": "synthetic-g6-018",
+      "firstName": "明远",
+      "lastName": "蒋",
+      "nickname": "小雪",
+      "gender": "female",
+      "birthDate": "2015-12-28",
+      "birthPlace": "成都",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-024",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-048",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05+root-family-06",
+      "photoId": "synthetic-avatar-g6-02"
+    },
+    "synthetic-g6-019": {
+      "id": "synthetic-g6-019",
+      "firstName": "浩然",
+      "lastName": "秦",
+      "nickname": "小年",
+      "gender": "male",
+      "birthDate": "2015-01-19",
+      "birthPlace": "西安",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-005",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-029",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g6-03"
+    },
+    "synthetic-g6-020": {
+      "id": "synthetic-g6-020",
+      "firstName": "新月",
+      "lastName": "韩",
+      "nickname": "小言",
+      "gender": "other",
+      "birthDate": "2015-03-15",
+      "birthPlace": "武汉",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-002",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-026",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [
+        {
+          "id": "synthetic-g4-015",
+          "type": "godparent"
+        }
+      ],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g6-04"
+    },
+    "synthetic-g6-021": {
+      "id": "synthetic-g6-021",
+      "firstName": "晨曦",
+      "lastName": "卫",
+      "nickname": "小星",
+      "gender": "male",
+      "birthDate": "2019-09-06",
+      "birthPlace": "长沙",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-023",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-047",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-06",
+      "photoId": "synthetic-avatar-g6-05"
+    },
+    "synthetic-g6-022": {
+      "id": "synthetic-g6-022",
+      "firstName": "明远",
+      "lastName": "尤",
+      "nickname": "小扬",
+      "gender": "female",
+      "birthDate": "2019-04-25",
+      "birthPlace": "青岛",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-006",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-030",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01+root-family-02",
+      "photoId": "synthetic-avatar-g6-06"
+    },
+    "synthetic-g6-023": {
+      "id": "synthetic-g6-023",
+      "firstName": "浩然",
+      "lastName": "孙",
+      "nickname": "小曦",
+      "gender": "male",
+      "birthDate": "2017-06-23",
+      "birthPlace": "苏州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-014",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-038",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05+root-family-06",
+      "photoId": "synthetic-avatar-g6-07"
+    },
+    "synthetic-g6-024": {
+      "id": "synthetic-g6-024",
+      "firstName": "新月",
+      "lastName": "许",
+      "nickname": "小然",
+      "gender": "female",
+      "birthDate": "2016-09-07",
+      "birthPlace": "杭州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-007",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-031",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-04",
+      "photoId": "synthetic-avatar-g6-08"
+    },
+    "synthetic-g6-025": {
+      "id": "synthetic-g6-025",
+      "firstName": "晨曦",
+      "lastName": "杨",
+      "nickname": "小文",
+      "gender": "male",
+      "birthDate": "2019-04-12",
+      "birthPlace": "南京",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "武汉",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-003",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-027",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g6-01"
+    },
+    "synthetic-g6-026": {
+      "id": "synthetic-g6-026",
+      "firstName": "明远",
+      "lastName": "褚",
+      "nickname": "小宇",
+      "gender": "female",
+      "birthDate": "2015-11-14",
+      "birthPlace": "成都",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "南京",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-022",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-046",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g6-02"
+    },
+    "synthetic-g6-027": {
+      "id": "synthetic-g6-027",
+      "firstName": "浩然",
+      "lastName": "吕",
+      "nickname": "小涵",
+      "gender": "male",
+      "birthDate": "2016-05-10",
+      "birthPlace": "西安",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "青岛",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-009",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-033",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g6-03"
+    },
+    "synthetic-g6-028": {
+      "id": "synthetic-g6-028",
+      "firstName": "新月",
+      "lastName": "赵",
+      "nickname": "小峰",
+      "gender": "female",
+      "birthDate": "2018-07-28",
+      "birthPlace": "武汉",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "西安",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-012",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-036",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-01",
+      "photoId": "synthetic-avatar-g6-04"
+    },
+    "synthetic-g6-029": {
+      "id": "synthetic-g6-029",
+      "firstName": "晨曦",
+      "lastName": "陈",
+      "nickname": "小桐",
+      "gender": "male",
+      "birthDate": "2017-06-02",
+      "birthPlace": "长沙",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "杭州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-021",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-045",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-05",
+      "photoId": "synthetic-avatar-g6-05"
+    },
+    "synthetic-g6-030": {
+      "id": "synthetic-g6-030",
+      "firstName": "明远",
+      "lastName": "王",
+      "nickname": "小宁",
+      "gender": "female",
+      "birthDate": "2015-03-21",
+      "birthPlace": "青岛",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "长沙",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-019",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-043",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03",
+      "photoId": "synthetic-avatar-g6-06"
+    },
+    "synthetic-g6-031": {
+      "id": "synthetic-g6-031",
+      "firstName": "浩然",
+      "lastName": "吴",
+      "nickname": "小远",
+      "gender": "male",
+      "birthDate": "2018-09-23",
+      "birthPlace": "苏州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "成都",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-017",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-041",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-03+root-family-04",
+      "photoId": "synthetic-avatar-g6-07"
+    },
+    "synthetic-g6-032": {
+      "id": "synthetic-g6-032",
+      "firstName": "新月",
+      "lastName": "何",
+      "nickname": "小衡",
+      "gender": "female",
+      "birthDate": "2015-03-20",
+      "birthPlace": "杭州",
+      "occupation": "学生",
+      "education": "在读",
+      "currentResidence": "苏州",
+      "notes": "虚构测试成员，不对应任何真实人物。",
+      "parents": [
+        {
+          "id": "synthetic-g5-008",
+          "type": "blood"
+        },
+        {
+          "id": "synthetic-g5-032",
+          "type": "blood"
+        }
+      ],
+      "children": [],
+      "siblings": [],
+      "spouses": [],
+      "godparents": [],
+      "godchildren": [],
+      "syntheticGeneration": 5,
+      "syntheticRole": "descendant",
+      "syntheticRootId": "root-family-02",
+      "photoId": "synthetic-avatar-g6-08"
+    }
+  },
+  "nicknameOverrides": {},
+  "manualPositions": {},
+  "childLayoutAssignments": {},
+  "gridLayoutOverrides": {},
+  "layoutPreferences": {
+    "rootOrders": [],
+    "rowOrders": [],
+    "bridgeOrders": [],
+    "rootAccentAssignments": {},
+    "familyAccentAssignments": {}
+  },
+  "rootMemberId": "synthetic-g1-001",
+  "defaultViewpointId": "synthetic-g4-025"
+}

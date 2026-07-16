@@ -575,26 +575,27 @@ function normalizeRowInsideDomain(
   if (units.length === 0) return
   const minimumX = domain.rect.x + input.metrics.gridSize
   const maximumRight = domain.rect.x + domain.rect.width - input.metrics.gridSize
-  units[0].rect.x = Math.max(
-    minimumX,
-    Math.min(units[0].rect.x, maximumRight - units[0].rect.width),
-  )
-  for (let index = 1; index < units.length; index += 1) {
-    const previous = units[index - 1]
-    const minimumUnitX = snapUp(
-      previous.rect.x + previous.rect.width + input.metrics.familyGap,
+
+  // Keep branch-centering as the desired position, then project the row into
+  // the hard domain bounds while preserving order and the minimum family gap.
+  let nextX = maximumRight
+  for (let index = units.length - 1; index >= 0; index -= 1) {
+    const unit = units[index]
+    const maximumUnitX = nextX - unit.rect.width
+    unit.rect.x = snapDown(
+      Math.min(unit.rect.x, maximumUnitX),
       input.metrics.gridSize,
     )
-    units[index].rect.x = Math.max(units[index].rect.x, minimumUnitX)
+    nextX = unit.rect.x - input.metrics.familyGap
   }
-  const overflow = units.at(-1)!.rect.x + units.at(-1)!.rect.width - maximumRight
-  if (overflow > 0) {
-    const shift = snapUp(overflow, input.metrics.gridSize)
-    units.forEach(unit => { unit.rect.x -= shift })
-  }
-  if (units[0].rect.x < minimumX) {
-    const shift = snapUp(minimumX - units[0].rect.x, input.metrics.gridSize)
-    units.forEach(unit => { unit.rect.x += shift })
+
+  nextX = minimumX
+  for (const unit of units) {
+    unit.rect.x = snapUp(
+      Math.max(unit.rect.x, nextX),
+      input.metrics.gridSize,
+    )
+    nextX = unit.rect.x + unit.rect.width + input.metrics.familyGap
   }
 }
 
@@ -733,6 +734,10 @@ function centerX(unit: PlacedFamilyUnit): number {
 
 function snapUp(value: number, gridSize: number): number {
   return Math.ceil(value / gridSize) * gridSize
+}
+
+function snapDown(value: number, gridSize: number): number {
+  return Math.floor(value / gridSize) * gridSize
 }
 
 function snapNearest(value: number, gridSize: number): number {

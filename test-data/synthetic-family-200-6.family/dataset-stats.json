@@ -1,0 +1,22 @@
+{
+  "seed": 20260716,
+  "memberCount": 200,
+  "generationCounts": [
+    12,
+    24,
+    36,
+    48,
+    48,
+    32
+  ],
+  "founderMemberCount": 12,
+  "incomingSpouseCount": 72,
+  "rootFamilyCount": 6,
+  "currentCoupleCount": 84,
+  "crossRootCurrentCoupleCount": 6,
+  "historicalCoupleCount": 2,
+  "adoptedParentRefCount": 2,
+  "stepParentRefCount": 1,
+  "godparentRefCount": 3,
+  "avatarCount": 48
+}
