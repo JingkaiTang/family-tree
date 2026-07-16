@@ -21,6 +21,7 @@ interface ParentageEdge {
 interface DomainRow extends PlacedRow {
   domainId: string
   hasExplicitPreference: boolean
+  columns: Record<string, number>
 }
 
 export function placeRootDomains(
@@ -147,9 +148,37 @@ function domainContentWidth(
   const sourceSpans = sourceUnitIds.map(unitId => branchSpan(unitId, new Set()))
   const combinedSourceSpan = sourceSpans.reduce((sum, width) => sum + width, 0)
     + Math.max(0, sourceSpans.length - 1) * input.metrics.familyGap
+  const preferences = domain.kind === 'root'
+    ? input.preferences.rowOrders
+    : input.preferences.bridgeOrders
+  const hasManualColumns = preferences.some(preference => (
+    preference.domainId === domain.id
+    && Object.keys(preference.columns ?? {}).length > 0
+  ))
+  const unitById = new Map(domainUnits.map(unit => [unit.id, unit]))
+  const manuallyPositionedWidth = hasManualColumns
+    ? orderDomainRows(domain, domainUnits, edges, input)
+      .reduce((maximum, row) => {
+        const rowUnits = row.unitIds
+          .map(unitId => unitById.get(unitId))
+          .filter((unit): unit is RootedFamilyUnit => unit !== undefined)
+        for (let index = 0; index < rowUnits.length; index += 1) {
+          const column = row.columns[rowUnits[index].id]
+          if (column === undefined) continue
+          const trailingWidth = rowUnits.slice(index).reduce((sum, unit) => (
+            sum + (widthByUnitId.get(unit.id) ?? input.metrics.cardWidth)
+          ), 0) + Math.max(0, rowUnits.length - index - 1) * input.metrics.familyGap
+          maximum = Math.max(
+            maximum,
+            column * input.metrics.gridSize + trailingWidth,
+          )
+        }
+        return maximum
+      }, 0)
+    : 0
 
   return snapUp(
-    Math.max(combinedSourceSpan, ...rowWidths),
+    Math.max(combinedSourceSpan, manuallyPositionedWidth, ...rowWidths),
     input.metrics.gridSize,
   )
 }
@@ -427,6 +456,7 @@ function orderDomainRows(
         generation,
         unitIds,
         hasExplicitPreference: preference !== undefined,
+        columns: { ...(preference?.columns ?? {}) },
       }
     })
 
@@ -470,7 +500,7 @@ function placeInitialRows(
       domain.rect.x + (domain.rect.width - packedWidth) / 2,
       input.metrics.gridSize,
     )
-    return rowUnits.map((unit, order) => {
+    const placed = rowUnits.map((unit, order) => {
       const width = widths[order]
       const placed: PlacedFamilyUnit = {
         ...unit,
@@ -489,6 +519,8 @@ function placeInitialRows(
       x += width + input.metrics.familyGap
       return placed
     })
+    normalizeRowInsideDomain(placed, domain, input, row.columns)
+    return placed
   })
 }
 
@@ -555,14 +587,18 @@ function centerParentChildBranches(
       const rowUnits = row.unitIds
         .map(unitId => unitById.get(unitId))
         .filter((unit): unit is PlacedFamilyUnit => unit !== undefined)
-      normalizeRowInsideDomain(rowUnits, domain, input)
+      normalizeRowInsideDomain(rowUnits, domain, input, row.columns)
     }
   }
 
   for (const unit of units.filter(value => value.isRootFamily)) {
     const row = rowByUnitId.get(unit.id)
     const domain = domainById.get(unit.domainId)
-    if (row?.unitIds.length !== 1 || domain === undefined) continue
+    if (
+      row?.unitIds.length !== 1
+      || domain === undefined
+      || row.columns[unit.id] !== undefined
+    ) continue
     unit.rect.x = domain.rect.x + (domain.rect.width - unit.rect.width) / 2
   }
 }
@@ -571,10 +607,24 @@ function normalizeRowInsideDomain(
   units: PlacedFamilyUnit[],
   domain: PlacedLayoutDomain,
   input: PlaceRootDomainsInput,
+  columns: Readonly<Record<string, number>> = {},
 ): void {
   if (units.length === 0) return
   const minimumX = domain.rect.x + input.metrics.gridSize
   const maximumRight = domain.rect.x + domain.rect.width - input.metrics.gridSize
+
+  if (Object.keys(columns).length > 0) {
+    let nextX = minimumX
+    for (const unit of units) {
+      const column = columns[unit.id]
+      const desiredX = column === undefined
+        ? nextX
+        : minimumX + column * input.metrics.gridSize
+      unit.rect.x = snapUp(Math.max(desiredX, nextX), input.metrics.gridSize)
+      nextX = unit.rect.x + unit.rect.width + input.metrics.familyGap
+    }
+    return
+  }
 
   // Keep branch-centering as the desired position, then project the row into
   // the hard domain bounds while preserving order and the minimum family gap.

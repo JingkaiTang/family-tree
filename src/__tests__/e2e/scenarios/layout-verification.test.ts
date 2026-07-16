@@ -350,6 +350,21 @@ function expectValidRootLayout(scene: LayoutScene, expectedPersonIds: string[]) 
     expect(orderedRoots[index - 1].rect.x + orderedRoots[index - 1].rect.width)
       .toBeLessThanOrEqual(orderedRoots[index].rect.x)
   }
+  const rootDomainByRootId = new Map(scene.rootDomains.flatMap(domain => (
+    domain.rootIds.map(rootId => [rootId, domain] as const)
+  )))
+  for (const bridge of scene.bridgeDomains) {
+    const sourceCenters = bridge.rootIds.flatMap(rootId => {
+      const source = rootDomainByRootId.get(rootId)
+      return source === undefined
+        ? []
+        : [source.rect.x + source.rect.width / 2]
+    })
+    if (sourceCenters.length < 2) continue
+    const bridgeCenter = bridge.rect.x + bridge.rect.width / 2
+    expect(bridgeCenter).toBeGreaterThan(Math.min(...sourceCenters))
+    expect(bridgeCenter).toBeLessThan(Math.max(...sourceCenters))
+  }
   if (scene.routes.length < 100) {
     for (let left = 0; left < scene.routes.length; left += 1) {
       for (let right = left + 1; right < scene.routes.length; right += 1) {

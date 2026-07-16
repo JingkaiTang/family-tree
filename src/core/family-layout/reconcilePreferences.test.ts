@@ -167,6 +167,26 @@ describe('convertLegacyGridPreferences', () => {
 })
 
 describe('reconcileLayoutPreferences', () => {
+  it('keeps a grid column preference for a row containing one family unit', () => {
+    const data = createEmptyFamily()
+    data.members.a = member('a')
+    data.layoutPreferences.rowOrders = [{
+      id: 'row:domain:root:a:0',
+      domainId: 'domain:root:a',
+      generation: 0,
+      unitIds: ['unit:person:a'],
+      columns: { 'unit:person:a': 3 },
+    }]
+
+    expect(reconcileLayoutPreferences(data).rowOrders).toEqual([{
+      id: 'row:domain:root:a:0',
+      domainId: 'domain:root:a',
+      generation: 0,
+      unitIds: ['unit:person:a'],
+      columns: { 'unit:person:a': 3 },
+    }])
+  })
+
   it('keeps valid relative order, removes duplicates and unknowns, and fills the row', () => {
     const data = createEmptyFamily()
     data.members = {

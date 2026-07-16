@@ -55,7 +55,7 @@ const members = computed(() => Object.values(props.data.members))
 let layoutRequestId = 0
 let suppressInitialSceneFocus = !!props.initialView
 type LayoutPreferenceExpectation =
-  | { kind: 'root-row' | 'bridge-row'; id: string; unitIds: string[] }
+  | { kind: 'root-row' | 'bridge-row'; id: string; unitIds: string[]; columns?: Record<string, number> }
   | { kind: 'root-domain'; componentId: string; rootIds: string[] }
 
 let expectedPreferenceUpdate: LayoutPreferenceExpectation | null = null
@@ -301,6 +301,8 @@ interface RowDragState {
   generation: number
   sourceIndex: number
   targetIndex: number
+  sourceColumn: number
+  targetColumn: number
   dx: number
   dy: number
 }
@@ -366,7 +368,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     pendingDropToken = null
   }
 
-  if (unit.isRootFamily && domain.kind === 'root') {
+  if (payload.wholeRoot && unit.isRootFamily && domain.kind === 'root') {
     const candidates = rootDomainsForComponent(domain.componentId)
     const sourceIndex = candidates.findIndex(value => value.id === domain.id)
     const targetIndex = rootInsertionIndex(
@@ -392,6 +394,11 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
   const sourceIndex = sourceRow.unitIds.indexOf(payload.unitId)
   const centerX = unit.rect.x + unit.rect.width / 2 + dx
   const centerY = unit.rect.y + unit.rect.height / 2 + dy
+  const sourceColumn = unitColumn(unit.rect.x, domain.rect.x)
+  const targetColumn = Math.max(
+    0,
+    unitColumn(unit.rect.x + dx, domain.rect.x),
+  )
   const targetDomain = closestDomain(centerX)
   const targetRow = targetDomain === undefined
     ? undefined
@@ -409,11 +416,15 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     generation: sourceRow.generation,
     sourceIndex,
     targetIndex,
+    sourceColumn,
+    targetColumn,
     dx,
     dy,
   }
   dragInvalid.value = !validScope
-  dragCanDrop.value = validScope && targetIndex !== sourceIndex
+  dragCanDrop.value = validScope && (
+    targetIndex !== sourceIndex || targetColumn !== sourceColumn
+  )
 }
 
 async function onUnitDrop(payload: FamilyUnitDragPayload) {
@@ -450,11 +461,13 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
       clearDrag(payload.unitId)
       return
     }
-    const preference = {
+    const columns = columnsAfterDrop(state)
+    const preference: RowOrderPreference = {
       id: state.rowId,
       domainId: state.domainId,
       generation: state.generation,
       unitIds: [...rowOrder],
+      ...(Object.keys(columns).length > 0 ? { columns } : {}),
     }
     if (state.mode === 'root-row') {
       nextData = withDomainRowOrderPreference(props.data, preference)
@@ -468,6 +481,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
       kind: state.mode,
       id: state.rowId,
       unitIds: [...rowOrder],
+      ...(preference.columns ? { columns: { ...preference.columns } } : {}),
     }
   }
   pendingSceneRecovery = { data: nextData, changedIds }
@@ -497,10 +511,9 @@ function hasExpectedLayoutPreference(
   const rows = expected.kind === 'root-row'
     ? data.layoutPreferences.rowOrders
     : data.layoutPreferences.bridgeOrders
-  return equalOrder(
-    rows.find(value => value.id === expected.id)?.unitIds,
-    expected.unitIds,
-  )
+  const row = rows.find(value => value.id === expected.id)
+  return equalOrder(row?.unitIds, expected.unitIds)
+    && equalColumns(row?.columns, expected.columns)
 }
 
 function onUnitCancel(payload: FamilyUnitDragPayload) {
@@ -584,6 +597,27 @@ function rootInsertionIndex(
     centerX <= domain.rect.x + domain.rect.width / 2
   ))
   return index < 0 ? remaining.length : index
+}
+
+function unitColumn(unitX: number, domainX: number): number {
+  return Math.round(
+    (unitX - domainX - DEFAULT_LAYOUT_METRICS.gridSize)
+      / DEFAULT_LAYOUT_METRICS.gridSize,
+  )
+}
+
+function columnsAfterDrop(state: RowDragState): Record<string, number> {
+  const preferences = state.mode === 'root-row'
+    ? props.data.layoutPreferences.rowOrders
+    : props.data.layoutPreferences.bridgeOrders
+  const current = preferences.find(value => value.id === state.rowId)
+  const columns = { ...(current?.columns ?? {}) }
+  if (state.targetIndex === state.sourceIndex) {
+    columns[state.unitId] = state.targetColumn
+  } else {
+    delete columns[state.unitId]
+  }
+  return columns
 }
 
 function insertionIndex(unitIds: string[], draggedUnitId: string, centerX: number): number {
@@ -721,6 +755,18 @@ function isUnitDragging(unit: LayoutScene['units'][number]): boolean {
 function equalOrder(left: string[] | undefined, right: string[]): boolean {
   return left?.length === right.length
     && left.every((value, index) => value === right[index])
+}
+
+function equalColumns(
+  left: Record<string, number> | undefined,
+  right: Record<string, number> | undefined,
+): boolean {
+  const leftEntries = Object.entries(left ?? {}).sort(([a], [b]) => a.localeCompare(b))
+  const rightEntries = Object.entries(right ?? {}).sort(([a], [b]) => a.localeCompare(b))
+  return leftEntries.length === rightEntries.length
+    && leftEntries.every(([unitId, column], index) => (
+      unitId === rightEntries[index]?.[0] && column === rightEntries[index]?.[1]
+    ))
 }
 
 const draggedUnit = computed(() => {

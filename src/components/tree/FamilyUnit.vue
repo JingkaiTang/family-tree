@@ -7,7 +7,7 @@ import type {
   Point,
 } from '@/core/family-layout/types'
 import type { Member } from '@/core/schema'
-import MemberNode from './MemberNode.vue'
+import MemberNode, { type MemberDragPayload } from './MemberNode.vue'
 
 const props = defineProps<{
   unit: PlacedFamilyUnit
@@ -30,6 +30,7 @@ export interface FamilyUnitDragPayload {
   memberIds: string[]
   dx: number
   dy: number
+  wholeRoot: boolean
 }
 
 const emit = defineEmits<{
@@ -133,23 +134,24 @@ const unitStyle = computed(() => ({
     : undefined,
 }))
 
-function unitPayload(payload: { dx: number; dy: number }): FamilyUnitDragPayload {
+function unitPayload(payload: MemberDragPayload): FamilyUnitDragPayload {
   return {
     unitId: props.unit.id,
     memberIds: [...props.unit.memberIds],
     dx: payload.dx,
     dy: payload.dy,
+    wholeRoot: payload.wholeRoot,
   }
 }
 
 let activeDrag = false
 
-function onMemberDrag(payload: { dx: number; dy: number }) {
+function onMemberDrag(payload: MemberDragPayload) {
   activeDrag = true
   emit('unit-drag', unitPayload(payload))
 }
 
-function onMemberDrop(payload: { dx: number; dy: number }) {
+function onMemberDrop(payload: MemberDragPayload) {
   if (!activeDrag) return
   activeDrag = false
   const value = unitPayload(payload)
@@ -164,6 +166,7 @@ function onMemberDrop(payload: { dx: number; dy: number }) {
     :data-root-family="unit.isRootFamily ? 'true' : undefined"
     :data-root-signature="unit.rootSignature.join(',')"
     :data-domain-id="unit.domainId"
+    :title="unit.isRootFamily ? '拖动家庭；按住 Ctrl（macOS 可用 Command）拖动整个根家族' : undefined"
     class="absolute left-0 top-0 rounded-2xl border motion-reduce:!transition-none"
     :class="isDragging ? 'z-30 shadow-xl' : ''"
     :style="unitStyle"

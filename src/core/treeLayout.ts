@@ -86,12 +86,14 @@ function toLayoutPreferences(data: FamilyData): LayoutPreferences {
       domainId: row.domainId,
       generation: row.generation,
       unitIds: [...row.unitIds],
+      ...(row.columns ? { columns: { ...row.columns } } : {}),
     })),
     bridgeOrders: data.layoutPreferences.bridgeOrders.map(row => ({
       id: row.id,
       domainId: row.domainId,
       generation: row.generation,
       unitIds: [...row.unitIds],
+      ...(row.columns ? { columns: { ...row.columns } } : {}),
     })),
     rootAccentAssignments: {
       ...data.layoutPreferences.rootAccentAssignments,

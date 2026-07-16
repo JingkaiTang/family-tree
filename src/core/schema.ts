@@ -86,6 +86,7 @@ export const RowOrderPreference = z.object({
   domainId: z.string().min(1),
   generation: z.number().int(),
   unitIds: z.array(z.string().min(1)),
+  columns: z.record(z.string(), z.number().int().nonnegative()).optional(),
 })
 export type RowOrderPreference = z.infer<typeof RowOrderPreference>
 export const RootOrderPreference = z.object({

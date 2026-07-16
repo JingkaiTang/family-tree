@@ -73,7 +73,6 @@ export function buildRootDomains(
   const domains = orderDomains(
     unorderedDomains,
     rootOrder,
-    interactionComponents,
     rootPositionById,
   ).map((domain, order) => ({ ...domain, order }))
 
@@ -464,42 +463,25 @@ function orderBridgeUnits(
 function orderDomains(
   domains: LayoutDomain[],
   rootOrder: string[],
-  components: InteractionComponent[],
   rootPositionById: ReadonlyMap<string, number>,
 ): LayoutDomain[] {
-  const domainById = new Map(domains.map(domain => [domain.id, domain]))
-  const bridgeBeforeRootId = new Map<string, InteractionComponent[]>()
-  const islandsAfterRootId = new Map<string, InteractionComponent[]>()
-  for (const component of components) {
-    const spatialRootIds = [...component.rootIds].sort((left, right) => (
-      (rootPositionById.get(left) ?? Number.POSITIVE_INFINITY)
-      - (rootPositionById.get(right) ?? Number.POSITIVE_INFINITY)
-    ))
-    const lastRootId = spatialRootIds.at(-1)
-    if (lastRootId === undefined) continue
-    const target = component.kind === 'pair-bridge'
-      ? bridgeBeforeRootId
-      : islandsAfterRootId
-    const values = target.get(lastRootId) ?? []
-    values.push(component)
-    values.sort((left, right) => left.domainId.localeCompare(right.domainId))
-    target.set(lastRootId, values)
+  const fallbackPosition = rootOrder.length
+  const anchor = (domain: LayoutDomain): number => {
+    const positions = domain.rootIds
+      .map(rootId => rootPositionById.get(rootId))
+      .filter((position): position is number => position !== undefined)
+    return positions.length === 0
+      ? fallbackPosition
+      : positions.reduce((sum, position) => sum + position, 0) / positions.length
   }
 
-  const ordered: LayoutDomain[] = []
-  for (const rootId of rootOrder) {
-    for (const component of bridgeBeforeRootId.get(rootId) ?? []) {
-      const domain = domainById.get(component.domainId)
-      if (domain !== undefined) ordered.push(domain)
-    }
-    const rootDomain = domainById.get(`domain:${rootId}`)
-    if (rootDomain !== undefined) ordered.push(rootDomain)
-    for (const component of islandsAfterRootId.get(rootId) ?? []) {
-      const domain = domainById.get(component.domainId)
-      if (domain !== undefined) ordered.push(domain)
-    }
-  }
-  return ordered
+  return [...domains].sort((left, right) => {
+    const anchorDifference = anchor(left) - anchor(right)
+    if (anchorDifference !== 0) return anchorDifference
+    if (left.kind === 'root' && right.kind !== 'root') return -1
+    if (right.kind === 'root' && left.kind !== 'root') return 1
+    return left.id.localeCompare(right.id)
+  })
 }
 
 function collectPersonIds(units: FamilyUnit[]): string[] {

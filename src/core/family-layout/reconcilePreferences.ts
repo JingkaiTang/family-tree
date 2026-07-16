@@ -6,12 +6,12 @@ import type {
   RowOrderPreference,
 } from '@/core/schema'
 import { assignGenerations } from './assignGenerations'
+import { buildRootDomains } from './buildRootDomains'
 import { buildFamilyUnits, type BuiltFamilyUnits } from './buildFamilyUnits'
 import { discoverRootFamilies } from './discoverRootFamilies'
 import { normalizeFacts } from './normalizeFacts'
 import { projectView } from './projectView'
 import { propagateRootSignatures } from './propagateRootSignatures'
-import { rootSignatureKey } from './rootSignatures'
 import {
   DEFAULT_FAMILY_VIEW_POLICY,
   DEFAULT_LAYOUT_METRICS,
@@ -57,7 +57,10 @@ export function withDomainRowOrderPreference(
   const rowOrders = data.layoutPreferences.rowOrders
     .filter(value => value.id !== preference.id)
     .map(cloneRowOrder)
-  rowOrders.push({ ...preference, unitIds: unique(preference.unitIds) })
+  rowOrders.push(cloneRowOrder({
+    ...preference,
+    unitIds: unique(preference.unitIds),
+  }))
   return withPreferences(data, { rowOrders })
 }
 
@@ -68,7 +71,10 @@ export function withBridgeOrderPreference(
   const bridgeOrders = data.layoutPreferences.bridgeOrders
     .filter(value => value.id !== preference.id)
     .map(cloneRowOrder)
-  bridgeOrders.push({ ...preference, unitIds: unique(preference.unitIds) })
+  bridgeOrders.push(cloneRowOrder({
+    ...preference,
+    unitIds: unique(preference.unitIds),
+  }))
   return withPreferences(data, { bridgeOrders })
 }
 
@@ -219,6 +225,7 @@ interface CurrentLayoutState {
   unitIdsByGeneration: Map<number, string[]>
   unitIdsByDomainGeneration: Map<string, string[]>
   domainIdByUnitId: Record<string, string>
+  bridgeDomainIds: Set<string>
   roots: RootFamily[]
 }
 
@@ -237,7 +244,7 @@ function reconcileRowOrders(
       ? scopeLegacyRow(preference, state)
       : scopeDomainRow(preference, state)
     if (scoped === undefined) return []
-    const isBridge = scoped.domainId.startsWith('domain:bridge:')
+    const isBridge = state.bridgeDomainIds.has(scoped.domainId)
     if ((kind === 'bridge') !== isBridge) return []
     const positions = inheritedUnitPositions(preference.unitIds, state.built.units)
     const overlap = scoped.unitIds.filter(unitId => positions.has(unitId)).length
@@ -258,7 +265,10 @@ function reconcileRowOrders(
   }
   return [...selectedByKey.values()]
     .map(value => value.preference)
-    .filter(preference => preference.unitIds.length >= 2)
+    .filter(preference => (
+      preference.unitIds.length >= 2
+      || Object.keys(preference.columns ?? {}).length > 0
+    ))
     .sort(compareRowOrders)
 }
 
@@ -328,9 +338,16 @@ function scopeDomainRow(
   if (candidates === undefined) return undefined
   const positions = inheritedUnitPositions(preference.unitIds, state.built.units)
   if (!candidates.some(unitId => positions.has(unitId))) return undefined
+  const columns = Object.fromEntries(
+    Object.entries(preference.columns ?? {})
+      .filter(([unitId]) => candidates.includes(unitId)),
+  )
   return {
-    ...preference,
+    id: preference.id,
+    domainId: preference.domainId,
+    generation: preference.generation,
     unitIds: sortByPersistedPositions(candidates, positions),
+    ...(Object.keys(columns).length > 0 ? { columns } : {}),
   }
 }
 
@@ -349,15 +366,20 @@ function buildCurrentLayoutState(data: FamilyData): CurrentLayoutState {
     generationByUnitId,
   })
   const signatures = propagateRootSignatures({ projected, units, roots })
-  const domainIdByUnitId = Object.fromEntries(units.map(unit => {
-    const signature = signatures.signatureByUnitId[unit.id] ?? []
-    const domainId = signature.length === 1
-      ? `domain:${signature[0]}`
-      : signature.length > 1
-        ? `domain:bridge:${rootSignatureKey(signature)}`
-        : 'domain:unassigned'
-    return [unit.id, domainId]
-  }))
+  const domains = buildRootDomains({
+    projected,
+    units,
+    roots: roots.roots,
+    signatures,
+    accents: {},
+    preferences: EMPTY_LAYOUT_PREFERENCES,
+  })
+  const domainIdByUnitId = domains.domainIdByUnitId
+  const bridgeDomainIds = new Set(
+    domains.domains
+      .filter(domain => domain.kind !== 'root')
+      .map(domain => domain.id),
+  )
   const unitIdsByGeneration = new Map<number, string[]>()
   const unitIdsByDomainGeneration = new Map<string, string[]>()
   for (const unit of units) {
@@ -376,6 +398,7 @@ function buildCurrentLayoutState(data: FamilyData): CurrentLayoutState {
     unitIdsByGeneration,
     unitIdsByDomainGeneration,
     domainIdByUnitId,
+    bridgeDomainIds,
     roots: roots.roots,
   }
 }
@@ -436,7 +459,11 @@ function cloneRootOrder(value: RootOrderPreference): RootOrderPreference {
 }
 
 function cloneRowOrder(value: RowOrderPreference): RowOrderPreference {
-  return { ...value, unitIds: [...value.unitIds] }
+  return {
+    ...value,
+    unitIds: [...value.unitIds],
+    ...(value.columns ? { columns: { ...value.columns } } : {}),
+  }
 }
 
 function compareRowOrders(left: RowOrderPreference, right: RowOrderPreference): number {

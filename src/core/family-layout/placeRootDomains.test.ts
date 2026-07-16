@@ -51,6 +51,26 @@ describe('placeRootDomains', () => {
       .toBe(false)
   })
 
+  it('places a dense two-root bridge between its source roots instead of at the edge', () => {
+    const result = placeRootDomains(preparedTwoRootMultipleMarriagesLayout())
+    const roots = [...result.rootDomains].sort((left, right) => (
+      left.rect.x - right.rect.x
+    ))
+    const bridge = result.bridgeDomains[0]
+
+    expect(centerX(bridge.rect)).toBeGreaterThan(centerX(roots[0].rect))
+    expect(centerX(bridge.rect)).toBeLessThan(centerX(roots[1].rect))
+  })
+
+  it('keeps a multi-root island inside the span of its source roots', () => {
+    const result = placeRootDomains(preparedDenseRootLayout())
+    const sourceCenters = result.rootDomains.map(domain => centerX(domain.rect))
+    const island = result.bridgeDomains[0]
+
+    expect(centerX(island.rect)).toBeGreaterThan(Math.min(...sourceCenters))
+    expect(centerX(island.rect)).toBeLessThan(Math.max(...sourceCenters))
+  })
+
   it('applies saved row order only inside the matching root domain row', () => {
     const input = preparedAsymmetricRootLayout()
     const domain = input.domains.find(value => value.kind === 'root')!
@@ -75,6 +95,30 @@ describe('placeRootDomains', () => {
 
     expect(scene.rows.find(row => row.id === `row:${domain.id}:${generation}`))
       .toEqual({ id: `row:${domain.id}:${generation}`, generation, unitIds })
+  })
+
+  it('places a single family unit at its persisted grid column', () => {
+    const input = preparedAsymmetricRootLayout()
+    const domain = input.domains.find(value => value.kind === 'root')!
+    const rootUnit = input.units.find(unit => unit.isRootFamily)!
+    const scene = placeRootDomains({
+      ...input,
+      preferences: {
+        ...input.preferences,
+        rowOrders: [{
+          id: `row:${domain.id}:${rootUnit.generation}`,
+          domainId: domain.id,
+          generation: rootUnit.generation,
+          unitIds: [rootUnit.id],
+          columns: { [rootUnit.id]: 0 },
+        }],
+      },
+    })
+    const placedDomain = scene.rootDomains.find(value => value.id === domain.id)!
+    const placedRoot = scene.units.find(unit => unit.id === rootUnit.id)!
+
+    expect(placedRoot.rect.x).toBe(placedDomain.rect.x + 24)
+    expect(centerX(placedRoot.rect)).not.toBe(centerX(placedDomain.rect))
   })
 
   it('anchors a migrated root to the previous root center', () => {

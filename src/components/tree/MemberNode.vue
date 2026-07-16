@@ -23,9 +23,16 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'click', id: string): void
   (e: 'dblclick', id: string): void
-  (e: 'drag', payload: { id: string; dx: number; dy: number }): void
-  (e: 'drop', payload: { id: string; dx: number; dy: number }): void
+  (e: 'drag', payload: MemberDragPayload): void
+  (e: 'drop', payload: MemberDragPayload): void
 }>()
+
+export interface MemberDragPayload {
+  id: string
+  dx: number
+  dy: number
+  wholeRoot: boolean
+}
 
 const family = useFamilyStore()
 const photoUrl = ref<string | null>(null)
@@ -105,6 +112,7 @@ let dragStartY = 0
 let dragging = false
 let dragCaptured = false
 let activePointerId: number | null = null
+let wholeRootDrag = false
 
 function onPointerDown(e: PointerEvent) {
   // 只响应主键（鼠标左键 / 触摸 / 笔）
@@ -115,6 +123,7 @@ function onPointerDown(e: PointerEvent) {
   dragging = false
   dragCaptured = false
   activePointerId = e.pointerId
+  wholeRootDrag = e.ctrlKey || e.metaKey
   const el = e.currentTarget as HTMLElement
   try {
     el.setPointerCapture(e.pointerId)
@@ -130,7 +139,7 @@ function onPointerMove(e: PointerEvent) {
   const dy = e.clientY - dragStartY
   if (!dragging && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
   dragging = true
-  emit('drag', { id: props.member.id, dx, dy })
+  emit('drag', { id: props.member.id, dx, dy, wholeRoot: wholeRootDrag })
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -138,6 +147,7 @@ function onPointerUp(e: PointerEvent) {
   const dx = e.clientX - dragStartX
   const dy = e.clientY - dragStartY
   const wasDragging = dragging
+  const wholeRoot = wholeRootDrag
   if (dragCaptured) {
     try {
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
@@ -148,8 +158,9 @@ function onPointerUp(e: PointerEvent) {
   activePointerId = null
   dragging = false
   dragCaptured = false
+  wholeRootDrag = false
   if (wasDragging) {
-    emit('drop', { id: props.member.id, dx, dy })
+    emit('drop', { id: props.member.id, dx, dy, wholeRoot })
   }
 }
 
@@ -159,7 +170,13 @@ function onPointerCancel(e: PointerEvent) {
   dragging = false
   dragCaptured = false
   // 通知父级复位：dx=dy=0 相当于取消
-  emit('drop', { id: props.member.id, dx: 0, dy: 0 })
+  emit('drop', {
+    id: props.member.id,
+    dx: 0,
+    dy: 0,
+    wholeRoot: wholeRootDrag,
+  })
+  wholeRootDrag = false
 }
 </script>
 

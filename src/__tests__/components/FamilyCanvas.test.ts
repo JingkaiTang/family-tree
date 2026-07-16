@@ -438,6 +438,7 @@ async function beginDrag(
   memberIndex: number,
   dx: number,
   dy: number,
+  modifier: { ctrlKey?: boolean; metaKey?: boolean } = {},
 ) {
   const node = wrapper.findAll('[data-testid="member-node"]')[memberIndex]
   await node.trigger('pointerdown', {
@@ -446,6 +447,7 @@ async function beginDrag(
     pointerId: 1,
     clientX: 600,
     clientY: 100,
+    ...modifier,
   })
   await node.trigger('pointermove', {
     pointerId: 1,
@@ -1032,7 +1034,7 @@ describe('FamilyCanvas', () => {
     expect(resetToDefaultView).toHaveBeenCalledTimes(1)
   })
 
-  it('lets reset supersede a pending root-domain drop', async () => {
+  it('lets reset supersede a pending root-unit drop', async () => {
     const nextScene = threeRootDragScene()
     const staleDrop = deferred<LayoutScene>()
     layoutFamilyTree
@@ -1043,8 +1045,8 @@ describe('FamilyCanvas', () => {
     const wrapper = mountCanvas(data, { layoutResetVersion: 0 })
     await flushPromises()
 
-    const node = await beginDrag(wrapper, 0, 600, 0)
-    await node.trigger('pointerup', { pointerId: 1, clientX: 1200, clientY: 100 })
+    const node = await beginDrag(wrapper, 0, 48, 0)
+    await node.trigger('pointerup', { pointerId: 1, clientX: 648, clientY: 100 })
     await nextTick()
     expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(true)
 
@@ -1159,7 +1161,7 @@ describe('FamilyCanvas', () => {
     expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
   })
 
-  it('moves every unit in a root domain when dragging its root family', async () => {
+  it('moves a root family unit independently from its descendants', async () => {
     const nextScene = threeRootDragScene()
     const pending = deferred<LayoutScene>()
     layoutFamilyTree
@@ -1168,7 +1170,42 @@ describe('FamilyCanvas', () => {
     const wrapper = mountCanvas(familyData(nextScene.cards.map(card => mk(card.id))))
     await flushPromises()
 
-    const node = await beginDrag(wrapper, 0, 600, 0)
+    const node = await beginDrag(wrapper, 0, 48, 0)
+    const units = wrapper.findAll('[data-testid="family-unit"]')
+    expect(units[0].attributes('style')).toContain('translate(48px, 0px)')
+    expect(units[1].attributes('style')).toContain('translate(0px, 360px)')
+
+    await node.trigger('pointerup', { pointerId: 1, clientX: 648, clientY: 100 })
+    await nextTick()
+
+    expect(wrapper.emitted('domain-row-order-change')).toEqual([[
+      {
+        id: 'row:domain:root:a:0',
+        domainId: 'domain:root:a',
+        generation: 0,
+        unitIds: ['unit:root:a'],
+        columns: { 'unit:root:a': 1 },
+      },
+    ]])
+    expect(wrapper.emitted('root-order-change')).toBeUndefined()
+    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
+      .toContain('translate(0px, 360px)')
+
+    pending.resolve(structuredClone(nextScene))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('moves the whole root domain when Ctrl is held while dragging its root family', async () => {
+    const nextScene = threeRootDragScene()
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(nextScene))
+      .mockReturnValueOnce(pending.promise)
+    const wrapper = mountCanvas(familyData(nextScene.cards.map(card => mk(card.id))))
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 0, 600, 0, { ctrlKey: true })
     const units = wrapper.findAll('[data-testid="family-unit"]')
     expect(units[0].attributes('style')).toContain('translate(600px, 0px)')
     expect(units[1].attributes('style')).toContain('translate(600px, 360px)')
@@ -1180,24 +1217,25 @@ describe('FamilyCanvas', () => {
       'component:main',
       ['root:b', 'root:a', 'root:c'],
     ]])
-    expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
-      .toContain('translate(600px, 360px)')
+    expect(wrapper.emitted('domain-row-order-change')).toBeUndefined()
 
     pending.resolve(structuredClone(nextScene))
     await flushPromises()
     expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
   })
 
-  it('cancels an active root-domain preview when a newer data layout starts', async () => {
+  it('cancels an active root-unit preview when a newer data layout starts', async () => {
     const nextScene = threeRootDragScene()
     layoutFamilyTree.mockResolvedValue(structuredClone(nextScene))
     const data = familyData(nextScene.cards.map(card => mk(card.id)))
     const wrapper = mountCanvas(data)
     await flushPromises()
 
-    await beginDrag(wrapper, 0, 600, 0)
+    await beginDrag(wrapper, 0, 48, 0)
+    expect(wrapper.findAll('[data-testid="family-unit"]')[0].attributes('style'))
+      .toContain('translate(48px, 0px)')
     expect(wrapper.findAll('[data-testid="family-unit"]')[1].attributes('style'))
-      .toContain('translate(600px, 360px)')
+      .toContain('translate(0px, 360px)')
 
     const newerData = structuredClone(data)
     newerData.members.X = mk('X')
