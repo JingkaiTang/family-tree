@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { resolvePhotoUrl, importPhoto, deletePhoto } from '@/services/tauriApi'
+import { resolvePhotoUrl, importPhoto } from '@/services/tauriApi'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import PhotoCropper from './PhotoCropper.vue'
 
 const props = defineProps<{ photoId?: string }>()
-const emit = defineEmits<{ (e: 'change', photoId: string | undefined): void }>()
+const emit = defineEmits<{
+  (e: 'change', photoId: string | undefined): void
+  (e: 'stage', photoId: string): void
+}>()
 
 const family = useFamilyStore()
 const ui = useUiStore()
@@ -44,15 +47,9 @@ async function onCropConfirm(blob: Blob) {
   try {
     const bytes = new Uint8Array(await blob.arrayBuffer())
     const { photoId } = await importPhoto(family.projectPath, bytes, 'image/png')
-    if (props.photoId) {
-      try {
-        await deletePhoto(family.projectPath, props.photoId)
-      } catch {
-        /* ignore */
-      }
-    }
+    emit('stage', photoId)
     emit('change', photoId)
-    ui.showToast('success', '照片已保存')
+    ui.showToast('success', '照片已暂存，保存成员后生效')
   } catch (err) {
     ui.showToast('error', '上传失败：' + (err instanceof Error ? err.message : String(err)))
   } finally {
@@ -65,13 +62,8 @@ function onCropCancel() {
   pendingFile.value = null
 }
 
-async function onRemove() {
-  if (!props.photoId || !family.projectPath) return
-  try {
-    await deletePhoto(family.projectPath, props.photoId)
-  } catch {
-    /* ignore */
-  }
+function onRemove() {
+  if (!props.photoId) return
   emit('change', undefined)
 }
 

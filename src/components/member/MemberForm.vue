@@ -12,6 +12,7 @@ const emit = defineEmits<{
   (e: 'save'): void
   (e: 'cancel'): void
   (e: 'delete'): void
+  (e: 'media-stage', photoId: string): void
 }>()
 
 // 本地 reactive 拷贝，修改后通过 update:modelValue 同步
@@ -37,7 +38,11 @@ function onPhotoChange(photoId: string | undefined) {
 
 <template>
   <form class="space-y-4" @submit.prevent="emit('save')">
-    <PhotoPicker :photo-id="local.photoId" @change="onPhotoChange" />
+    <PhotoPicker
+      :photo-id="local.photoId"
+      @change="onPhotoChange"
+      @stage="emit('media-stage', $event)"
+    />
 
     <div class="grid grid-cols-2 gap-3">
       <label class="flex flex-col gap-1">

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { flushNow } from '@/services/autosave'
+import { deletePhoto } from '@/services/tauriApi'
 import MemberForm from '@/components/member/MemberForm.vue'
 import RelationEditor from '@/components/member/RelationEditor.vue'
 import { getKinship } from '@/core/kinship'
@@ -22,6 +23,7 @@ const member = computed(() => family.getMember(props.id))
 
 // 表单本地副本
 const draft = ref<Member | null>(null)
+const stagedPhotos = new Map<string, string>()
 
 watch(
   member,
@@ -60,13 +62,15 @@ async function onSave() {
   family.upsertMember({ ...draft.value })
   try {
     await flushNow()
+    await discardUnreferencedStagedPhotos()
     ui.showToast('success', '已保存')
   } catch (e) {
     ui.showToast('error', '保存失败：' + (e instanceof Error ? e.message : String(e)))
   }
 }
 
-function onCancel() {
+async function onCancel() {
+  await discardUnreferencedStagedPhotos()
   router.back()
 }
 
@@ -78,15 +82,48 @@ async function onDelete() {
   family.deleteMember(props.id)
   try {
     await flushNow()
-  } catch {
-    /* ignore */
+    await discardUnreferencedStagedPhotos()
+  } catch (e) {
+    ui.showToast('error', '删除保存失败：' + (e instanceof Error ? e.message : String(e)))
+    return
   }
   router.push('/tree')
 }
 
-function onBack() {
+async function onBack() {
+  await discardUnreferencedStagedPhotos()
   router.back()
 }
+
+function onMediaStaged(photoId: string) {
+  if (!family.projectPath) return
+  stagedPhotos.set(photoId, family.projectPath)
+}
+
+async function discardUnreferencedStagedPhotos() {
+  if (stagedPhotos.size === 0) return
+  const referencedPhotoIds = new Set(
+    family.membersArray
+      .map(value => value.photoId)
+      .filter((value): value is string => value !== undefined),
+  )
+  for (const [photoId, projectPath] of [...stagedPhotos]) {
+    if (referencedPhotoIds.has(photoId)) {
+      stagedPhotos.delete(photoId)
+      continue
+    }
+    try {
+      await deletePhoto(projectPath, photoId)
+      stagedPhotos.delete(photoId)
+    } catch (e) {
+      ui.showToast('error', '暂存照片清理失败：' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+}
+
+onBeforeUnmount(() => {
+  void discardUnreferencedStagedPhotos()
+})
 </script>
 
 <template>
@@ -116,6 +153,7 @@ function onBack() {
           @save="onSave"
           @cancel="onCancel"
           @delete="onDelete"
+          @media-stage="onMediaStaged"
         />
       </section>
 
