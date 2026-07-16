@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import {
   reconcileLayoutPreferences,
   withBridgeOrderPreference,
@@ -35,6 +35,10 @@ export const useFamilyStore = defineStore('family', () => {
   const projectMeta = ref<ProjectMeta | null>(null)
   const data = ref<FamilyData>(createEmptyFamily())
   const isDirty = ref(false)
+  /** 当前项目会话标识；切换或关闭项目时递增，防止旧保存回写新会话状态。 */
+  const projectToken = ref(0)
+  /** 当前项目数据修订号；每次受控变更严格递增。 */
+  const revision = ref(0)
   /** 最近一次成功保存的时间戳，用于 UI 显示 */
   const lastSavedAt = ref<number | null>(null)
 
@@ -42,19 +46,23 @@ export const useFamilyStore = defineStore('family', () => {
   const memberCount = computed(() => membersArray.value.length)
 
   function setProject(path: string, meta: ProjectMeta, family: FamilyData) {
+    projectToken.value += 1
+    isDirty.value = false
+    revision.value = 0
     projectPath.value = path
     projectMeta.value = meta
     data.value = family
-    isDirty.value = false
     lastSavedAt.value = Date.now()
     setLastProjectPath(path)
   }
 
   function closeProject() {
+    projectToken.value += 1
+    isDirty.value = false
+    revision.value = 0
     projectPath.value = null
     projectMeta.value = null
     data.value = createEmptyFamily()
-    isDirty.value = false
     lastSavedAt.value = null
     setLastProjectPath(null)
   }
@@ -64,7 +72,17 @@ export const useFamilyStore = defineStore('family', () => {
     lastSavedAt.value = Date.now()
   }
 
+  function markSaved(savedProjectToken: number, savedRevision: number): boolean {
+    if (
+      savedProjectToken !== projectToken.value
+      || savedRevision !== revision.value
+    ) return false
+    markClean()
+    return true
+  }
+
   function markDirty() {
+    revision.value += 1
     isDirty.value = true
   }
 
@@ -362,24 +380,14 @@ export const useFamilyStore = defineStore('family', () => {
     markDirty()
   }
 
-  // 深度监听 data，一旦任何字段改变就标记 dirty（保底兜底，正常变更都走上面方法）
-  watch(
-    data,
-    () => {
-      // 仅当项目已打开时才触发 dirty（避免 setProject 时误标）
-      if (projectPath.value !== null) {
-        isDirty.value = true
-      }
-    },
-    { deep: true },
-  )
-
   return {
     // state
     projectPath,
     projectMeta,
     data,
     isDirty,
+    projectToken,
+    revision,
     lastSavedAt,
     // getters
     membersArray,
@@ -388,6 +396,7 @@ export const useFamilyStore = defineStore('family', () => {
     setProject,
     closeProject,
     markClean,
+    markSaved,
     markDirty,
     getMember,
     upsertMember,

@@ -39,13 +39,18 @@ function restoreDefaultLayout() {
   layoutResetVersion.value += 1
 }
 
-function onBack() {
-  ui.setViewpoint(null)
-  ui.setSelected(null)
-  ui.setShowAuxiliaryRelations(false)
-  ui.setCanvasView(null)
-  family.closeProject()
-  router.push('/')
+async function onBack() {
+  try {
+    await flushNow()
+    ui.setViewpoint(null)
+    ui.setSelected(null)
+    ui.setShowAuxiliaryRelations(false)
+    ui.setCanvasView(null)
+    family.closeProject()
+    await router.push('/')
+  } catch (e) {
+    ui.showToast('error', '保存失败，项目保持打开：' + (e instanceof Error ? e.message : String(e)))
+  }
 }
 
 async function onSaveNow() {

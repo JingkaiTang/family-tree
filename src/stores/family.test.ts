@@ -22,6 +22,20 @@ describe('family store relation invariants', () => {
     expect(family.getCurrentSpouseConflicts('b', 'c')).toEqual(['a'])
   })
 
+  it('only marks the exact saved project revision as clean', () => {
+    const family = useFamilyStore()
+    const token = family.projectToken
+
+    family.upsertMember(mk('a'))
+    const firstRevision = family.revision
+    family.updateMember('a', { firstName: '新名字' })
+
+    expect(family.markSaved(token, firstRevision)).toBe(false)
+    expect(family.isDirty).toBe(true)
+    expect(family.markSaved(token, family.revision)).toBe(true)
+    expect(family.isDirty).toBe(false)
+  })
+
   it('does not replace a conflicting current spouse without explicit replacement', () => {
     const family = useFamilyStore()
     const a = mk('a')
