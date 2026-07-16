@@ -83,12 +83,6 @@ const lifeSpan = computed(() => {
   return ''
 })
 
-const photoHeight = computed(() => Math.min(
-  props.width * 4 / 3,
-  Math.max(0, props.height - 64),
-  Math.round(props.height * 0.68),
-))
-
 function onClick() {
   emit('click', props.member.id)
 }
@@ -211,11 +205,10 @@ function onPointerCancel(e: PointerEvent) {
       :style="{ backgroundColor: rootAccent }"
     />
 
-    <!-- 照片优先保持竖幅，但必须为姓名、称呼和生卒信息留出文本区。 -->
+    <!-- 3:4 照片铺满卡片内部，避免为文字区再次裁掉大部分竖向内容。 -->
     <div
       data-testid="member-photo"
-      class="relative w-full flex-shrink-0 bg-slate-100"
-      :style="{ height: `${photoHeight}px` }"
+      class="absolute inset-0 bg-slate-100"
     >
       <img
         v-if="photoUrl"
@@ -231,26 +224,49 @@ function onPointerCancel(e: PointerEvent) {
         {{ member.gender === 'female' ? '♀' : member.gender === 'male' ? '♂' : '·' }}
       </div>
     </div>
-    <!-- 下半：姓名/称呼/生卒，flex-1 占满剩余，内容垂直居中 -->
+
+    <!-- 底部两行信息覆盖层不参与卡片尺寸计算，因此不会改变家族树布局。 -->
     <div
       data-testid="member-details"
-      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1"
+      class="absolute inset-x-0 bottom-0 z-10 flex min-h-20 flex-col justify-end px-2 pb-2 pt-7 text-center"
+      :class="photoUrl
+        ? 'bg-gradient-to-t from-slate-950/85 via-slate-900/55 to-transparent text-white'
+        : 'bg-gradient-to-t from-white via-white/95 to-transparent text-slate-800'"
     >
       <div
         data-testid="member-name"
-        class="max-w-full truncate text-center text-sm font-semibold leading-tight"
+        class="max-w-full truncate text-sm font-semibold leading-tight drop-shadow-sm"
       >
         {{ fullName }}
       </div>
       <div
-        v-if="kinship"
-        data-testid="member-kinship"
-        class="max-w-full truncate text-[11px] font-medium text-emerald-600"
+        v-if="kinship || lifeSpan"
+        data-testid="member-meta"
+        class="mt-1 flex max-w-full items-center justify-center gap-1 text-[10px] leading-tight"
       >
-        {{ kinship }}
-      </div>
-      <div v-if="lifeSpan" data-testid="member-lifespan" class="text-[10px] text-slate-400">
-        {{ lifeSpan }}
+        <span
+          v-if="kinship"
+          data-testid="member-kinship"
+          class="max-w-[55%] truncate font-medium"
+          :class="photoUrl ? 'text-emerald-200' : 'text-emerald-600'"
+        >
+          {{ kinship }}
+        </span>
+        <span
+          v-if="kinship && lifeSpan"
+          aria-hidden="true"
+          :class="photoUrl ? 'text-white/50' : 'text-slate-300'"
+        >
+          ·
+        </span>
+        <span
+          v-if="lifeSpan"
+          data-testid="member-lifespan"
+          class="truncate"
+          :class="photoUrl ? 'text-white/80' : 'text-slate-500'"
+        >
+          {{ lifeSpan }}
+        </span>
       </div>
     </div>
   </div>

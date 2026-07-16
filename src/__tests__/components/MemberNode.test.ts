@@ -170,7 +170,7 @@ describe('MemberNode', () => {
     expect(style).toContain('top: 300px')
   })
 
-  it('默认卡片为姓名、称呼和生卒信息保留至少 64px 文本区', () => {
+  it('默认卡片保持布局尺寸并让照片铺满卡片内部', () => {
     const wrapper = mountNode({
       width: 168,
       height: 216,
@@ -180,14 +180,15 @@ describe('MemberNode', () => {
         deathDate: '2020-01-01',
       },
     })
+    const node = wrapper.get('[data-testid="member-node"]')
     const photo = wrapper.get('[data-testid="member-photo"]')
     const details = wrapper.get('[data-testid="member-details"]')
-    const photoHeightMatch = (photo.attributes('style') ?? '').match(/height:\s*([\d.]+)px/)
-    expect(photoHeightMatch).not.toBeNull()
-    const photoHeight = Number.parseFloat(photoHeightMatch?.[1] ?? 'NaN')
 
-    expect(photoHeight).toBeLessThanOrEqual(152)
-    expect(216 - photoHeight).toBeGreaterThanOrEqual(64)
+    expect(node.attributes('style')).toContain('width: 168px')
+    expect(node.attributes('style')).toContain('height: 216px')
+    expect(photo.classes()).toEqual(expect.arrayContaining(['absolute', 'inset-0']))
+    expect(photo.attributes('style')).toBeUndefined()
+    expect(details.classes()).toEqual(expect.arrayContaining(['absolute', 'inset-x-0', 'bottom-0']))
     expect(details.get('[data-testid="member-name"]').text()).toBe('唐靖凯')
     expect(details.get('[data-testid="member-kinship"]').text()).toBe('父亲')
     expect(details.get('[data-testid="member-lifespan"]').text()).toBe('1960 – 2020')
