@@ -80,6 +80,24 @@ describe('MemberNode', () => {
     expect(wrapper.text()).toContain('·')
   })
 
+  it('没有照片时按性别和年龄段显示默认剪影', () => {
+    const childBirthYear = new Date().getFullYear() - 10
+    const wrapper = mountNode({
+      member: mk('test', { gender: 'female', birthDate: `${childBirthYear}-01-01` }),
+    })
+    const avatar = wrapper.get('[data-testid="member-default-avatar"]')
+
+    expect(avatar.attributes('data-gender')).toBe('female')
+    expect(avatar.attributes('data-age-band')).toBe('child')
+    expect(avatar.attributes('aria-label')).toBe('儿童女性默认头像')
+  })
+
+  it('缺少出生日期时使用成年默认剪影', () => {
+    const wrapper = mountNode({ member: mk('test', { gender: 'male' }) })
+    expect(wrapper.get('[data-testid="member-default-avatar"]').attributes('data-age-band'))
+      .toBe('adult')
+  })
+
   // ========== 性别颜色边框 ==========
   it('男性使用 sky 色边框', () => {
     const wrapper = mountNode({

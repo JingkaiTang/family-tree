@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { resolvePhotoUrl } from '@/services/tauriApi'
+import DefaultAvatar from '@/components/member/DefaultAvatar.vue'
+import { getDefaultAvatarAgeBand } from '@/core/defaultAvatar'
 
 const props = defineProps<{
   member: Member
@@ -36,6 +38,7 @@ export interface MemberDragPayload {
 
 const family = useFamilyStore()
 const photoUrl = ref<string | null>(null)
+const defaultAvatarAgeBand = computed(() => getDefaultAvatarAgeBand(props.member))
 
 watch(
   () => [props.member.photoId, family.projectPath] as const,
@@ -217,12 +220,12 @@ function onPointerCancel(e: PointerEvent) {
         alt=""
         draggable="false"
       />
-      <div
+      <DefaultAvatar
         v-else
-        class="flex h-full w-full items-center justify-center text-3xl text-slate-300"
-      >
-        {{ member.gender === 'female' ? '♀' : member.gender === 'male' ? '♂' : '·' }}
-      </div>
+        data-testid="member-default-avatar"
+        :gender="member.gender"
+        :age-band="defaultAvatarAgeBand"
+      />
     </div>
 
     <!-- 底部两行信息覆盖层不参与卡片尺寸计算，因此不会改变家族树布局。 -->
