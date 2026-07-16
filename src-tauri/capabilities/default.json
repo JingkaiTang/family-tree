@@ -5,13 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "core:window:default",
-    "core:window:allow-close",
-    "core:window:allow-minimize",
-    "core:window:allow-maximize",
-    "dialog:default",
-    "dialog:allow-open",
-    "dialog:allow-save",
-    "fs:default"
+    "core:window:allow-destroy",
+    "dialog:allow-open"
   ]
 }

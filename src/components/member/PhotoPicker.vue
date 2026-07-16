@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { resolvePhotoUrl, importPhoto } from '@/services/tauriApi'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
@@ -17,21 +17,38 @@ const ui = useUiStore()
 const previewUrl = ref<string | null>(null)
 const pendingFile = ref<File | null>(null)
 const uploading = ref(false)
+let previewRequest = 0
+
+function replacePreviewUrl(next: string | null) {
+  const previous = previewUrl.value
+  if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
+  previewUrl.value = next
+}
 
 async function refreshPreview() {
+  const request = ++previewRequest
   if (!props.photoId || !family.projectPath) {
-    previewUrl.value = null
+    replacePreviewUrl(null)
     return
   }
   try {
-    previewUrl.value = await resolvePhotoUrl(family.projectPath, props.photoId, true)
-    previewUrl.value += `?t=${Date.now()}`
+    const next = await resolvePhotoUrl(family.projectPath, props.photoId, true)
+    if (request !== previewRequest) {
+      if (next.startsWith('blob:')) URL.revokeObjectURL(next)
+      return
+    }
+    replacePreviewUrl(next)
   } catch {
-    previewUrl.value = null
+    if (request === previewRequest) replacePreviewUrl(null)
   }
 }
 
-watch(() => props.photoId, refreshPreview, { immediate: true })
+watch(() => [props.photoId, family.projectPath] as const, refreshPreview, { immediate: true })
+
+onBeforeUnmount(() => {
+  previewRequest += 1
+  replacePreviewUrl(null)
+})
 
 function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement

@@ -1,11 +1,13 @@
 use std::fs;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use image::imageops::FilterType;
 use image::GenericImageView;
+use image::ImageReader;
 use serde::Serialize;
 
+use super::project::validate_project_root;
 use crate::errors::{CmdError, CmdResult};
 
 const MEDIA_DIR: &str = "media";
@@ -17,6 +19,9 @@ const MAX_DIM: u32 = 1600;
 const THUMB_DIM: u32 = 256;
 const WEBP_QUALITY: f32 = 80.0;
 const THUMB_WEBP_QUALITY: f32 = 70.0;
+const MAX_IMPORT_BYTES: usize = 25 * 1024 * 1024;
+const MAX_IMPORT_PIXELS: u64 = 40_000_000;
+const MAX_PHOTO_ID_LEN: usize = 128;
 
 #[derive(Debug, Serialize)]
 pub struct ImportedPhoto {
@@ -24,21 +29,16 @@ pub struct ImportedPhoto {
     pub photo_id: String,
 }
 
-fn validate_root(path: &str) -> CmdResult<PathBuf> {
-    let p = PathBuf::from(path);
-    if !p.is_absolute() {
-        return Err(CmdError::InvalidPath(format!(
-            "路径必须为绝对路径：{}",
-            path
-        )));
+fn validate_photo_id(photo_id: &str) -> CmdResult<&str> {
+    if photo_id.is_empty()
+        || photo_id.len() > MAX_PHOTO_ID_LEN
+        || !photo_id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+    {
+        return Err(CmdError::InvalidPath(format!("非法照片 ID：{}", photo_id)));
     }
-    if !p.exists() {
-        return Err(CmdError::InvalidPath(format!(
-            "项目目录不存在：{}",
-            p.display()
-        )));
-    }
-    Ok(p)
+    Ok(photo_id)
 }
 
 fn ensure_media_dirs(root: &Path) -> CmdResult<()> {
@@ -60,11 +60,7 @@ fn clamp_dim(w: u32, h: u32, max_dim: u32) -> (u32, u32) {
 }
 
 /// 把一张图压成 webp 写入指定路径。
-fn encode_and_write_webp(
-    src: &image::DynamicImage,
-    dest: &Path,
-    quality: f32,
-) -> CmdResult<()> {
+fn encode_and_write_webp(src: &image::DynamicImage, dest: &Path, quality: f32) -> CmdResult<()> {
     // 转 RGBA8 → webp encoder
     let rgba = src.to_rgba8();
     let (w, h) = rgba.dimensions();
@@ -85,8 +81,21 @@ pub fn import_photo(
     bytes: Vec<u8>,
     _mime: String,
 ) -> CmdResult<ImportedPhoto> {
-    let root = validate_root(&project_path)?;
+    let root = validate_project_root(&project_path)?;
     ensure_media_dirs(&root)?;
+
+    if bytes.len() > MAX_IMPORT_BYTES {
+        return Err(CmdError::Other("图片超过 25 MiB 限制".into()));
+    }
+
+    let (source_width, source_height) = ImageReader::new(Cursor::new(&bytes))
+        .with_guessed_format()
+        .map_err(|e| CmdError::Other(format!("图片格式识别失败：{}", e)))?
+        .into_dimensions()
+        .map_err(|e| CmdError::Other(format!("图片尺寸读取失败：{}", e)))?;
+    if u64::from(source_width) * u64::from(source_height) > MAX_IMPORT_PIXELS {
+        return Err(CmdError::Other("图片像素数超过 4000 万限制".into()));
+    }
 
     // 解码（任意格式 image crate 支持的）
     let img = image::load_from_memory(&bytes)
@@ -104,9 +113,6 @@ pub fn import_photo(
     // 缩略图：按最长边 THUMB_DIM 缩放（从原图缩，保真）
     let (tw, th) = clamp_dim(w, h, THUMB_DIM);
     let thumb = img.resize(tw, th, FilterType::Lanczos3);
-    // 抑制未使用警告（load_from_memory 返回就够了）
-    let _ = Cursor::new(&bytes);
-
     // 分配一个 UUID，写入两处
     let photo_id = uuid::Uuid::new_v4().to_string();
     let photo_path = root
@@ -127,7 +133,8 @@ pub fn import_photo(
 /// 立即把指定 photoId 文件移入 .trash/（软删除）
 #[tauri::command]
 pub fn delete_photo(project_path: String, photo_id: String) -> CmdResult<()> {
-    let root = validate_root(&project_path)?;
+    let root = validate_project_root(&project_path)?;
+    validate_photo_id(&photo_id)?;
     ensure_media_dirs(&root)?;
     move_to_trash(&root, &photo_id)?;
     Ok(())
@@ -137,9 +144,12 @@ pub fn delete_photo(project_path: String, photo_id: String) -> CmdResult<()> {
 /// 返回被清理的照片数（每个 id 计 1，即使两张文件）。
 #[tauri::command]
 pub fn gc_media(project_path: String, used_ids: Vec<String>) -> CmdResult<u32> {
-    let root = validate_root(&project_path)?;
+    let root = validate_project_root(&project_path)?;
     ensure_media_dirs(&root)?;
 
+    for photo_id in &used_ids {
+        validate_photo_id(photo_id)?;
+    }
     let used: std::collections::HashSet<String> = used_ids.into_iter().collect();
     let photos_dir = root.join(MEDIA_DIR).join(PHOTOS_SUBDIR);
     let mut trashed = 0u32;
@@ -159,6 +169,7 @@ pub fn gc_media(project_path: String, used_ids: Vec<String>) -> CmdResult<u32> {
 }
 
 fn move_to_trash(root: &Path, photo_id: &str) -> CmdResult<()> {
+    validate_photo_id(photo_id)?;
     let trash_dir = root.join(TRASH_SUBDIR);
     fs::create_dir_all(&trash_dir)?;
 
@@ -185,10 +196,24 @@ fn move_to_trash(root: &Path, photo_id: &str) -> CmdResult<()> {
     Ok(())
 }
 
+/// 只读取已验证项目目录中的照片字节，避免向 WebView 暴露任意本地文件协议。
+#[tauri::command]
+pub fn load_photo(project_path: String, photo_id: String, thumb: bool) -> CmdResult<Vec<u8>> {
+    let root = validate_project_root(&project_path)?;
+    let photo_id = validate_photo_id(&photo_id)?;
+    let subdir = if thumb { THUMBS_SUBDIR } else { PHOTOS_SUBDIR };
+    let path = root
+        .join(MEDIA_DIR)
+        .join(subdir)
+        .join(format!("{}.webp", photo_id));
+    fs::read(&path).map_err(|_| CmdError::InvalidPath(format!("照片不存在：{}", path.display())))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::env;
+    use std::path::PathBuf;
 
     fn tmp_dir(name: &str) -> PathBuf {
         let mut p = env::temp_dir();
@@ -210,11 +235,17 @@ mod tests {
         buf
     }
 
-    #[test]
-    fn import_creates_photo_and_thumb() {
-        let root = tmp_dir("import");
+    fn create_test_project(name: &str) -> (PathBuf, String) {
+        let root = tmp_dir(name);
         fs::create_dir_all(&root).unwrap();
         let root_s = root.to_string_lossy().to_string();
+        crate::commands::project::create_project(root_s.clone(), "测试".into()).unwrap();
+        (root, root_s)
+    }
+
+    #[test]
+    fn import_creates_photo_and_thumb() {
+        let (root, root_s) = create_test_project("import");
         let bytes = tiny_png_bytes();
 
         let res = import_photo(root_s.clone(), bytes, "image/png".into()).expect("import");
@@ -231,15 +262,14 @@ mod tests {
         assert!(photo.exists());
         assert!(thumb.exists());
         assert!(photo.metadata().unwrap().len() > 0);
+        assert!(!load_photo(root_s, res.photo_id, true).unwrap().is_empty());
 
         fs::remove_dir_all(&root).ok();
     }
 
     #[test]
     fn gc_moves_unused_to_trash() {
-        let root = tmp_dir("gc");
-        fs::create_dir_all(&root).unwrap();
-        let root_s = root.to_string_lossy().to_string();
+        let (root, root_s) = create_test_project("gc");
         let bytes = tiny_png_bytes();
 
         let a = import_photo(root_s.clone(), bytes.clone(), "image/png".into()).unwrap();
@@ -268,6 +298,14 @@ mod tests {
             .any(|e| e.file_name().to_string_lossy().contains(&b.photo_id));
         assert!(has_b_in_trash);
 
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn media_commands_reject_path_traversal_ids() {
+        let (root, root_s) = create_test_project("unsafe-id");
+        let err = delete_photo(root_s, "../escape".into()).unwrap_err();
+        assert!(matches!(err, CmdError::InvalidPath(_)));
         fs::remove_dir_all(&root).ok();
     }
 }

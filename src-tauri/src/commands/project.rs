@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +35,7 @@ const THUMBS_SUBDIR: &str = "thumbs";
 const TRASH_SUBDIR: &str = ".trash";
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 const MAX_BAK_COUNT: usize = 3;
+const MAX_FAMILY_JSON_BYTES: u64 = 50 * 1024 * 1024;
 
 // ============================================================
 // Helpers
@@ -99,7 +100,7 @@ fn is_leap(y: i64) -> bool {
     (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
 }
 
-fn validate_project_dir(path: &str) -> CmdResult<PathBuf> {
+fn validate_absolute_directory(path: &str) -> CmdResult<PathBuf> {
     let p = PathBuf::from(path);
     if !p.is_absolute() {
         return Err(CmdError::InvalidPath(format!(
@@ -107,7 +108,37 @@ fn validate_project_dir(path: &str) -> CmdResult<PathBuf> {
             path
         )));
     }
-    Ok(p)
+    if p.components()
+        .any(|part| matches!(part, Component::ParentDir | Component::CurDir))
+    {
+        return Err(CmdError::InvalidPath(format!(
+            "路径不能包含 . 或 ..：{}",
+            path
+        )));
+    }
+    let canonical = fs::canonicalize(&p)
+        .map_err(|_| CmdError::InvalidPath(format!("目录不存在或无法访问：{}", p.display())))?;
+    if !canonical.is_dir() {
+        return Err(CmdError::InvalidPath(format!(
+            "路径不是目录：{}",
+            canonical.display()
+        )));
+    }
+    Ok(canonical)
+}
+
+pub(crate) fn validate_project_root(path: &str) -> CmdResult<PathBuf> {
+    let root = validate_absolute_directory(path)?;
+    for marker in [META_FILE, FAMILY_FILE] {
+        if !root.join(marker).is_file() {
+            return Err(CmdError::CorruptedProject(format!(
+                "项目缺少 {}：{}",
+                marker,
+                root.display()
+            )));
+        }
+    }
+    Ok(root)
 }
 
 fn ensure_dirs(root: &Path) -> CmdResult<()> {
@@ -120,9 +151,8 @@ fn ensure_dirs(root: &Path) -> CmdResult<()> {
 
 fn read_meta(root: &Path) -> CmdResult<ProjectMeta> {
     let meta_path = root.join(META_FILE);
-    let bytes = fs::read(&meta_path).map_err(|_| {
-        CmdError::CorruptedProject(format!("找不到 {}", meta_path.display()))
-    })?;
+    let bytes = fs::read(&meta_path)
+        .map_err(|_| CmdError::CorruptedProject(format!("找不到 {}", meta_path.display())))?;
     let meta: ProjectMeta = serde_json::from_slice(&bytes)?;
     Ok(meta)
 }
@@ -139,10 +169,7 @@ fn atomic_write(target: &Path, bytes: &[u8]) -> CmdResult<()> {
         .ok_or_else(|| CmdError::InvalidPath(target.display().to_string()))?;
     fs::create_dir_all(parent)?;
     let mut tmp = target.to_path_buf();
-    let file_name = target
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("tmp");
+    let file_name = target.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
     tmp.set_file_name(format!(".{}.tmp", file_name));
     fs::write(&tmp, bytes)?;
     // 若目标存在，rename 覆盖；macOS/Linux 原子；Windows 2019+ 也原子
@@ -179,16 +206,15 @@ fn rotate_backups(root: &Path) -> CmdResult<()> {
 
 #[tauri::command]
 pub fn create_project(path: String, name: String) -> CmdResult<ProjectMeta> {
-    let root = validate_project_dir(&path)?;
-    ensure_dirs(&root)?;
+    let root = validate_absolute_directory(&path)?;
 
-    // 如果 family.json 已存在，拒绝覆盖
-    if root.join(FAMILY_FILE).exists() {
-        return Err(CmdError::Other(format!(
-            "该目录已存在家族项目（{}），请改用\"打开\"。",
-            FAMILY_FILE
-        )));
+    // 任一项目标记已存在都拒绝覆盖，避免把损坏项目当成新项目重建。
+    if root.join(FAMILY_FILE).exists() || root.join(META_FILE).exists() {
+        return Err(CmdError::Other(
+            "该目录已存在家族项目文件，请改用\"打开\"。".into(),
+        ));
     }
+    ensure_dirs(&root)?;
 
     let now = now_iso();
     let meta = ProjectMeta {
@@ -215,20 +241,20 @@ pub fn create_project(path: String, name: String) -> CmdResult<ProjectMeta> {
 
 #[tauri::command]
 pub fn load_project(path: String) -> CmdResult<LoadedProject> {
-    let root = validate_project_dir(&path)?;
-    if !root.exists() {
-        return Err(CmdError::InvalidPath(format!(
-            "目录不存在：{}",
-            root.display()
-        )));
-    }
+    let root = validate_project_root(&path)?;
     ensure_dirs(&root)?;
 
     let meta = read_meta(&root)?;
     let family_path = root.join(FAMILY_FILE);
-    let family_bytes = fs::read(&family_path).map_err(|_| {
-        CmdError::CorruptedProject(format!("找不到 {}", family_path.display()))
-    })?;
+    let family_size = fs::metadata(&family_path)?.len();
+    if family_size > MAX_FAMILY_JSON_BYTES {
+        return Err(CmdError::CorruptedProject(format!(
+            "{} 超过 50 MiB 限制",
+            family_path.display()
+        )));
+    }
+    let family_bytes = fs::read(&family_path)
+        .map_err(|_| CmdError::CorruptedProject(format!("找不到 {}", family_path.display())))?;
     let family: serde_json::Value = serde_json::from_slice(&family_bytes)?;
 
     Ok(LoadedProject {
@@ -240,12 +266,9 @@ pub fn load_project(path: String) -> CmdResult<LoadedProject> {
 
 #[tauri::command]
 pub fn save_project(path: String, family_json: String) -> CmdResult<()> {
-    let root = validate_project_dir(&path)?;
-    if !root.exists() {
-        return Err(CmdError::InvalidPath(format!(
-            "目录不存在：{}",
-            root.display()
-        )));
+    let root = validate_project_root(&path)?;
+    if family_json.len() as u64 > MAX_FAMILY_JSON_BYTES {
+        return Err(CmdError::Other("family.json 超过 50 MiB 限制".into()));
     }
 
     // 先校验 JSON 合法（不做 schema 校验，schema 校验在前端 Zod 做）
@@ -261,22 +284,6 @@ pub fn save_project(path: String, family_json: String) -> CmdResult<()> {
     }
 
     Ok(())
-}
-
-/// M4 已由 commands::media 模块实现真正的 import/delete/gc，这里仅保留 resolve_photo_path
-#[tauri::command]
-pub fn resolve_photo_path(
-    project_path: String,
-    photo_id: String,
-    thumb: bool,
-) -> CmdResult<String> {
-    let root = validate_project_dir(&project_path)?;
-    let sub = if thumb { THUMBS_SUBDIR } else { PHOTOS_SUBDIR };
-    let full = root
-        .join(MEDIA_DIR)
-        .join(sub)
-        .join(format!("{}.webp", photo_id));
-    Ok(full.to_string_lossy().to_string())
 }
 
 // ============================================================
@@ -301,6 +308,7 @@ mod tests {
     #[test]
     fn create_load_save_roundtrip() {
         let root = tmp_dir("roundtrip");
+        fs::create_dir_all(&root).unwrap();
         let root_s = root.to_string_lossy().to_string();
 
         // create
@@ -351,6 +359,7 @@ mod tests {
     #[test]
     fn save_rejects_invalid_json() {
         let root = tmp_dir("badjson");
+        fs::create_dir_all(&root).unwrap();
         let root_s = root.to_string_lossy().to_string();
         create_project(root_s.clone(), "x".into()).unwrap();
         let err = save_project(root_s.clone(), "not-json".into()).unwrap_err();
@@ -359,16 +368,19 @@ mod tests {
     }
 
     #[test]
-    fn resolve_photo_path_forms_correct_path() {
-        let path = resolve_photo_path(
-            "/tmp/FakeFamily".into(),
-            "abc-123".into(),
-            false,
-        )
-        .unwrap();
-        assert!(path.ends_with("media/photos/abc-123.webp"));
+    fn save_rejects_directory_without_project_markers() {
+        let root = tmp_dir("not-project");
+        fs::create_dir_all(&root).unwrap();
+        let err = save_project(root.to_string_lossy().to_string(), "{}".into()).unwrap_err();
+        assert!(matches!(err, CmdError::CorruptedProject(_)));
+        let _ = fs::remove_dir_all(&root);
+    }
 
-        let thumb = resolve_photo_path("/tmp/FakeFamily".into(), "abc-123".into(), true).unwrap();
-        assert!(thumb.ends_with("media/thumbs/abc-123.webp"));
+    #[test]
+    fn path_validation_rejects_parent_segments() {
+        let root = env::temp_dir();
+        let path = root.join("child").join("..");
+        let err = validate_absolute_directory(&path.to_string_lossy()).unwrap_err();
+        assert!(matches!(err, CmdError::InvalidPath(_)));
     }
 }

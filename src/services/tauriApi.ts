@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core'
-import { convertFileSrc } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import type { FamilyData, ProjectMeta } from '@/core/schema'
 
@@ -47,18 +46,18 @@ export async function gcMedia(projectPath: string, usedIds: string[]): Promise<n
   return invoke<number>('gc_media', { projectPath, usedIds })
 }
 
-/** 把项目内 media/photos/{id}.webp 解析成前端 <img> 可直接显示的 URL */
+/** 读取项目内照片并生成 <img> 可显示的临时 Blob URL；调用方负责 revoke。 */
 export async function resolvePhotoUrl(
   projectPath: string,
   photoId: string,
   thumb = false,
 ): Promise<string> {
-  const absPath = await invoke<string>('resolve_photo_path', {
+  const bytes = await invoke<number[]>('load_photo', {
     projectPath,
     photoId,
     thumb,
   })
-  return convertFileSrc(absPath)
+  return URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/webp' }))
 }
 
 // ---------------- Dialog helpers ----------------

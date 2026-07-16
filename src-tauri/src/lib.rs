@@ -5,7 +5,6 @@ mod errors;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
             commands::load_project,
@@ -13,7 +12,7 @@ pub fn run() {
             commands::import_photo,
             commands::delete_photo,
             commands::gc_media,
-            commands::resolve_photo_path,
+            commands::load_photo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

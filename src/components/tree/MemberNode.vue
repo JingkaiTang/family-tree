@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { resolvePhotoUrl } from '@/services/tauriApi'
@@ -38,23 +38,41 @@ export interface MemberDragPayload {
 
 const family = useFamilyStore()
 const photoUrl = ref<string | null>(null)
+let photoRequest = 0
 const defaultAvatarAgeBand = computed(() => getDefaultAvatarAgeBand(props.member))
+
+function replacePhotoUrl(next: string | null) {
+  const previous = photoUrl.value
+  if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
+  photoUrl.value = next
+}
 
 watch(
   () => [props.member.photoId, family.projectPath] as const,
   async ([photoId, path]) => {
+    const request = ++photoRequest
     if (!photoId || !path) {
-      photoUrl.value = null
+      replacePhotoUrl(null)
       return
     }
     try {
-      photoUrl.value = await resolvePhotoUrl(path, photoId, true)
+      const next = await resolvePhotoUrl(path, photoId, true)
+      if (request !== photoRequest) {
+        if (next.startsWith('blob:')) URL.revokeObjectURL(next)
+        return
+      }
+      replacePhotoUrl(next)
     } catch {
-      photoUrl.value = null
+      if (request === photoRequest) replacePhotoUrl(null)
     }
   },
   { immediate: true },
 )
+
+onBeforeUnmount(() => {
+  photoRequest += 1
+  replacePhotoUrl(null)
+})
 
 const fullName = computed(() => {
   const ln = props.member.lastName?.trim() ?? ''
