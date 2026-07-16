@@ -1,105 +1,40 @@
-import { createEmptyFamily, type FamilyData, type Member } from './schema'
-import { layoutFamilyScene } from './family-layout/layoutFamilyScene'
-import { normalizeFacts } from './family-layout/normalizeFacts'
+import type { Member } from './schema'
+import type { LayoutScene } from './family-layout/types'
 import {
-  DEFAULT_FAMILY_VIEW_POLICY,
-  DEFAULT_LAYOUT_METRICS,
-  type FamilyViewPolicy,
-  type LayoutPreferences,
-  type LayoutScene,
-} from './family-layout/types'
+  layoutFamilyTreeSync,
+  type LayoutFamilyTreeOptions,
+} from './treeLayoutCore'
+import { LayoutWorkerClient } from './treeLayoutWorkerClient'
 
 export type { LayoutScene } from './family-layout/types'
+export type { LayoutFamilyTreeOptions } from './treeLayoutCore'
 
-export interface LayoutFamilyTreeOptions {
-  data?: FamilyData
-  view?: Partial<FamilyViewPolicy>
-  previousScene?: LayoutScene
-  changedIds?: string[]
-  auxiliaryFocusPersonId?: string
-}
+let workerClient: LayoutWorkerClient | null = null
+let workerDisabled = false
 
 export async function layoutFamilyTree(
   members: Member[],
   options: LayoutFamilyTreeOptions = {},
 ): Promise<LayoutScene> {
-  const data = options.data ?? temporaryFamily(members)
-  const normalized = normalizeFacts(data)
+  if (!canUseWorker()) return layoutFamilyTreeSync(members, options)
 
-  return layoutFamilyScene({
-    facts: normalized.facts,
-    view: mergeViewPolicy(data, normalized.facts.parentages, options.view),
-    preferences: toLayoutPreferences(data),
-    metrics: { ...DEFAULT_LAYOUT_METRICS },
-    inputDiagnostics: normalized.diagnostics,
-    previousScene: options.previousScene,
-    changedIds: options.changedIds,
-    auxiliaryFocusPersonId: options.auxiliaryFocusPersonId,
-    preferredComponentPersonId: data.rootMemberId,
-  })
-}
-
-function temporaryFamily(members: Member[]): FamilyData {
-  return {
-    ...createEmptyFamily(),
-    members: Object.fromEntries(members.map(member => [member.id, member])),
-  }
-}
-
-function mergeViewPolicy(
-  data: FamilyData,
-  parentages: ReturnType<typeof normalizeFacts>['facts']['parentages'],
-  view: Partial<FamilyViewPolicy> | undefined,
-): FamilyViewPolicy {
-  const legacyPrimaryParentageByChild: Record<string, string> = {}
-  for (const [childId, assignment] of Object.entries(data.childLayoutAssignments)) {
-    if (!assignment.primaryParentId) continue
-    const parentage = parentages.find(value => (
-      value.childIds.includes(childId)
-      && value.parentIds.includes(assignment.primaryParentId!)
+  try {
+    workerClient ??= new LayoutWorkerClient(new Worker(
+      new URL('./treeLayout.worker.ts', import.meta.url),
+      { type: 'module', name: 'family-tree-layout' },
     ))
-    if (parentage) legacyPrimaryParentageByChild[childId] = parentage.id
-  }
-
-  return {
-    ...DEFAULT_FAMILY_VIEW_POLICY,
-    ...view,
-    primaryPartnershipByPerson: {
-      ...DEFAULT_FAMILY_VIEW_POLICY.primaryPartnershipByPerson,
-      ...view?.primaryPartnershipByPerson,
-    },
-    primaryParentageByChild: {
-      ...legacyPrimaryParentageByChild,
-      ...view?.primaryParentageByChild,
-    },
+    return await workerClient.layout(members, options)
+  } catch {
+    // Worker 初始化或运行失败时保留完整功能，下一次调用直接走同步回退。
+    workerClient?.dispose()
+    workerClient = null
+    workerDisabled = true
+    return layoutFamilyTreeSync(members, options)
   }
 }
 
-function toLayoutPreferences(data: FamilyData): LayoutPreferences {
-  return {
-    rootOrders: data.layoutPreferences.rootOrders.map(order => ({
-      componentId: order.componentId,
-      rootIds: [...order.rootIds],
-    })),
-    rowOrders: data.layoutPreferences.rowOrders.map(row => ({
-      id: row.id,
-      domainId: row.domainId,
-      generation: row.generation,
-      unitIds: [...row.unitIds],
-      ...(row.columns ? { columns: { ...row.columns } } : {}),
-    })),
-    bridgeOrders: data.layoutPreferences.bridgeOrders.map(row => ({
-      id: row.id,
-      domainId: row.domainId,
-      generation: row.generation,
-      unitIds: [...row.unitIds],
-      ...(row.columns ? { columns: { ...row.columns } } : {}),
-    })),
-    rootAccentAssignments: {
-      ...data.layoutPreferences.rootAccentAssignments,
-    },
-    familyAccentAssignments: {
-      ...data.layoutPreferences.familyAccentAssignments,
-    },
-  }
+function canUseWorker(): boolean {
+  return !workerDisabled && (workerClient !== null
+    ? true
+    : typeof window !== 'undefined' && typeof Worker !== 'undefined')
 }
