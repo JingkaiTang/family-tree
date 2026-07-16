@@ -294,6 +294,64 @@ function threeRootDragScene(): LayoutScene {
   ])
 }
 
+function subtreeDragScene(): LayoutScene {
+  const units = [
+    subtreeUnit('unit:root', 'root', 24, 0, 0, true),
+    subtreeUnit('unit:branch', 'branch', 24, 360, 1),
+    subtreeUnit('unit:sibling', 'sibling', 480, 360, 1),
+    subtreeUnit('unit:child', 'child', 24, 720, 2),
+    subtreeUnit('unit:cousin', 'cousin', 480, 720, 2),
+    subtreeUnit('unit:grandchild', 'grandchild', 24, 1080, 3),
+  ]
+  return {
+    units,
+    cards: units.map(unit => ({
+      id: unit.memberIds[0],
+      unitId: unit.id,
+      generation: unit.generation,
+      rect: { ...unit.rect },
+    })),
+    hubs: [],
+    rows: [
+      { id: 'row:domain:root:test:0', generation: 0, unitIds: ['unit:root'] },
+      { id: 'row:domain:root:test:1', generation: 1, unitIds: ['unit:branch', 'unit:sibling'] },
+      { id: 'row:domain:root:test:2', generation: 2, unitIds: ['unit:child', 'unit:cousin'] },
+      { id: 'row:domain:root:test:3', generation: 3, unitIds: ['unit:grandchild'] },
+    ],
+    rootDomains: [dragDomain(
+      'domain:root:test',
+      'root:test',
+      0,
+      units.map(unit => unit.id),
+    )],
+    bridgeDomains: [],
+    gateways: [],
+    routes: [],
+    primaryParentageGroups: [
+      { id: 'parentage:root', sourceUnitId: 'unit:root', childPersonIds: ['branch', 'sibling'] },
+      { id: 'parentage:branch', sourceUnitId: 'unit:branch', childPersonIds: ['child'] },
+      { id: 'parentage:sibling', sourceUnitId: 'unit:sibling', childPersonIds: ['cousin'] },
+      { id: 'parentage:child', sourceUnitId: 'unit:child', childPersonIds: ['grandchild'] },
+    ],
+    bounds: { x: 0, y: 0, width: 1200, height: 1296 },
+    diagnostics: [],
+  }
+}
+
+function subtreeUnit(
+  id: string,
+  personId: string,
+  x: number,
+  y: number,
+  generation: number,
+  isRootFamily = false,
+): LayoutScene['units'][number] {
+  return {
+    ...dragUnit(id, personId, 'domain:root:test', 'root:test', x, y, isRootFamily),
+    generation,
+  }
+}
+
 function dragScene(
   rootDomains: LayoutScene['rootDomains'],
   units: LayoutScene['units'],
@@ -407,6 +465,10 @@ function mountStoreCanvas(data: FamilyData, props = {}) {
       },
       onRootOrderChange(componentId: string, rootIds: string[]) {
         family.setRootOrderPreference(componentId, rootIds)
+        void wrapper.setProps({ data: family.data })
+      },
+      onSubtreeOrderChange(batch: Parameters<typeof family.setLayoutRowPreferenceBatch>[0]) {
+        family.setLayoutRowPreferenceBatch(batch)
         void wrapper.setProps({ data: family.data })
       },
     },
@@ -1216,6 +1278,61 @@ describe('FamilyCanvas', () => {
     expect(wrapper.emitted('root-order-change')).toEqual([[
       'component:main',
       ['root:b', 'root:a', 'root:c'],
+    ]])
+    expect(wrapper.emitted('domain-row-order-change')).toBeUndefined()
+
+    pending.resolve(structuredClone(nextScene))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('moves and persists the whole descendant subtree when Ctrl is held on a non-root family', async () => {
+    const nextScene = subtreeDragScene()
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(nextScene))
+      .mockReturnValueOnce(pending.promise)
+    const wrapper = mountCanvas(familyData(nextScene.cards.map(card => mk(card.id))))
+    await flushPromises()
+
+    const node = await beginDrag(wrapper, 1, 600, 0, { ctrlKey: true })
+    const units = wrapper.findAll('[data-testid="family-unit"]')
+    expect(units[1].attributes('style')).toContain('translate(624px, 360px)')
+    expect(units[2].attributes('style')).toContain('translate(480px, 360px)')
+    expect(units[3].attributes('style')).toContain('translate(624px, 720px)')
+    expect(units[4].attributes('style')).toContain('translate(480px, 720px)')
+    expect(units[5].attributes('style')).toContain('translate(624px, 1080px)')
+
+    await node.trigger('pointerup', { pointerId: 1, clientX: 1200, clientY: 100 })
+    await nextTick()
+
+    expect(wrapper.emitted('subtree-order-change')).toEqual([[
+      {
+        rowOrders: [
+          {
+            id: 'row:domain:root:test:1',
+            domainId: 'domain:root:test',
+            generation: 1,
+            unitIds: ['unit:sibling', 'unit:branch'],
+            columns: { 'unit:branch': 25 },
+          },
+          {
+            id: 'row:domain:root:test:2',
+            domainId: 'domain:root:test',
+            generation: 2,
+            unitIds: ['unit:cousin', 'unit:child'],
+            columns: { 'unit:child': 25 },
+          },
+          {
+            id: 'row:domain:root:test:3',
+            domainId: 'domain:root:test',
+            generation: 3,
+            unitIds: ['unit:grandchild'],
+            columns: { 'unit:grandchild': 25 },
+          },
+        ],
+        bridgeOrders: [],
+      },
     ]])
     expect(wrapper.emitted('domain-row-order-change')).toBeUndefined()
 

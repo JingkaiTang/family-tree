@@ -272,6 +272,7 @@ function seedFixture() {
         @domain-row-order-change="family.setDomainRowOrderPreference"
         @bridge-order-change="family.setBridgeOrderPreference"
         @root-order-change="family.setRootOrderPreference"
+        @subtree-order-change="family.setLayoutRowPreferenceBatch"
       />
     </main>
 

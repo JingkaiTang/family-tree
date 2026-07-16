@@ -1,6 +1,7 @@
 import type {
   BridgeOrderPreference,
   FamilyData,
+  LayoutRowPreferenceBatch,
   PersistedLayoutPreferences,
   RootOrderPreference,
   RowOrderPreference,
@@ -76,6 +77,20 @@ export function withBridgeOrderPreference(
     unitIds: unique(preference.unitIds),
   }))
   return withPreferences(data, { bridgeOrders })
+}
+
+export function withLayoutRowPreferenceBatch(
+  data: FamilyData,
+  batch: LayoutRowPreferenceBatch,
+): FamilyData {
+  let next = data
+  for (const preference of [...batch.rowOrders].sort(compareRowOrders)) {
+    next = withDomainRowOrderPreference(next, preference)
+  }
+  for (const preference of [...batch.bridgeOrders].sort(compareRowOrders)) {
+    next = withBridgeOrderPreference(next, preference)
+  }
+  return next
 }
 
 export function withoutManualLayoutOrders(data: FamilyData): FamilyData {

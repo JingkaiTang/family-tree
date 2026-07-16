@@ -20,6 +20,7 @@ describe('layoutFamilyScene', () => {
       rows: [],
       rootDomains: [],
       bridgeDomains: [],
+      primaryParentageGroups: [],
       gateways: [],
       routes: [],
       bounds: { x: 0, y: 0, width: 0, height: 0 },
@@ -45,6 +46,19 @@ describe('layoutFamilyScene', () => {
     expect(scene.cards).toHaveLength(5)
     expect(scene.rows.map(row => row.generation)).toEqual([0, 1, 2])
     expect(scene.routes).toHaveLength(2)
+    expect(scene.primaryParentageGroups?.map(group => ({
+      sourceUnitId: group.sourceUnitId,
+      childPersonIds: group.childPersonIds,
+    }))).toEqual([
+      {
+        sourceUnitId: 'unit:partnership:current:father+mother',
+        childPersonIds: ['child'],
+      },
+      {
+        sourceUnitId: 'unit:partnership:current:grandfather+grandmother',
+        childPersonIds: ['father'],
+      },
+    ])
     expect(scene.rootDomains).toHaveLength(1)
     expect(unsafeDiagnostics(scene)).toEqual([])
     expectNoOverlap(scene)

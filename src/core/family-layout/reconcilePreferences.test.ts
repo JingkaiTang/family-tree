@@ -7,6 +7,7 @@ import {
 import {
   convertLegacyGridPreferences,
   reconcileLayoutPreferences,
+  withLayoutRowPreferenceBatch,
   withRowOrderPreference,
 } from './reconcilePreferences'
 
@@ -450,5 +451,54 @@ describe('withRowOrderPreference', () => {
     ])
     expect(next.manualPositions).toEqual({})
     expect(next.gridLayoutOverrides).toEqual({})
+  })
+})
+
+describe('withLayoutRowPreferenceBatch', () => {
+  it('atomically upserts root and bridge rows without mutating unrelated preferences', () => {
+    const data = createEmptyFamily()
+    data.layoutPreferences.rowOrders = [legacyRow('row:keep', ['unit:keep'])]
+    data.layoutPreferences.rootOrders = [{
+      componentId: 'component:test',
+      rootIds: ['root:test'],
+    }]
+    const before = structuredClone(data)
+
+    const next = withLayoutRowPreferenceBatch(data, {
+      rowOrders: [{
+        id: 'row:root:1',
+        domainId: 'domain:root:test',
+        generation: 1,
+        unitIds: ['unit:branch'],
+        columns: { 'unit:branch': 8 },
+      }],
+      bridgeOrders: [{
+        id: 'row:bridge:2',
+        domainId: 'domain:bridge:a+b',
+        generation: 2,
+        unitIds: ['unit:child'],
+        columns: { 'unit:child': 10 },
+      }],
+    })
+
+    expect(data).toEqual(before)
+    expect(next.layoutPreferences.rowOrders).toEqual([
+      legacyRow('row:keep', ['unit:keep']),
+      {
+        id: 'row:root:1',
+        domainId: 'domain:root:test',
+        generation: 1,
+        unitIds: ['unit:branch'],
+        columns: { 'unit:branch': 8 },
+      },
+    ])
+    expect(next.layoutPreferences.bridgeOrders).toEqual([{
+      id: 'row:bridge:2',
+      domainId: 'domain:bridge:a+b',
+      generation: 2,
+      unitIds: ['unit:child'],
+      columns: { 'unit:child': 10 },
+    }])
+    expect(next.layoutPreferences.rootOrders).toEqual(before.layoutPreferences.rootOrders)
   })
 })

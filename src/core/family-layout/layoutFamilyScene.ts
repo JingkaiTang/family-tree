@@ -97,7 +97,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
   if (!first.routingDiagnostics.some(value => (
     value.code === 'UNROUTABLE_PRIMARY_EDGE'
   ))) {
-    return hasUnsafeDiagnostic(first.scene)
+    const scene = hasUnsafeDiagnostic(first.scene)
       ? buildSafeFallbackScene(
           units,
           domainModel.domains,
@@ -106,6 +106,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
           retainedDiagnostics,
         )
       : first.scene
+    return withPrimaryParentageGroups(scene, built.parentageGroups)
   }
 
   const retryMetrics = withExpandedGenerationGap(
@@ -122,7 +123,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
     projected.auxiliaryRelations,
     discovery.previousRootIdByRootId,
   )
-  return hasUnsafeDiagnostic(retry.scene)
+  const scene = hasUnsafeDiagnostic(retry.scene)
     ? buildSafeFallbackScene(
         units,
         domainModel.domains,
@@ -131,6 +132,20 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
         retainedDiagnostics,
       )
     : retry.scene
+  return withPrimaryParentageGroups(scene, built.parentageGroups)
+}
+
+function withPrimaryParentageGroups(
+  scene: LayoutScene,
+  groups: ParentageGroup[],
+): LayoutScene {
+  return {
+    ...scene,
+    primaryParentageGroups: groups.map(group => ({
+      ...group,
+      childPersonIds: [...group.childPersonIds],
+    })),
+  }
 }
 
 interface LayoutAttempt {

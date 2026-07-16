@@ -30,7 +30,7 @@ export interface FamilyUnitDragPayload {
   memberIds: string[]
   dx: number
   dy: number
-  wholeRoot: boolean
+  groupDrag: boolean
 }
 
 const emit = defineEmits<{
@@ -140,7 +140,7 @@ function unitPayload(payload: MemberDragPayload): FamilyUnitDragPayload {
     memberIds: [...props.unit.memberIds],
     dx: payload.dx,
     dy: payload.dy,
-    wholeRoot: payload.wholeRoot,
+    groupDrag: payload.groupDrag,
   }
 }
 
@@ -166,7 +166,9 @@ function onMemberDrop(payload: MemberDragPayload) {
     :data-root-family="unit.isRootFamily ? 'true' : undefined"
     :data-root-signature="unit.rootSignature.join(',')"
     :data-domain-id="unit.domainId"
-    :title="unit.isRootFamily ? '拖动家庭；按住 Ctrl（macOS 可用 Command）拖动整个根家族' : undefined"
+    :title="unit.isRootFamily
+      ? '拖动家庭；按住 Ctrl（macOS 可用 Command）拖动整个根家族'
+      : '拖动家庭；按住 Ctrl（macOS 可用 Command）拖动该家庭及其后代'"
     class="absolute left-0 top-0 rounded-2xl border motion-reduce:!transition-none"
     :class="isDragging ? 'z-30 shadow-xl' : ''"
     :style="unitStyle"

@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type Point } from '@/core/family-layout/types'
-import type { BridgeOrderPreference, FamilyData, RowOrderPreference } from '@/core/schema'
+import type {
+  BridgeOrderPreference,
+  FamilyData,
+  LayoutRowPreferenceBatch,
+  RowOrderPreference,
+} from '@/core/schema'
 import {
   withBridgeOrderPreference,
   withDomainRowOrderPreference,
+  withLayoutRowPreferenceBatch,
   withRootOrderPreference,
 } from '@/core/family-layout/reconcilePreferences'
 import { layoutFamilyTree } from '@/core/treeLayout'
@@ -31,6 +37,7 @@ const emit = defineEmits<{
   (event: 'domain-row-order-change', preference: RowOrderPreference): void
   (event: 'bridge-order-change', preference: BridgeOrderPreference): void
   (event: 'root-order-change', componentId: string, rootIds: string[]): void
+  (event: 'subtree-order-change', batch: LayoutRowPreferenceBatch): void
 }>()
 
 const PADDING = 40
@@ -57,6 +64,7 @@ let suppressInitialSceneFocus = !!props.initialView
 type LayoutPreferenceExpectation =
   | { kind: 'root-row' | 'bridge-row'; id: string; unitIds: string[]; columns?: Record<string, number> }
   | { kind: 'root-domain'; componentId: string; rootIds: string[] }
+  | { kind: 'subtree'; batch: LayoutRowPreferenceBatch }
 
 let expectedPreferenceUpdate: LayoutPreferenceExpectation | null = null
 let pendingDropToken: number | null = null
@@ -227,6 +235,36 @@ const cardsByUnitId = computed(() => {
   return values
 })
 
+const unitById = computed(() => new Map(
+  scene.value.units.map(unit => [unit.id, unit]),
+))
+
+const domainById = computed(() => new Map(
+  [...scene.value.rootDomains, ...scene.value.bridgeDomains]
+    .map(domain => [domain.id, domain]),
+))
+
+const unitIdByPersonId = computed(() => new Map(
+  scene.value.cards.map(card => [card.id, card.unitId]),
+))
+
+const primaryChildUnitIdsBySourceId = computed(() => {
+  const values = new Map<string, string[]>()
+  for (const group of scene.value.primaryParentageGroups ?? []) {
+    const childUnitIds = group.childPersonIds.flatMap(personId => {
+      const childUnitId = unitIdByPersonId.value.get(personId)
+      return childUnitId === undefined || childUnitId === group.sourceUnitId
+        ? []
+        : [childUnitId]
+    })
+    values.set(
+      group.sourceUnitId,
+      [...new Set(childUnitIds)].sort((left, right) => left.localeCompare(right)),
+    )
+  }
+  return values
+})
+
 const hubsByUnitId = computed(() => {
   const values = new Map<string, LayoutScene['hubs']>()
   for (const hub of scene.value.hubs) {
@@ -318,7 +356,15 @@ interface RootDomainDragState {
   dy: number
 }
 
-type FamilyDragState = RowDragState | RootDomainDragState
+interface SubtreeDragState {
+  mode: 'subtree'
+  unitId: string
+  unitIds: string[]
+  dx: number
+  dy: number
+}
+
+type FamilyDragState = RowDragState | RootDomainDragState | SubtreeDragState
 
 function cancelPendingLayoutInteraction() {
   layoutRequestId += 1
@@ -351,8 +397,8 @@ function screenToStageScale(): number {
 
 function onUnitDrag(payload: FamilyUnitDragPayload) {
   const scale = screenToStageScale()
-  const unit = scene.value.units.find(value => value.id === payload.unitId)
-  const domain = allDomains().find(value => value.id === unit?.domainId)
+  const unit = unitById.value.get(payload.unitId)
+  const domain = unit === undefined ? undefined : domainById.value.get(unit.domainId)
   const sourceRow = scene.value.rows.find(row => row.unitIds.includes(payload.unitId))
   if (!unit || !domain || !sourceRow) return
   const dx = payload.dx / scale
@@ -368,7 +414,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     pendingDropToken = null
   }
 
-  if (payload.wholeRoot && unit.isRootFamily && domain.kind === 'root') {
+  if (payload.groupDrag && unit.isRootFamily && domain.kind === 'root') {
     const candidates = rootDomainsForComponent(domain.componentId)
     const sourceIndex = candidates.findIndex(value => value.id === domain.id)
     const targetIndex = rootInsertionIndex(
@@ -388,6 +434,38 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     }
     dragInvalid.value = false
     dragCanDrop.value = sourceIndex >= 0 && targetIndex !== sourceIndex
+    return
+  }
+
+  if (payload.groupDrag) {
+    const unitIds = dragState.value?.mode === 'subtree'
+      && dragState.value.unitId === unit.id
+      ? dragState.value.unitIds
+      : primarySubtreeUnitIds(unit.id)
+    const subtreeUnits = unitIds
+      .map(unitId => unitById.value.get(unitId))
+      .filter((value): value is LayoutScene['units'][number] => value !== undefined)
+    const minimumDx = Math.max(...subtreeUnits.map(value => {
+      const valueDomain = domainById.value.get(value.domainId)
+      return valueDomain === undefined
+        ? Number.NEGATIVE_INFINITY
+        : valueDomain.rect.x + DEFAULT_LAYOUT_METRICS.gridSize - value.rect.x
+    }))
+    const effectiveDx = Math.max(dx, minimumDx)
+    dragState.value = {
+      mode: 'subtree',
+      unitId: unit.id,
+      unitIds,
+      dx: effectiveDx,
+      dy,
+    }
+    dragInvalid.value = false
+    dragCanDrop.value = subtreeUnits.some(value => {
+      const valueDomain = domainById.value.get(value.domainId)
+      return valueDomain !== undefined
+        && unitColumn(value.rect.x + effectiveDx, valueDomain.rect.x)
+          !== unitColumn(value.rect.x, valueDomain.rect.x)
+    })
     return
   }
 
@@ -455,6 +533,22 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
       rootIds: [...rootIds],
     }
     emit('root-order-change', state.componentId, [...rootIds])
+  } else if (state.mode === 'subtree') {
+    const batch = previewSubtreeBatch.value
+    if (batch === null) {
+      clearDrag(payload.unitId)
+      return
+    }
+    nextData = withLayoutRowPreferenceBatch(props.data, batch)
+    const subtreeMemberIds = scene.value.units
+      .filter(unit => state.unitIds.includes(unit.id))
+      .flatMap(unit => unit.memberIds)
+    changedIds = affectedMemberIds(subtreeMemberIds)
+    expectation = {
+      kind: 'subtree',
+      batch: structuredClone(batch),
+    }
+    emit('subtree-order-change', structuredClone(batch))
   } else {
     const rowOrder = previewUnitIds.value
     if (rowOrder === null) {
@@ -508,12 +602,28 @@ function hasExpectedLayoutPreference(
     ))
     return equalOrder(rootOrder?.rootIds, expected.rootIds)
   }
+  if (expected.kind === 'subtree') {
+    return expected.batch.rowOrders.every(preference => (
+      hasRowPreference(data.layoutPreferences.rowOrders, preference)
+    )) && expected.batch.bridgeOrders.every(preference => (
+      hasRowPreference(data.layoutPreferences.bridgeOrders, preference)
+    ))
+  }
   const rows = expected.kind === 'root-row'
     ? data.layoutPreferences.rowOrders
     : data.layoutPreferences.bridgeOrders
   const row = rows.find(value => value.id === expected.id)
   return equalOrder(row?.unitIds, expected.unitIds)
     && equalColumns(row?.columns, expected.columns)
+}
+
+function hasRowPreference(
+  preferences: RowOrderPreference[],
+  expected: RowOrderPreference,
+): boolean {
+  const current = preferences.find(value => value.id === expected.id)
+  return equalOrder(current?.unitIds, expected.unitIds)
+    && equalColumns(current?.columns, expected.columns)
 }
 
 function onUnitCancel(payload: FamilyUnitDragPayload) {
@@ -541,6 +651,20 @@ function clearDrag(unitId: string) {
 
 function allDomains() {
   return [...scene.value.rootDomains, ...scene.value.bridgeDomains]
+}
+
+function primarySubtreeUnitIds(sourceUnitId: string): string[] {
+  const visited = new Set<string>()
+  const queue = [sourceUnitId]
+  for (let index = 0; index < queue.length; index += 1) {
+    const unitId = queue[index]
+    if (visited.has(unitId)) continue
+    visited.add(unitId)
+    queue.push(...(primaryChildUnitIdsBySourceId.value.get(unitId) ?? []))
+  }
+  return scene.value.units
+    .filter(unit => visited.has(unit.id))
+    .map(unit => unit.id)
 }
 
 function closestDomain(centerX: number) {
@@ -639,7 +763,12 @@ function arrayMove<T>(values: T[], from: number, to: number): T[] {
 
 const previewUnitIds = computed(() => {
   const state = dragState.value
-  if (!state || state.mode === 'root-domain' || !dragCanDrop.value) return null
+  if (
+    !state
+    || state.mode === 'root-domain'
+    || state.mode === 'subtree'
+    || !dragCanDrop.value
+  ) return null
   const row = scene.value.rows.find(value => value.id === state.rowId)
   if (!row) return null
   return arrayMove(row.unitIds, state.sourceIndex, state.targetIndex)
@@ -653,10 +782,66 @@ const previewRootIds = computed(() => {
   return arrayMove(rootIds, state.sourceIndex, state.targetIndex)
 })
 
+const previewSubtreeBatch = computed<LayoutRowPreferenceBatch | null>(() => {
+  const state = dragState.value
+  if (!state || state.mode !== 'subtree' || !dragCanDrop.value) return null
+  const movedUnitIds = new Set(state.unitIds)
+  const batch: LayoutRowPreferenceBatch = { rowOrders: [], bridgeOrders: [] }
+
+  for (const row of scene.value.rows) {
+    const movedRowUnitIds = row.unitIds.filter(unitId => movedUnitIds.has(unitId))
+    if (movedRowUnitIds.length === 0) continue
+    const rowUnits = row.unitIds
+      .map(unitId => unitById.value.get(unitId))
+      .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
+    const domain = rowUnits[0] === undefined
+      ? undefined
+      : domainById.value.get(rowUnits[0].domainId)
+    if (!domain) continue
+    const preferences = domain.kind === 'root'
+      ? props.data.layoutPreferences.rowOrders
+      : props.data.layoutPreferences.bridgeOrders
+    const current = preferences.find(value => value.id === row.id)
+    const columns = { ...(current?.columns ?? {}) }
+    for (const unitId of movedRowUnitIds) {
+      const unit = unitById.value.get(unitId)
+      if (unit === undefined) continue
+      columns[unitId] = Math.max(
+        0,
+        unitColumn(unit.rect.x + state.dx, domain.rect.x),
+      )
+    }
+    const originalIndex = new Map(row.unitIds.map((unitId, index) => [unitId, index]))
+    const unitIds = [...row.unitIds].sort((leftId, rightId) => {
+      const left = unitById.value.get(leftId)
+      const right = unitById.value.get(rightId)
+      const leftX = (left?.rect.x ?? 0) + (movedUnitIds.has(leftId) ? state.dx : 0)
+      const rightX = (right?.rect.x ?? 0) + (movedUnitIds.has(rightId) ? state.dx : 0)
+      return leftX - rightX
+        || (originalIndex.get(leftId) ?? 0) - (originalIndex.get(rightId) ?? 0)
+        || leftId.localeCompare(rightId)
+    })
+    const preference: RowOrderPreference = {
+      id: row.id,
+      domainId: domain.id,
+      generation: row.generation,
+      unitIds,
+      columns,
+    }
+    if (domain.kind === 'root') batch.rowOrders.push(preference)
+    else batch.bridgeOrders.push(preference)
+  }
+
+  batch.rowOrders.sort((left, right) => left.id.localeCompare(right.id))
+  batch.bridgeOrders.sort((left, right) => left.id.localeCompare(right.id))
+  return batch
+})
+
 const previewOffsetByUnitId = computed<Record<string, Point>>(() => {
   const state = dragState.value
   if (!state) return {}
   if (state.mode === 'root-domain') return rootDomainPreviewOffsets(state)
+  if (state.mode === 'subtree') return {}
   const order = previewUnitIds.value
   if (!order) return {}
   const row = scene.value.rows.find(value => value.id === state.rowId)
@@ -742,6 +927,11 @@ function dragOffsetForUnit(unit: LayoutScene['units'][number]): Point | undefine
       ? { x: state.dx, y: Math.max(-24, Math.min(24, state.dy)) }
       : undefined
   }
+  if (state.mode === 'subtree') {
+    return state.unitIds.includes(unit.id)
+      ? { x: state.dx, y: Math.max(-24, Math.min(24, state.dy)) }
+      : undefined
+  }
   return state.unitId === unit.id ? { x: state.dx, y: state.dy } : undefined
 }
 
@@ -749,6 +939,8 @@ function isUnitDragging(unit: LayoutScene['units'][number]): boolean {
   const state = dragState.value
   return state?.mode === 'root-domain'
     ? unit.domainId === state.domainId
+    : state?.mode === 'subtree'
+      ? state.unitIds.includes(unit.id)
     : state?.unitId === unit.id
 }
 
@@ -775,14 +967,21 @@ const draggedUnit = computed(() => {
 })
 
 const fadedRouteIds = computed(() => {
-  const unit = draggedUnit.value
-  if (!unit) return []
+  const state = dragState.value
+  if (!state) return []
+  const unitIds = new Set(
+    state.mode === 'root-domain'
+      ? scene.value.units.filter(unit => unit.domainId === state.domainId).map(unit => unit.id)
+      : state.mode === 'subtree'
+        ? state.unitIds
+        : [state.unitId],
+  )
   const contacts = [
     ...scene.value.hubs
-      .filter(hub => hub.unitId === unit.id)
+      .filter(hub => unitIds.has(hub.unitId))
       .map(hub => hub.point),
     ...scene.value.cards
-      .filter(card => card.unitId === unit.id)
+      .filter(card => unitIds.has(card.unitId))
       .map(card => ({
         x: card.rect.x + card.rect.width / 2,
         y: card.rect.y,

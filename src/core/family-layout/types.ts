@@ -287,6 +287,8 @@ export interface RouteFamilyLanesResult {
   diagnostics: LayoutDiagnostic[]
 }
 export interface LayoutScene extends SceneGeometry {
+  /** 当前视图实际采用的主亲子关系，供交互按布局语义识别后代子树。 */
+  primaryParentageGroups?: ParentageGroup[]
   gateways: RouteGateway[]
   routes: RoutedFamilyEdge[]
   diagnostics: LayoutDiagnostic[]

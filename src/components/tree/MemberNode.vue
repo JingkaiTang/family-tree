@@ -31,7 +31,7 @@ export interface MemberDragPayload {
   id: string
   dx: number
   dy: number
-  wholeRoot: boolean
+  groupDrag: boolean
 }
 
 const family = useFamilyStore()
@@ -106,7 +106,7 @@ let dragStartY = 0
 let dragging = false
 let dragCaptured = false
 let activePointerId: number | null = null
-let wholeRootDrag = false
+let groupDrag = false
 
 function onPointerDown(e: PointerEvent) {
   // 只响应主键（鼠标左键 / 触摸 / 笔）
@@ -117,7 +117,7 @@ function onPointerDown(e: PointerEvent) {
   dragging = false
   dragCaptured = false
   activePointerId = e.pointerId
-  wholeRootDrag = e.ctrlKey || e.metaKey
+  groupDrag = e.ctrlKey || e.metaKey
   const el = e.currentTarget as HTMLElement
   try {
     el.setPointerCapture(e.pointerId)
@@ -133,7 +133,7 @@ function onPointerMove(e: PointerEvent) {
   const dy = e.clientY - dragStartY
   if (!dragging && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
   dragging = true
-  emit('drag', { id: props.member.id, dx, dy, wholeRoot: wholeRootDrag })
+  emit('drag', { id: props.member.id, dx, dy, groupDrag })
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -141,7 +141,7 @@ function onPointerUp(e: PointerEvent) {
   const dx = e.clientX - dragStartX
   const dy = e.clientY - dragStartY
   const wasDragging = dragging
-  const wholeRoot = wholeRootDrag
+  const shouldGroupDrag = groupDrag
   if (dragCaptured) {
     try {
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
@@ -152,9 +152,9 @@ function onPointerUp(e: PointerEvent) {
   activePointerId = null
   dragging = false
   dragCaptured = false
-  wholeRootDrag = false
+  groupDrag = false
   if (wasDragging) {
-    emit('drop', { id: props.member.id, dx, dy, wholeRoot })
+    emit('drop', { id: props.member.id, dx, dy, groupDrag: shouldGroupDrag })
   }
 }
 
@@ -168,9 +168,9 @@ function onPointerCancel(e: PointerEvent) {
     id: props.member.id,
     dx: 0,
     dy: 0,
-    wholeRoot: wholeRootDrag,
+    groupDrag,
   })
-  wholeRootDrag = false
+  groupDrag = false
 }
 </script>
 

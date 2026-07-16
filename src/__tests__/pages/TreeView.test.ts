@@ -20,7 +20,12 @@ vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
 const FamilyCanvasStub = defineComponent({
   name: 'FamilyCanvas',
   props: ['selectedId', 'viewpointId', 'showAuxiliaryRelations', 'layoutResetVersion'],
-  emits: ['domain-row-order-change', 'bridge-order-change', 'root-order-change'],
+  emits: [
+    'domain-row-order-change',
+    'bridge-order-change',
+    'root-order-change',
+    'subtree-order-change',
+  ],
   setup(_, { emit }) {
     return () => h('div', [
       h('button', {
@@ -47,6 +52,25 @@ const FamilyCanvasStub = defineComponent({
           'root:b',
           'root:a',
         ]),
+      }),
+      h('button', {
+        'data-testid': 'reorder-subtree',
+        onClick: () => emit('subtree-order-change', {
+          rowOrders: [{
+            id: 'row:domain:root:test:2',
+            domainId: 'domain:root:test',
+            generation: 2,
+            unitIds: ['unit:child'],
+            columns: { 'unit:child': 8 },
+          }],
+          bridgeOrders: [{
+            id: 'row:domain:bridge:a+b:3',
+            domainId: 'domain:bridge:a+b',
+            generation: 3,
+            unitIds: ['unit:grandchild'],
+            columns: { 'unit:grandchild': 10 },
+          }],
+        }),
       }),
     ])
   },
@@ -112,6 +136,38 @@ describe('TreeView row order integration', () => {
     expect(family.data.layoutPreferences.rootOrders).toEqual([{
       componentId: 'component:main',
       rootIds: ['root:b', 'root:a'],
+    }])
+  })
+
+  it('persists all subtree row preferences as one store update', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          FamilyCanvas: FamilyCanvasStub,
+          SearchBar: true,
+        },
+      },
+    })
+
+    await wrapper.get('[data-testid="reorder-subtree"]').trigger('click')
+
+    expect(family.data.layoutPreferences.rowOrders).toEqual([{
+      id: 'row:domain:root:test:2',
+      domainId: 'domain:root:test',
+      generation: 2,
+      unitIds: ['unit:child'],
+      columns: { 'unit:child': 8 },
+    }])
+    expect(family.data.layoutPreferences.bridgeOrders).toEqual([{
+      id: 'row:domain:bridge:a+b:3',
+      domainId: 'domain:bridge:a+b',
+      generation: 3,
+      unitIds: ['unit:grandchild'],
+      columns: { 'unit:grandchild': 10 },
     }])
   })
 

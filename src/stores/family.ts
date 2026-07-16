@@ -4,6 +4,7 @@ import {
   reconcileLayoutPreferences,
   withBridgeOrderPreference,
   withDomainRowOrderPreference,
+  withLayoutRowPreferenceBatch,
   withRowOrderPreference,
   withRootOrderPreference,
   withoutManualLayoutOrders,
@@ -13,6 +14,7 @@ import type {
   ChildLayoutAssignment,
   FamilyData,
   GridLayoutOverride,
+  LayoutRowPreferenceBatch,
   Member,
   ProjectMeta,
   RowOrderPreference,
@@ -318,6 +320,10 @@ export const useFamilyStore = defineStore('family', () => {
     applyLayoutPreferenceUpdate(withBridgeOrderPreference(data.value, preference))
   }
 
+  function setLayoutRowPreferenceBatch(batch: LayoutRowPreferenceBatch) {
+    applyLayoutPreferenceUpdate(withLayoutRowPreferenceBatch(data.value, batch))
+  }
+
   function clearAllLayoutOrderPreferences() {
     applyLayoutPreferenceUpdate(withoutManualLayoutOrders(data.value))
   }
@@ -400,6 +406,7 @@ export const useFamilyStore = defineStore('family', () => {
     setRootOrderPreference,
     setDomainRowOrderPreference,
     setBridgeOrderPreference,
+    setLayoutRowPreferenceBatch,
     clearAllLayoutOrderPreferences,
     setFamilyAccentAssignment,
     setManualPosition,

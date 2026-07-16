@@ -96,6 +96,10 @@ export const RootOrderPreference = z.object({
 export type RootOrderPreference = z.infer<typeof RootOrderPreference>
 export const BridgeOrderPreference = RowOrderPreference
 export type BridgeOrderPreference = z.infer<typeof BridgeOrderPreference>
+export interface LayoutRowPreferenceBatch {
+  rowOrders: RowOrderPreference[]
+  bridgeOrders: BridgeOrderPreference[]
+}
 export const PersistedLayoutPreferences = z.object({
   rootOrders: z.array(RootOrderPreference).default([]),
   rowOrders: z.array(RowOrderPreference).default([]),
