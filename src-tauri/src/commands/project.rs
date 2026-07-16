@@ -33,7 +33,7 @@ const MEDIA_DIR: &str = "media";
 const PHOTOS_SUBDIR: &str = "photos";
 const THUMBS_SUBDIR: &str = "thumbs";
 const TRASH_SUBDIR: &str = ".trash";
-const CURRENT_SCHEMA_VERSION: u32 = 1;
+const CURRENT_SCHEMA_VERSION: u32 = 4;
 const MAX_BAK_COUNT: usize = 3;
 const MAX_FAMILY_JSON_BYTES: u64 = 50 * 1024 * 1024;
 
@@ -271,14 +271,23 @@ pub fn save_project(path: String, family_json: String) -> CmdResult<()> {
         return Err(CmdError::Other("family.json 超过 50 MiB 限制".into()));
     }
 
-    // 先校验 JSON 合法（不做 schema 校验，schema 校验在前端 Zod 做）
-    let _parsed: serde_json::Value = serde_json::from_str(&family_json)?;
+    // Rust 层只校验 JSON 和格式版本；完整 schema 与关系图约束由前端校验。
+    let parsed: serde_json::Value = serde_json::from_str(&family_json)?;
+    if parsed.get("schemaVersion").and_then(|value| value.as_u64())
+        != Some(u64::from(CURRENT_SCHEMA_VERSION))
+    {
+        return Err(CmdError::Other(format!(
+            "family.json 的 schemaVersion 必须为 {}",
+            CURRENT_SCHEMA_VERSION
+        )));
+    }
 
     rotate_backups(&root)?;
     atomic_write(&root.join(FAMILY_FILE), family_json.as_bytes())?;
 
     // 更新 meta.updatedAt
     if let Ok(mut meta) = read_meta(&root) {
+        meta.schema_version = CURRENT_SCHEMA_VERSION;
         meta.updated_at = now_iso();
         let _ = write_meta(&root, &meta);
     }
@@ -329,7 +338,7 @@ mod tests {
 
         // save then load again
         let new_family = serde_json::json!({
-            "schemaVersion": 1,
+            "schemaVersion": CURRENT_SCHEMA_VERSION,
             "members": {
                 "m1": {
                     "id": "m1",
@@ -347,6 +356,7 @@ mod tests {
             loaded2.family["members"]["m1"]["firstName"],
             serde_json::Value::String("三".into())
         );
+        assert_eq!(loaded2.meta.schema_version, CURRENT_SCHEMA_VERSION);
 
         // save again triggers a .bak.1
         save_project(root_s.clone(), new_family.to_string()).expect("save2");
@@ -364,6 +374,17 @@ mod tests {
         create_project(root_s.clone(), "x".into()).unwrap();
         let err = save_project(root_s.clone(), "not-json".into()).unwrap_err();
         assert!(matches!(err, CmdError::Json(_)));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn save_rejects_non_current_schema() {
+        let root = tmp_dir("old-schema");
+        fs::create_dir_all(&root).unwrap();
+        let root_s = root.to_string_lossy().to_string();
+        create_project(root_s.clone(), "x".into()).unwrap();
+        let err = save_project(root_s, r#"{"schemaVersion":1}"#.into()).unwrap_err();
+        assert!(matches!(err, CmdError::Other(_)));
         let _ = fs::remove_dir_all(&root);
     }
 

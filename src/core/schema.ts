@@ -14,6 +14,7 @@ export const SpouseType = z.enum(['married', 'divorced'])
 /** 干亲关系 — 社会关系，不参与血缘/姻亲的称呼推算链。 */
 export const GodparentType = z.enum(['godparent'])
 export const GodchildType = z.enum(['godchild'])
+export const PhotoId = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/)
 
 // ---------------- Relations ----------------
 const ParentRef = z.object({ id: z.string(), type: ParentType })
@@ -31,7 +32,7 @@ export const Member = z.object({
   nickname: z.string().optional(),
   gender: Gender,
   /** photoId 形如 "7f3a..."，实际文件在 media/photos/{photoId}.webp */
-  photoId: z.string().optional(),
+  photoId: PhotoId.optional(),
   birthDate: z.string().optional(), // ISO yyyy-mm-dd
   deathDate: z.string().optional(),
   birthPlace: z.string().optional(),

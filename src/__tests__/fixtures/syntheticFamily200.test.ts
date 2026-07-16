@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { FamilyData } from '@/core/schema'
+import { validateFamilyIntegrity } from '@/core/familyIntegrity'
 import {
   SYNTHETIC_GENERATION_COUNTS,
   syntheticAvatarManifest,
@@ -14,6 +15,7 @@ describe('syntheticFamily200', () => {
     const parsed = FamilyData.safeParse(family)
 
     expect(parsed.success).toBe(true)
+    expect(validateFamilyIntegrity(family)).toEqual([])
     expect(syntheticFamily200()).toEqual(family)
     expect(syntheticFamily200(1)).not.toEqual(family)
     expect(syntheticFamilyStats(family)).toEqual({

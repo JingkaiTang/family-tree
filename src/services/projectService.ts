@@ -1,5 +1,12 @@
-import { FamilyData, ProjectMeta, createEmptyFamily, createEmptyMeta } from '@/core/schema'
+import {
+  FamilyData,
+  ProjectMeta,
+  SCHEMA_VERSION,
+  createEmptyFamily,
+  createEmptyMeta,
+} from '@/core/schema'
 import { migrate } from '@/core/migrate'
+import { assertFamilyIntegrity } from '@/core/familyIntegrity'
 import * as api from './tauriApi'
 
 export interface OpenResult {
@@ -33,12 +40,25 @@ export async function openProject(dirPath: string): Promise<OpenResult> {
       '家族数据校验失败：' + parsed.error.issues.map((i) => i.message).join('; '),
     )
   }
-  const meta = ProjectMeta.safeParse(loaded.meta).success
-    ? loaded.meta
+  assertFamilyIntegrity(parsed.data)
+
+  const parsedMeta = ProjectMeta.safeParse(loaded.meta)
+  if (parsedMeta.success && parsedMeta.data.schemaVersion > SCHEMA_VERSION) {
+    throw new Error('项目元数据版本过新，当前版本不支持')
+  }
+  const meta = parsedMeta.success
+    ? { ...parsedMeta.data, schemaVersion: parsed.data.schemaVersion }
     : createEmptyMeta(dirPath.split('/').pop() ?? '未命名家族')
   return { path: loaded.path, meta, family: parsed.data }
 }
 
 export async function saveProject(dirPath: string, family: FamilyData): Promise<void> {
-  await api.saveProject(dirPath, family)
+  const parsed = FamilyData.safeParse(family)
+  if (!parsed.success) {
+    throw new Error(
+      '家族数据校验失败：' + parsed.error.issues.map(issue => issue.message).join('; '),
+    )
+  }
+  assertFamilyIntegrity(parsed.data)
+  await api.saveProject(dirPath, parsed.data)
 }
