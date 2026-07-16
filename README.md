@@ -1,6 +1,12 @@
 # 家族树 (Family Tree)
 
+[![CI](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml)
+
 一款轻量级中文家族关系管理桌面应用，基于 Tauri 2 构建。可视化管理家族成员，自动计算亲戚间的中文称谓。
+
+> **项目状态：Alpha。** 当前已建立数据校验、备份和 CI 基线，但还没有稳定版本、自动更新或签名发布链。请定期备份真实项目；本地 `.family` 文件不加密。
+
+[架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [发布前置](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
 
 ## 功能特性
 
@@ -17,7 +23,7 @@
   - 长幼区分：哥哥/弟弟、伯父/叔叔、嫂子/弟媳……
 - **成员信息管理** — 姓名、性别、出生日期、照片、籍贯、职业等
 - **自定义称呼** — 支持为特定关系手动覆盖自动计算的称谓（如"二叔"）
-- **本地数据** — 所有数据存储在本地文件，无需联网，隐私安全
+- **本地数据** — 所有数据保存在用户选择的本地目录，应用不主动上传
 
 ## 技术栈
 
@@ -67,20 +73,21 @@ BFS 寻路 → 路径规范化 → 模式匹配翻译
 - 每组父母与子女拥有独立 route owner、颜色和 lane。同一个家庭的 stem、child bus 与下行支线可以合并；不同家庭允许点交叉，但禁止共享正长度线段、形成错误 T 形连接或穿过无关卡片，交叉点由 line bridge 显示层次。
 - 普通家庭、桥接家庭和根家庭三种拖拽分别只写入域内行顺序、桥接顺序和根顺序偏好，不修改亲属事实。“恢复默认布局”会一次清空三类偏好，丢弃增量场景并恢复默认视图。
 - 历史配偶、次要父母、继亲和干亲只在主场景完成后为当前焦点成员绘制虚线，不参与根发现、根签名、代际、主几何或主路线占用。
-- 默认布局是确定性的同步纯函数流水线，目标规模为 500 人；增量更新会尽量继承旧根颜色、根顺序和未变化连通分量的位置。
+- 默认布局核心是确定性的同步纯函数流水线，桌面前端通过原生 Web Worker 异步调用；目标规模为 500 人，增量更新会尽量继承旧根颜色、根顺序和未变化连通分量的位置。
 
 ## 开发
 
 ### 环境要求
 
-- **Node.js** >= 18
-- **Rust** (通过 [rustup](https://rustup.rs/) 安装，需 MSVC 工具链)
+- **Node.js** >= 20
+- **Rust stable**（通过 [rustup](https://rustup.rs/) 安装）
+- 当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
 - **Windows**: Visual Studio Build Tools 2022（MSVC C++ 工作负载）
 
 ### 安装依赖
 
 ```bash
-npm install
+npm ci
 ```
 
 ### 启动 Web 开发服务器
@@ -90,6 +97,8 @@ npm run dev
 ```
 
 浏览器访问 http://localhost:5173
+
+该模式用于前端界面调试；创建、打开项目和本地照片等文件能力需要在 Tauri 桌面进程中运行。
 
 ### 启动 Tauri 桌面应用
 
@@ -117,11 +126,19 @@ npm run tauri:build
 
 产物在 `src-tauri/target/release/bundle/` 下。
 
+macOS 的 CI、沙箱或其他无 GUI 环境无法运行 Finder 美化脚本时，使用 `CI=true npm run tauri:build`；仍会生成可安装的 `.dmg`，但不包含自定义 Finder 排版。
+
 ### 运行测试
 
 ```bash
 npm test
+npm run build
 npm run test:layout-perf
+
+cd src-tauri
+cargo fmt --all -- --check
+cargo test --locked
+cargo clippy --all-targets --all-features --locked -- -D warnings
 ```
 
 `test:layout-perf` 使用确定性的 500 人连通家谱，并在受控机器上执行 1000ms CI 预算门禁；普通 `npm test` 只验证正确性，避免共享机器负载造成偶发失败。
@@ -138,11 +155,14 @@ npm run typecheck
 src/
 ├── core/                    # 核心业务逻辑
 │   ├── schema.ts            # 数据模型（Zod 定义）
+│   ├── familyIntegrity.ts   # 跨成员引用与关系图完整性
 │   ├── kinship/             # 称谓计算系统
 │   │   ├── index.ts         # 统一入口：override → 干亲 → BFS → 翻译
 │   │   ├── pathFinder.ts    # BFS 寻路 + 路径规范化
 │   │   └── chineseTerms.ts  # 路径 → 中文称谓翻译
-│   ├── treeLayout.ts        # 默认布局异步门面
+│   ├── treeLayout.ts        # 默认布局异步门面与 Worker 回退
+│   ├── treeLayout.worker.ts # 浏览器布局 Worker
+│   ├── treeLayoutCore.ts    # 可复用的同步纯布局入口
 │   ├── family-layout/       # 根发现/签名、根域网格、bridge、lane 路由与场景校验
 │   ├── relativesAdapter.ts  # relatives-tree 兼容适配与历史行为测试
 │   └── migrate.ts           # Schema 版本迁移
@@ -163,6 +183,8 @@ src-tauri/                   # Rust 后端
 └── Cargo.toml
 ```
 
-## License
+## 参与和许可
 
-MIT
+欢迎通过 Issue 和 Pull Request 参与。参与前请阅读 [贡献指南](CONTRIBUTING.md) 和 [行为准则](CODE_OF_CONDUCT.md)；请勿提交真实家庭数据，漏洞请按 [安全政策](SECURITY.md) 私下报告。
+
+本项目采用 [MIT License](LICENSE)。

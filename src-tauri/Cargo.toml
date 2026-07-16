@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "A desktop family tree application"
 authors = ["t7kai"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/JingkaiTang/family-tree"
 
 [lib]
 name = "family_tree_lib"
