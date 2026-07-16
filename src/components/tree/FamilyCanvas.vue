@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type Point } from '@/core/family-layout/types'
+import { DEFAULT_LAYOUT_METRICS, type LayoutScene } from '@/core/family-layout/types'
 import type {
   BridgeOrderPreference,
   FamilyData,
@@ -14,9 +14,32 @@ import {
   withRootOrderPreference,
 } from '@/core/family-layout/reconcilePreferences'
 import { layoutFamilyTree } from '@/core/treeLayout'
+import {
+  affectedMemberIds,
+  buildFamilyCanvasSceneModel,
+  closestDomain,
+  closestRowInDomain,
+  columnsAfterDrop,
+  dragOffsetForUnit as resolveDragOffsetForUnit,
+  fadedRouteIds as resolveFadedRouteIds,
+  hasExpectedLayoutPreference,
+  insertionIndex,
+  isUnitDragging as resolveIsUnitDragging,
+  previewOffsetByUnitId as resolvePreviewOffsetByUnitId,
+  previewRootIds as resolvePreviewRootIds,
+  previewSubtreeBatch as resolvePreviewSubtreeBatch,
+  previewUnitIds as resolvePreviewUnitIds,
+  primarySubtreeUnitIds,
+  rootDomainsForComponent,
+  rootInsertionIndex,
+  unitColumn,
+  type FamilyDragState,
+  type LayoutPreferenceExpectation,
+} from './familyCanvasModel'
 import PanZoomWrapper, { type PanzoomView } from './PanZoomWrapper.vue'
 import FamilyUnit, { type FamilyUnitDragPayload } from './FamilyUnit.vue'
 import GridBackground from './GridBackground.vue'
+import LayoutDiagnostics from './LayoutDiagnostics.vue'
 import RelationLayer from './RelationLayer.vue'
 
 const props = defineProps<{
@@ -61,11 +84,6 @@ const scene = ref<LayoutScene>(EMPTY_SCENE)
 const members = computed(() => Object.values(props.data.members))
 let layoutRequestId = 0
 let suppressInitialSceneFocus = !!props.initialView
-type LayoutPreferenceExpectation =
-  | { kind: 'root-row' | 'bridge-row'; id: string; unitIds: string[]; columns?: Record<string, number> }
-  | { kind: 'root-domain'; componentId: string; rootIds: string[] }
-  | { kind: 'subtree'; batch: LayoutRowPreferenceBatch }
-
 let expectedPreferenceUpdate: LayoutPreferenceExpectation | null = null
 let pendingDropToken: number | null = null
 let pendingSceneRecovery: { data: FamilyData; changedIds: string[] } | null = null
@@ -87,16 +105,6 @@ const visibleDiagnostics = computed(() => (
     ? scene.value.diagnostics
     : []
 ))
-const diagnosticTitle = computed(() => (
-  visibleDiagnostics.value.every(value => (
-    value.code === 'UNROUTABLE_PRIMARY_EDGE'
-    || value.code === 'CROSS_FAMILY_SEGMENT_OVERLAP'
-    || value.code === 'NODE_OVERLAP'
-  ))
-    ? '连线路由已降级'
-    : '家谱数据需要检查'
-))
-
 async function updateLayout(options: {
   data?: FamilyData
   previousScene?: LayoutScene
@@ -215,75 +223,7 @@ watch(
   requestAuxiliaryRefresh,
 )
 
-const sceneOffset = computed(() => ({
-  x: PADDING - scene.value.bounds.x,
-  y: PADDING - scene.value.bounds.y,
-}))
-
-const canvasSize = computed(() => ({
-  width: Math.max(scene.value.bounds.width + PADDING * 2, 600),
-  height: Math.max(scene.value.bounds.height + PADDING * 2, 400),
-}))
-
-const cardsByUnitId = computed(() => {
-  const values = new Map<string, LayoutScene['cards']>()
-  for (const card of scene.value.cards) {
-    const cards = values.get(card.unitId) ?? []
-    cards.push(card)
-    values.set(card.unitId, cards)
-  }
-  return values
-})
-
-const unitById = computed(() => new Map(
-  scene.value.units.map(unit => [unit.id, unit]),
-))
-
-const domainById = computed(() => new Map(
-  [...scene.value.rootDomains, ...scene.value.bridgeDomains]
-    .map(domain => [domain.id, domain]),
-))
-
-const unitIdByPersonId = computed(() => new Map(
-  scene.value.cards.map(card => [card.id, card.unitId]),
-))
-
-const primaryChildUnitIdsBySourceId = computed(() => {
-  const values = new Map<string, string[]>()
-  for (const group of scene.value.primaryParentageGroups ?? []) {
-    const childUnitIds = group.childPersonIds.flatMap(personId => {
-      const childUnitId = unitIdByPersonId.value.get(personId)
-      return childUnitId === undefined || childUnitId === group.sourceUnitId
-        ? []
-        : [childUnitId]
-    })
-    values.set(
-      group.sourceUnitId,
-      [...new Set(childUnitIds)].sort((left, right) => left.localeCompare(right)),
-    )
-  }
-  return values
-})
-
-const hubsByUnitId = computed(() => {
-  const values = new Map<string, LayoutScene['hubs']>()
-  for (const hub of scene.value.hubs) {
-    const hubs = values.get(hub.unitId) ?? []
-    hubs.push(hub)
-    values.set(hub.unitId, hubs)
-  }
-  return values
-})
-
-const rootAccentById = computed(() => Object.fromEntries(
-  scene.value.rootDomains.flatMap(domain => (
-    domain.rootIds.map(rootId => [rootId, domain.accent])
-  )),
-))
-
-const rootOrder = computed(() => [...scene.value.rootDomains]
-  .sort((left, right) => left.rect.x - right.rect.x || left.id.localeCompare(right.id))
-  .flatMap(domain => domain.rootIds))
+const sceneModel = computed(() => buildFamilyCanvasSceneModel(scene.value, PADDING))
 
 const kinshipByMemberId = computed<Record<string, string>>(() => {
   const viewpointId = props.viewpointId
@@ -299,8 +239,8 @@ function focusMember(id: string): boolean {
   const card = scene.value.cards.find(value => value.id === id)
   if (!card || !panzoomRef.value) return false
   panzoomRef.value.focusStagePoint(
-    card.rect.x + card.rect.width / 2 + sceneOffset.value.x,
-    card.rect.y + card.rect.height / 2 + sceneOffset.value.y,
+    card.rect.x + card.rect.width / 2 + sceneModel.value.sceneOffset.x,
+    card.rect.y + card.rect.height / 2 + sceneModel.value.sceneOffset.y,
   )
   return true
 }
@@ -310,14 +250,14 @@ function focusSceneCenter() {
   const bounds = scene.value.bounds
   if (scene.value.cards.length === 0) {
     panzoomRef.value.focusStagePoint(
-      canvasSize.value.width / 2,
-      canvasSize.value.height / 2,
+      sceneModel.value.canvasSize.width / 2,
+      sceneModel.value.canvasSize.height / 2,
     )
     return
   }
   panzoomRef.value.focusStagePoint(
-    bounds.x + bounds.width / 2 + sceneOffset.value.x,
-    bounds.y + bounds.height / 2 + sceneOffset.value.y,
+    bounds.x + bounds.width / 2 + sceneModel.value.sceneOffset.x,
+    bounds.y + bounds.height / 2 + sceneModel.value.sceneOffset.y,
   )
 }
 
@@ -330,41 +270,6 @@ watch(
 )
 
 defineExpose({ focusMember })
-
-interface RowDragState {
-  mode: 'root-row' | 'bridge-row'
-  unitId: string
-  domainId: string
-  rowId: string
-  generation: number
-  sourceIndex: number
-  targetIndex: number
-  sourceColumn: number
-  targetColumn: number
-  dx: number
-  dy: number
-}
-
-interface RootDomainDragState {
-  mode: 'root-domain'
-  unitId: string
-  domainId: string
-  componentId: string
-  sourceIndex: number
-  targetIndex: number
-  dx: number
-  dy: number
-}
-
-interface SubtreeDragState {
-  mode: 'subtree'
-  unitId: string
-  unitIds: string[]
-  dx: number
-  dy: number
-}
-
-type FamilyDragState = RowDragState | RootDomainDragState | SubtreeDragState
 
 function cancelPendingLayoutInteraction() {
   layoutRequestId += 1
@@ -397,8 +302,8 @@ function screenToStageScale(): number {
 
 function onUnitDrag(payload: FamilyUnitDragPayload) {
   const scale = screenToStageScale()
-  const unit = unitById.value.get(payload.unitId)
-  const domain = unit === undefined ? undefined : domainById.value.get(unit.domainId)
+  const unit = sceneModel.value.unitById.get(payload.unitId)
+  const domain = unit === undefined ? undefined : sceneModel.value.domainById.get(unit.domainId)
   const sourceRow = scene.value.rows.find(row => row.unitIds.includes(payload.unitId))
   if (!unit || !domain || !sourceRow) return
   const dx = payload.dx / scale
@@ -415,7 +320,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
   }
 
   if (payload.groupDrag && unit.isRootFamily && domain.kind === 'root') {
-    const candidates = rootDomainsForComponent(domain.componentId)
+    const candidates = rootDomainsForComponent(scene.value, domain.componentId)
     const sourceIndex = candidates.findIndex(value => value.id === domain.id)
     const targetIndex = rootInsertionIndex(
       candidates,
@@ -441,12 +346,12 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     const unitIds = dragState.value?.mode === 'subtree'
       && dragState.value.unitId === unit.id
       ? dragState.value.unitIds
-      : primarySubtreeUnitIds(unit.id)
+      : primarySubtreeUnitIds(scene.value, sceneModel.value, unit.id)
     const subtreeUnits = unitIds
-      .map(unitId => unitById.value.get(unitId))
+      .map(unitId => sceneModel.value.unitById.get(unitId))
       .filter((value): value is LayoutScene['units'][number] => value !== undefined)
     const minimumDx = Math.max(...subtreeUnits.map(value => {
-      const valueDomain = domainById.value.get(value.domainId)
+      const valueDomain = sceneModel.value.domainById.get(value.domainId)
       return valueDomain === undefined
         ? Number.NEGATIVE_INFINITY
         : valueDomain.rect.x + DEFAULT_LAYOUT_METRICS.gridSize - value.rect.x
@@ -461,7 +366,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     }
     dragInvalid.value = false
     dragCanDrop.value = subtreeUnits.some(value => {
-      const valueDomain = domainById.value.get(value.domainId)
+      const valueDomain = sceneModel.value.domainById.get(value.domainId)
       return valueDomain !== undefined
         && unitColumn(value.rect.x + effectiveDx, valueDomain.rect.x)
           !== unitColumn(value.rect.x, valueDomain.rect.x)
@@ -477,14 +382,14 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
     0,
     unitColumn(unit.rect.x + dx, domain.rect.x),
   )
-  const targetDomain = closestDomain(centerX)
+  const targetDomain = closestDomain(scene.value, centerX)
   const targetRow = targetDomain === undefined
     ? undefined
-    : closestRowInDomain(targetDomain.id, centerY)
+    : closestRowInDomain(scene.value, targetDomain.id, centerY)
   const validScope = targetDomain?.id === domain.id
     && targetRow?.generation === sourceRow.generation
   const targetIndex = validScope
-    ? insertionIndex(sourceRow.unitIds, payload.unitId, centerX)
+    ? insertionIndex(scene.value, sourceRow.unitIds, payload.unitId, centerX)
     : sourceIndex
   dragState.value = {
     mode: domain.kind === 'root' ? 'root-row' : 'bridge-row',
@@ -526,7 +431,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
     const domainMemberIds = scene.value.units
       .filter(unit => unit.domainId === state.domainId)
       .flatMap(unit => unit.memberIds)
-    changedIds = affectedMemberIds(domainMemberIds)
+    changedIds = affectedMemberIds(props.data, domainMemberIds)
     expectation = {
       kind: 'root-domain',
       componentId: state.componentId,
@@ -543,7 +448,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
     const subtreeMemberIds = scene.value.units
       .filter(unit => state.unitIds.includes(unit.id))
       .flatMap(unit => unit.memberIds)
-    changedIds = affectedMemberIds(subtreeMemberIds)
+    changedIds = affectedMemberIds(props.data, subtreeMemberIds)
     expectation = {
       kind: 'subtree',
       batch: structuredClone(batch),
@@ -555,7 +460,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
       clearDrag(payload.unitId)
       return
     }
-    const columns = columnsAfterDrop(state)
+    const columns = columnsAfterDrop(props.data, state)
     const preference: RowOrderPreference = {
       id: state.rowId,
       domainId: state.domainId,
@@ -570,7 +475,7 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
       nextData = withBridgeOrderPreference(props.data, preference)
       emit('bridge-order-change', preference)
     }
-    changedIds = affectedMemberIds(payload.memberIds)
+    changedIds = affectedMemberIds(props.data, payload.memberIds)
     expectation = {
       kind: state.mode,
       id: state.rowId,
@@ -590,40 +495,6 @@ async function onUnitDrop(payload: FamilyUnitDragPayload) {
     changedIds,
     preserveViewport: true,
   })
-}
-
-function hasExpectedLayoutPreference(
-  data: FamilyData,
-  expected: LayoutPreferenceExpectation,
-): boolean {
-  if (expected.kind === 'root-domain') {
-    const rootOrder = data.layoutPreferences.rootOrders.find(value => (
-      value.componentId === expected.componentId
-    ))
-    return equalOrder(rootOrder?.rootIds, expected.rootIds)
-  }
-  if (expected.kind === 'subtree') {
-    return expected.batch.rowOrders.every(preference => (
-      hasRowPreference(data.layoutPreferences.rowOrders, preference)
-    )) && expected.batch.bridgeOrders.every(preference => (
-      hasRowPreference(data.layoutPreferences.bridgeOrders, preference)
-    ))
-  }
-  const rows = expected.kind === 'root-row'
-    ? data.layoutPreferences.rowOrders
-    : data.layoutPreferences.bridgeOrders
-  const row = rows.find(value => value.id === expected.id)
-  return equalOrder(row?.unitIds, expected.unitIds)
-    && equalColumns(row?.columns, expected.columns)
-}
-
-function hasRowPreference(
-  preferences: RowOrderPreference[],
-  expected: RowOrderPreference,
-): boolean {
-  const current = preferences.find(value => value.id === expected.id)
-  return equalOrder(current?.unitIds, expected.unitIds)
-    && equalColumns(current?.columns, expected.columns)
 }
 
 function onUnitCancel(payload: FamilyUnitDragPayload) {
@@ -649,316 +520,35 @@ function clearDrag(unitId: string) {
   })
 }
 
-function allDomains() {
-  return [...scene.value.rootDomains, ...scene.value.bridgeDomains]
-}
+const previewUnitIds = computed(() => (
+  resolvePreviewUnitIds(scene.value, dragState.value, dragCanDrop.value)
+))
 
-function primarySubtreeUnitIds(sourceUnitId: string): string[] {
-  const visited = new Set<string>()
-  const queue = [sourceUnitId]
-  for (let index = 0; index < queue.length; index += 1) {
-    const unitId = queue[index]
-    if (visited.has(unitId)) continue
-    visited.add(unitId)
-    queue.push(...(primaryChildUnitIdsBySourceId.value.get(unitId) ?? []))
-  }
-  return scene.value.units
-    .filter(unit => visited.has(unit.id))
-    .map(unit => unit.id)
-}
+const previewRootIds = computed(() => (
+  resolvePreviewRootIds(scene.value, dragState.value, dragCanDrop.value)
+))
 
-function closestDomain(centerX: number) {
-  return allDomains()
-    .map(domain => ({
-      domain,
-      distance: centerX < domain.rect.x
-        ? domain.rect.x - centerX
-        : centerX > domain.rect.x + domain.rect.width
-          ? centerX - domain.rect.x - domain.rect.width
-          : 0,
-    }))
-    .sort((left, right) => (
-      left.distance - right.distance
-      || Math.abs(
-        left.domain.rect.x + left.domain.rect.width / 2 - centerX,
-      ) - Math.abs(
-        right.domain.rect.x + right.domain.rect.width / 2 - centerX,
-      )
-      || left.domain.id.localeCompare(right.domain.id)
-    ))[0]?.domain
-}
+const previewSubtreeBatch = computed(() => resolvePreviewSubtreeBatch(
+  scene.value,
+  props.data,
+  sceneModel.value,
+  dragState.value,
+  dragCanDrop.value,
+))
 
-function closestRowInDomain(domainId: string, centerY: number) {
-  return scene.value.rows
-    .filter(row => row.unitIds.some(unitId => (
-      scene.value.units.find(unit => unit.id === unitId)?.domainId === domainId
-    )))
-    .map(row => {
-      const rowUnits = row.unitIds
-        .map(unitId => scene.value.units.find(unit => unit.id === unitId))
-        .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
-      const rowCenterY = rowUnits.length === 0
-        ? Number.POSITIVE_INFINITY
-        : rowUnits.reduce((sum, unit) => sum + unit.rect.y + unit.rect.height / 2, 0) / rowUnits.length
-      return { ...row, distance: Math.abs(rowCenterY - centerY) }
-    })
-    .sort((left, right) => left.distance - right.distance || left.generation - right.generation)[0]
-}
+const previewOffsetByUnitId = computed(() => resolvePreviewOffsetByUnitId(
+  scene.value,
+  dragState.value,
+  previewUnitIds.value,
+  previewRootIds.value,
+))
 
-function rootDomainsForComponent(componentId: string) {
-  return scene.value.rootDomains
-    .filter(domain => domain.componentId === componentId)
-    .sort((left, right) => left.rect.x - right.rect.x || left.id.localeCompare(right.id))
-}
-
-function rootInsertionIndex(
-  domains: LayoutScene['rootDomains'],
-  draggedDomainId: string,
-  centerX: number,
-): number {
-  const remaining = domains.filter(domain => domain.id !== draggedDomainId)
-  const index = remaining.findIndex(domain => (
-    centerX <= domain.rect.x + domain.rect.width / 2
-  ))
-  return index < 0 ? remaining.length : index
-}
-
-function unitColumn(unitX: number, domainX: number): number {
-  return Math.round(
-    (unitX - domainX - DEFAULT_LAYOUT_METRICS.gridSize)
-      / DEFAULT_LAYOUT_METRICS.gridSize,
-  )
-}
-
-function columnsAfterDrop(state: RowDragState): Record<string, number> {
-  const preferences = state.mode === 'root-row'
-    ? props.data.layoutPreferences.rowOrders
-    : props.data.layoutPreferences.bridgeOrders
-  const current = preferences.find(value => value.id === state.rowId)
-  const columns = { ...(current?.columns ?? {}) }
-  if (state.targetIndex === state.sourceIndex) {
-    columns[state.unitId] = state.targetColumn
-  } else {
-    delete columns[state.unitId]
-  }
-  return columns
-}
-
-function insertionIndex(unitIds: string[], draggedUnitId: string, centerX: number): number {
-  const remainingIds = unitIds.filter(unitId => unitId !== draggedUnitId)
-  const index = remainingIds.findIndex(unitId => {
-    const unit = scene.value.units.find(value => value.id === unitId)
-    return unit !== undefined && centerX <= unit.rect.x + unit.rect.width / 2
-  })
-  return index < 0 ? remainingIds.length : index
-}
-
-function arrayMove<T>(values: T[], from: number, to: number): T[] {
-  const result = [...values]
-  const [value] = result.splice(from, 1)
-  if (value === undefined) return result
-  result.splice(to, 0, value)
-  return result
-}
-
-const previewUnitIds = computed(() => {
-  const state = dragState.value
-  if (
-    !state
-    || state.mode === 'root-domain'
-    || state.mode === 'subtree'
-    || !dragCanDrop.value
-  ) return null
-  const row = scene.value.rows.find(value => value.id === state.rowId)
-  if (!row) return null
-  return arrayMove(row.unitIds, state.sourceIndex, state.targetIndex)
-})
-
-const previewRootIds = computed(() => {
-  const state = dragState.value
-  if (!state || state.mode !== 'root-domain' || !dragCanDrop.value) return null
-  const domains = rootDomainsForComponent(state.componentId)
-  const rootIds = domains.map(domain => domain.rootIds[0]).filter(Boolean)
-  return arrayMove(rootIds, state.sourceIndex, state.targetIndex)
-})
-
-const previewSubtreeBatch = computed<LayoutRowPreferenceBatch | null>(() => {
-  const state = dragState.value
-  if (!state || state.mode !== 'subtree' || !dragCanDrop.value) return null
-  const movedUnitIds = new Set(state.unitIds)
-  const batch: LayoutRowPreferenceBatch = { rowOrders: [], bridgeOrders: [] }
-
-  for (const row of scene.value.rows) {
-    const movedRowUnitIds = row.unitIds.filter(unitId => movedUnitIds.has(unitId))
-    if (movedRowUnitIds.length === 0) continue
-    const rowUnits = row.unitIds
-      .map(unitId => unitById.value.get(unitId))
-      .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
-    const domain = rowUnits[0] === undefined
-      ? undefined
-      : domainById.value.get(rowUnits[0].domainId)
-    if (!domain) continue
-    const preferences = domain.kind === 'root'
-      ? props.data.layoutPreferences.rowOrders
-      : props.data.layoutPreferences.bridgeOrders
-    const current = preferences.find(value => value.id === row.id)
-    const columns = { ...(current?.columns ?? {}) }
-    for (const unitId of movedRowUnitIds) {
-      const unit = unitById.value.get(unitId)
-      if (unit === undefined) continue
-      columns[unitId] = Math.max(
-        0,
-        unitColumn(unit.rect.x + state.dx, domain.rect.x),
-      )
-    }
-    const originalIndex = new Map(row.unitIds.map((unitId, index) => [unitId, index]))
-    const unitIds = [...row.unitIds].sort((leftId, rightId) => {
-      const left = unitById.value.get(leftId)
-      const right = unitById.value.get(rightId)
-      const leftX = (left?.rect.x ?? 0) + (movedUnitIds.has(leftId) ? state.dx : 0)
-      const rightX = (right?.rect.x ?? 0) + (movedUnitIds.has(rightId) ? state.dx : 0)
-      return leftX - rightX
-        || (originalIndex.get(leftId) ?? 0) - (originalIndex.get(rightId) ?? 0)
-        || leftId.localeCompare(rightId)
-    })
-    const preference: RowOrderPreference = {
-      id: row.id,
-      domainId: domain.id,
-      generation: row.generation,
-      unitIds,
-      columns,
-    }
-    if (domain.kind === 'root') batch.rowOrders.push(preference)
-    else batch.bridgeOrders.push(preference)
-  }
-
-  batch.rowOrders.sort((left, right) => left.id.localeCompare(right.id))
-  batch.bridgeOrders.sort((left, right) => left.id.localeCompare(right.id))
-  return batch
-})
-
-const previewOffsetByUnitId = computed<Record<string, Point>>(() => {
-  const state = dragState.value
-  if (!state) return {}
-  if (state.mode === 'root-domain') return rootDomainPreviewOffsets(state)
-  if (state.mode === 'subtree') return {}
-  const order = previewUnitIds.value
-  if (!order) return {}
-  const row = scene.value.rows.find(value => value.id === state.rowId)
-  if (!row) return {}
-  const rowUnits = row.unitIds
-    .map(unitId => scene.value.units.find(unit => unit.id === unitId))
-    .filter((unit): unit is LayoutScene['units'][number] => unit !== undefined)
-  const rowGap = rowUnits.slice(1).reduce<number | null>((minimum, unit, index) => {
-    const previous = rowUnits[index]
-    const gap = unit.rect.x - previous.rect.x - previous.rect.width
-    if (gap < 0) return minimum
-    return minimum === null ? gap : Math.min(minimum, gap)
-  }, null) ?? DEFAULT_LAYOUT_METRICS.familyGap
-  let nextX = Math.min(...rowUnits.map(unit => unit.rect.x))
-  const previewXByUnitId = new Map<string, number>()
-  for (const unitId of order) {
-    const unit = scene.value.units.find(value => value.id === unitId)
-    if (!unit) continue
-    previewXByUnitId.set(unitId, nextX)
-    nextX += unit.rect.width + rowGap
-  }
-  return Object.fromEntries(order.flatMap(unitId => {
-    if (unitId === state.unitId) return []
-    const unit = scene.value.units.find(value => value.id === unitId)
-    const previewX = previewXByUnitId.get(unitId)
-    return unit && previewX !== undefined
-      ? [[unitId, { x: previewX - unit.rect.x, y: 0 }]]
-      : []
-  }))
-})
-
-function rootDomainPreviewOffsets(state: RootDomainDragState): Record<string, Point> {
-  const rootIds = previewRootIds.value
-  if (rootIds === null) return {}
-  const domains = rootDomainsForComponent(state.componentId)
-  const domainByRootId = new Map(domains.flatMap(domain => (
-    domain.rootIds[0] ? [[domain.rootIds[0], domain] as const] : []
-  )))
-  const slotXs = domains.map(domain => domain.rect.x)
-  const targetXByRootId = new Map<string, number>()
-  let nextX = slotXs[0] ?? 0
-  rootIds.forEach((rootId, index) => {
-    const domain = domainByRootId.get(rootId)
-    if (domain === undefined) return
-    const targetX = Math.max(slotXs[index] ?? nextX, nextX)
-    targetXByRootId.set(rootId, targetX)
-    nextX = targetX + domain.rect.width + DEFAULT_LAYOUT_METRICS.rootGap
-  })
-  const offsetByDomainId = new Map<string, number>()
-  for (const [rootId, domain] of domainByRootId) {
-    if (domain.id === state.domainId) continue
-    const targetX = targetXByRootId.get(rootId)
-    if (targetX !== undefined) offsetByDomainId.set(domain.id, targetX - domain.rect.x)
-  }
-  for (const bridge of scene.value.bridgeDomains.filter(value => (
-    value.componentId === state.componentId
-  ))) {
-    const offsets = bridge.rootIds.flatMap(rootId => {
-      const domain = domainByRootId.get(rootId)
-      const targetX = targetXByRootId.get(rootId)
-      return domain === undefined || targetX === undefined
-        ? []
-        : [targetX - domain.rect.x]
-    })
-    if (offsets.length > 0) {
-      offsetByDomainId.set(
-        bridge.id,
-        offsets.reduce((sum, value) => sum + value, 0) / offsets.length,
-      )
-    }
-  }
-  return Object.fromEntries(scene.value.units.flatMap(unit => {
-    const offset = offsetByDomainId.get(unit.domainId)
-    return offset === undefined ? [] : [[unit.id, { x: offset, y: 0 }]]
-  }))
-}
-
-function dragOffsetForUnit(unit: LayoutScene['units'][number]): Point | undefined {
-  const state = dragState.value
-  if (state === null) return undefined
-  if (state.mode === 'root-domain') {
-    return unit.domainId === state.domainId
-      ? { x: state.dx, y: Math.max(-24, Math.min(24, state.dy)) }
-      : undefined
-  }
-  if (state.mode === 'subtree') {
-    return state.unitIds.includes(unit.id)
-      ? { x: state.dx, y: Math.max(-24, Math.min(24, state.dy)) }
-      : undefined
-  }
-  return state.unitId === unit.id ? { x: state.dx, y: state.dy } : undefined
+function dragOffsetForUnit(unit: LayoutScene['units'][number]) {
+  return resolveDragOffsetForUnit(dragState.value, unit)
 }
 
 function isUnitDragging(unit: LayoutScene['units'][number]): boolean {
-  const state = dragState.value
-  return state?.mode === 'root-domain'
-    ? unit.domainId === state.domainId
-    : state?.mode === 'subtree'
-      ? state.unitIds.includes(unit.id)
-    : state?.unitId === unit.id
-}
-
-function equalOrder(left: string[] | undefined, right: string[]): boolean {
-  return left?.length === right.length
-    && left.every((value, index) => value === right[index])
-}
-
-function equalColumns(
-  left: Record<string, number> | undefined,
-  right: Record<string, number> | undefined,
-): boolean {
-  const leftEntries = Object.entries(left ?? {}).sort(([a], [b]) => a.localeCompare(b))
-  const rightEntries = Object.entries(right ?? {}).sort(([a], [b]) => a.localeCompare(b))
-  return leftEntries.length === rightEntries.length
-    && leftEntries.every(([unitId, column], index) => (
-      unitId === rightEntries[index]?.[0] && column === rightEntries[index]?.[1]
-    ))
+  return resolveIsUnitDragging(dragState.value, unit)
 }
 
 const draggedUnit = computed(() => {
@@ -966,56 +556,7 @@ const draggedUnit = computed(() => {
   return unitId ? scene.value.units.find(unit => unit.id === unitId) : undefined
 })
 
-const fadedRouteIds = computed(() => {
-  const state = dragState.value
-  if (!state) return []
-  const unitIds = new Set(
-    state.mode === 'root-domain'
-      ? scene.value.units.filter(unit => unit.domainId === state.domainId).map(unit => unit.id)
-      : state.mode === 'subtree'
-        ? state.unitIds
-        : [state.unitId],
-  )
-  const contacts = [
-    ...scene.value.hubs
-      .filter(hub => unitIds.has(hub.unitId))
-      .map(hub => hub.point),
-    ...scene.value.cards
-      .filter(card => unitIds.has(card.unitId))
-      .map(card => ({
-        x: card.rect.x + card.rect.width / 2,
-        y: card.rect.y,
-      })),
-  ]
-  return scene.value.routes.flatMap(route => (
-    route.segments.some(segment => {
-      const endpoints = [segment.points[0], segment.points.at(-1)]
-      return endpoints.some(point => point && contacts.some(contact => (
-        Math.abs(point.x - contact.x) < 0.5 && Math.abs(point.y - contact.y) < 0.5
-      )))
-    }) ? [route.id] : []
-  ))
-})
-
-function affectedMemberIds(memberIds: string[]): string[] {
-  const ids = new Set(memberIds)
-  const unitMemberIds = new Set(memberIds)
-  for (const memberId of memberIds) {
-    const member = props.data.members[memberId]
-    if (!member) continue
-    for (const parent of member.parents) ids.add(parent.id)
-    for (const child of member.children) ids.add(child.id)
-  }
-  for (const member of Object.values(props.data.members)) {
-    if (
-      member.parents.some(parent => unitMemberIds.has(parent.id))
-      || member.children.some(child => unitMemberIds.has(child.id))
-    ) {
-      ids.add(member.id)
-    }
-  }
-  return [...ids].sort((left, right) => left.localeCompare(right))
-}
+const fadedRouteIds = computed(() => resolveFadedRouteIds(scene.value, dragState.value))
 
 onBeforeUnmount(() => {
   if (settleTimer !== null) clearTimeout(settleTimer)
@@ -1039,8 +580,8 @@ function dismissDiagnostics() {
       <div
         class="relative"
         :style="{
-          width: `${canvasSize.width}px`,
-          height: `${canvasSize.height}px`,
+          width: `${sceneModel.canvasSize.width}px`,
+          height: `${sceneModel.canvasSize.height}px`,
         }"
       >
         <GridBackground />
@@ -1048,14 +589,14 @@ function dismissDiagnostics() {
         <div
           class="absolute left-0 top-0"
           :style="{
-            transform: `translate(${sceneOffset.x}px, ${sceneOffset.y}px)`,
+            transform: `translate(${sceneModel.sceneOffset.x}px, ${sceneModel.sceneOffset.y}px)`,
             transformOrigin: '0 0',
           }"
         >
           <RelationLayer
             :routes="scene.routes"
-            :width="canvasSize.width"
-            :height="canvasSize.height"
+            :width="sceneModel.canvasSize.width"
+            :height="sceneModel.canvasSize.height"
             :faded-route-ids="fadedRouteIds"
           />
 
@@ -1088,9 +629,9 @@ function dismissDiagnostics() {
             v-for="unit in scene.units"
             :key="unit.id"
             :unit="unit"
-            :cards="cardsByUnitId.get(unit.id) ?? []"
+            :cards="sceneModel.cardsByUnitId.get(unit.id) ?? []"
             :members="members"
-            :hubs="hubsByUnitId.get(unit.id) ?? []"
+            :hubs="sceneModel.hubsByUnitId.get(unit.id) ?? []"
             :selected-id="selectedId"
             :viewpoint-id="viewpointId"
             :drag-offset="dragOffsetForUnit(unit)"
@@ -1098,8 +639,8 @@ function dismissDiagnostics() {
             :is-dragging="isUnitDragging(unit)"
             :animate-position="animatePositions"
             :kinship-by-member-id="kinshipByMemberId"
-            :root-accent-by-id="rootAccentById"
-            :root-order="rootOrder"
+            :root-accent-by-id="sceneModel.rootAccentById"
+            :root-order="sceneModel.rootOrder"
             @unit-drag="onUnitDrag"
             @unit-drop="onUnitDrop"
             @unit-cancel="onUnitCancel"
@@ -1117,30 +658,10 @@ function dismissDiagnostics() {
       </div>
     </PanZoomWrapper>
 
-    <div
+    <LayoutDiagnostics
       v-if="visibleDiagnostics.length > 0"
-      data-testid="layout-diagnostics"
-      class="absolute left-1/2 top-3 z-50 w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50/95 px-4 py-3 text-sm text-amber-950 shadow-lg backdrop-blur"
-      role="status"
-    >
-      <div class="flex items-start gap-3">
-        <div class="min-w-0 flex-1">
-          <div class="font-semibold">{{ diagnosticTitle }}</div>
-          <ul class="mt-1 list-disc space-y-0.5 pl-5 text-xs">
-            <li v-for="diagnostic in visibleDiagnostics" :key="`${diagnostic.code}:${diagnostic.ids.join(',')}`">
-              {{ diagnostic.message }}
-            </li>
-          </ul>
-        </div>
-        <button
-          type="button"
-          class="rounded px-2 py-1 text-xs hover:bg-amber-100"
-          aria-label="关闭布局诊断"
-          @click="dismissDiagnostics"
-        >
-          关闭
-        </button>
-      </div>
-    </div>
+      :diagnostics="visibleDiagnostics"
+      @dismiss="dismissDiagnostics"
+    />
   </div>
 </template>
