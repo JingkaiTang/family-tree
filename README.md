@@ -2,133 +2,51 @@
 
 [![CI](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml)
 
-一款轻量级中文家族关系管理桌面应用，基于 Tauri 2 构建。可视化管理家族成员，自动计算亲戚间的中文称谓。
+一款面向中文家庭关系的本地优先桌面应用，使用 Tauri 2、Vue 3 和 Rust 构建。
 
-> **项目状态：Alpha。** 当前已建立数据校验、备份和 CI 基线，但还没有稳定版本、自动更新或签名发布链。请定期备份真实项目；本地 `.family` 文件不加密。
+![家族树主界面，展示虚构的六代家族](docs/assets/family-tree-overview.jpg)
 
-[架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [发布前置](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
+> 截图使用仓库内的虚构测试数据和合成头像，不包含真实个人信息。
 
-## 功能特性
+> **项目状态：Alpha。** 当前仅建议从源码构建，尚未提供签名安装包、自动更新或稳定数据格式承诺。请定期备份真实项目；本地 `.family` 项目文件不加密。
 
-- **家族树可视化** — 当前夫妻是不可拆分、可整体拖动的卡片家庭单元；家庭吸附代际网格，同一可见祖先家庭延伸出的成员跨代保持聚合。
-- **根族与跨根婚姻** — 根族通过留白、稳定颜色和根家庭强调做隐式区分，不绘制分区背景或标题；跨根家庭进入 bridge band，三根及稠密关系进入 bridge island。
-- **家庭专属连线** — 父母与子女使用家庭配色的独占通道；不同家庭不共用线段，垂直交叉处显示跨线桥。
-- **辅助关系开关** — 按需显示选中成员的历史配偶、次要父母与干亲关系，不改变主布局代际。
-- **受约束拖拽与完整重置** — 普通家庭只在同根同代排序，桥接家庭只在同桥接域同代排序，拖动根家庭会整体移动根域；“恢复默认布局”会清除全部手动排序并聚焦选中成员，没有选中成员时聚焦整棵树中心。
-- **中文称谓自动计算** — 输入任意两个成员，自动推算出正确的中文亲戚称呼
-  - 直系亲属：父母、祖父母、子女、孙辈……
-  - 旁系亲属：兄弟姐妹、堂/表兄弟、侄/甥……
-  - 姻亲：配偶的亲属、亲属的配偶、妯娌/连襟……
-  - 特殊关系：继父母/养子女、半亲兄弟姐妹、干亲
-  - 长幼区分：哥哥/弟弟、伯父/叔叔、嫂子/弟媳……
-- **成员信息管理** — 姓名、性别、出生日期、照片、籍贯、职业等
-- **自定义称呼** — 支持为特定关系手动覆盖自动计算的称谓（如"二叔"）
-- **本地数据** — 所有数据保存在用户选择的本地目录，应用不主动上传
+[架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [发布说明](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
 
-## 技术栈
+## 功能
 
-| 层 | 技术 |
-|---|---|
-| 前端框架 | Vue 3 + TypeScript |
-| 状态管理 | Pinia |
-| 样式 | Tailwind CSS |
-| 构建工具 | Vite 6 |
-| 桌面框架 | Tauri 2 (Rust) |
-| 家族树布局 | 自研 family-unit 代际网格与 family-owned lane 路由 |
-| 缩放/拖拽 | @panzoom/panzoom |
-| 数据校验 | Zod |
-| 测试 | Vitest |
+- **家族关系可视化**：按家庭单元和代际布局成员，支持缩放、平移、家庭拖拽与恢复默认布局。
+- **复杂家庭结构**：支持当前及历史配偶、养育/继亲、次要父母和干亲等关系。
+- **中文亲属称谓**：计算常见的直系、旁系与姻亲称谓，并支持按家庭习惯自定义覆盖。不同地区和家庭的称谓存在差异，自动结果仍需使用者确认。
+- **成员资料管理**：记录姓名、性别、出生日期、照片、籍贯和职业等信息。
+- **本地优先**：数据保存在使用者选择的普通文件夹中，应用不主动上传，便于自行复制和备份。
+- **数据可靠性**：项目打开和保存时执行结构校验，自动保留有限数量的本地备份。
 
-### 称谓计算架构
-
-称谓系统采用三层流水线设计：
-
-```
-BFS 寻路 → 路径规范化 → 模式匹配翻译
-```
-
-1. **BFS 寻路** (`pathFinder.ts`)：在家族关系图中广度优先搜索最短路径，边类型包括 parent/child/spouse/sibling
-2. **路径规范化** (`normalizePath`)：将 sibling 边展开为 parent + child，使路径仅含三种基本边，便于分类
-3. **模式匹配翻译** (`chineseTerms.ts`)：根据路径中边的组合模式（纯 parent → 直系祖先、parent+child → 旁系、末尾 spouse → 姻亲……）查表翻译为中文称谓
-
-关键设计点：
-- **堂/表判定**：分叉点（从共同祖先往下的第一步）性别决定——男→堂（同姓），女→表（异姓）
-- **侄/甥判定**：同辈旁系亲属性别决定——男→侄，女→外甥
-- **代际差**：`genDiff = up - down`（parent 步数减 child 步数），正=长辈，0=同辈，负=晚辈
-- **长幼区分**：利用成员 `birthDate` 比较年龄，无生日时回退为合并标签（如"叔伯"）
-
-### 家族树布局架构
-
-布局入口是 `src/core/treeLayout.ts`，核心纯函数流水线位于 `src/core/family-layout`：
-
-```text
-关系规范化 → 主/辅助关系投影 → 家庭单元构建 → 代际分配
-→ 可见根家庭发现 → 根签名传播 → 根交互图与域划分
-→ 根色分配与家庭装饰 → 连续根域网格排版 → 家庭专属通道路由
-→ 辅助关系独立路由 → 场景校验与安全回退
-```
-
-- 可见数据中没有主父代来源的祖先家庭构成根；直接嫁入/娶入且没有展开上游的成员继承配偶根，双方都有可见根时才形成跨根家庭。
-- 当前夫妻合并为一个家庭单元，单身成员保持独立单元；根族在各代占用连续列区间，其他根族不能插入。pair bridge 位于两根之间，三根、环状或高密度连接使用 bridge island。
-- 每组父母与子女拥有独立 route owner、颜色和 lane。同一个家庭的 stem、child bus 与下行支线可以合并；不同家庭允许点交叉，但禁止共享正长度线段、形成错误 T 形连接或穿过无关卡片，交叉点由 line bridge 显示层次。
-- 普通家庭、桥接家庭和根家庭三种拖拽分别只写入域内行顺序、桥接顺序和根顺序偏好，不修改亲属事实。“恢复默认布局”会一次清空三类偏好，丢弃增量场景并恢复默认视图。
-- 历史配偶、次要父母、继亲和干亲只在主场景完成后为当前焦点成员绘制虚线，不参与根发现、根签名、代际、主几何或主路线占用。
-- 默认布局核心是确定性的同步纯函数流水线，桌面前端通过原生 Web Worker 异步调用；目标规模为 500 人，增量更新会尽量继承旧根颜色、根顺序和未变化连通分量的位置。
-
-## 开发
+## 快速开始
 
 ### 环境要求
 
-- **Node.js** >= 20
-- **Rust stable**（通过 [rustup](https://rustup.rs/) 安装）
+- Node.js 20 或更高版本
+- Rust stable（推荐通过 [rustup](https://rustup.rs/) 安装）
 - 当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
-- **Windows**: Visual Studio Build Tools 2022（MSVC C++ 工作负载）
 
-### 安装依赖
+### 开发与构建
 
 ```bash
 npm ci
-```
-
-### 启动 Web 开发服务器
-
-```bash
-npm run dev
-```
-
-浏览器访问 http://localhost:5173
-
-该模式用于前端界面调试；创建、打开项目和本地照片等文件能力需要在 Tauri 桌面进程中运行。
-
-### 启动 Tauri 桌面应用
-
-```bash
 npm run tauri:dev
 ```
 
-> **Windows 注意**：需将 MSVC `link.exe` 所在目录加到 PATH 最前面，避免 Git Bash 的 `link` 冲突：
-> ```powershell
-> $env:PATH = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64;$env:PATH"
-> ```
->
-> 另需确保 rustup 默认工具链为 msvc：
-> ```bash
-> rustup default stable-x86_64-pc-windows-msvc
-> ```
->
-> Windows Hyper-V 保留了端口范围 1348-1447，原配置的 1420 端口会导致 EACCES 错误，已改为 5173。
+仅调试前端界面时可运行 `npm run dev`；创建项目、打开本地文件和管理照片等能力需要 Tauri 桌面进程。
 
-### 构建桌面安装包
+构建当前平台的安装包：
 
 ```bash
 npm run tauri:build
 ```
 
-产物在 `src-tauri/target/release/bundle/` 下。
+产物位于 `src-tauri/target/release/bundle/`。跨平台环境准备和常见构建问题见 [贡献指南](CONTRIBUTING.md)。
 
-macOS 的 CI、沙箱或其他无 GUI 环境无法运行 Finder 美化脚本时，使用 `CI=true npm run tauri:build`；仍会生成可安装的 `.dmg`，但不包含自定义 Finder 排版。
-
-### 运行测试
+### 验证改动
 
 ```bash
 npm test
@@ -141,50 +59,26 @@ cargo test --locked
 cargo clippy --all-targets --all-features --locked -- -D warnings
 ```
 
-`test:layout-perf` 使用确定性的 500 人连通家谱，并在受控机器上执行 1000ms CI 预算门禁；普通 `npm test` 只验证正确性，避免共享机器负载造成偶发失败。
+`test:layout-perf` 使用确定性的 500 人虚构家谱执行性能门禁，建议在资源稳定的本机或 CI 中运行。
 
-### 类型检查
+## 技术概览
 
-```bash
-npm run typecheck
-```
+| 层 | 技术 |
+|---|---|
+| 桌面与本地文件 | Tauri 2、Rust |
+| 前端 | Vue 3、TypeScript、Pinia、Tailwind CSS |
+| 数据与校验 | JSON、Zod、版本迁移与本地备份 |
+| 家族树 | 自研家庭单元布局与连线路由、Web Worker |
+| 测试 | Vitest、Rust test/clippy、RustSec audit |
 
-## 项目结构
+核心领域逻辑位于 `src/core`，Vue 组件负责交互编排；Tauri 后端只暴露受校验的本地文件命令。中文称谓采用“关系图寻路 → 路径规范化 → 规则翻译”的流水线，布局采用确定性的纯函数核心并通过 Web Worker 运行。完整边界和数据流见 [架构文档](docs/architecture.md)。
 
-```
-src/
-├── core/                    # 核心业务逻辑
-│   ├── schema.ts            # 数据模型（Zod 定义）
-│   ├── familyIntegrity.ts   # 跨成员引用与关系图完整性
-│   ├── kinship/             # 称谓计算系统
-│   │   ├── index.ts         # 统一入口：override → 干亲 → BFS → 翻译
-│   │   ├── pathFinder.ts    # BFS 寻路 + 路径规范化
-│   │   └── chineseTerms.ts  # 路径 → 中文称谓翻译
-│   ├── treeLayout.ts        # 默认布局异步门面与 Worker 回退
-│   ├── treeLayout.worker.ts # 浏览器布局 Worker
-│   ├── treeLayoutCore.ts    # 可复用的同步纯布局入口
-│   ├── family-layout/       # 根发现/签名、根域网格、bridge、lane 路由与场景校验
-│   ├── relativesAdapter.ts  # relatives-tree 兼容适配与历史行为测试
-│   └── migrate.ts           # Schema 版本迁移
-├── components/              # 通用组件
-│   ├── member/              # 成员相关组件
-│   ├── tree/                # 树视图组件
-│   └── search/              # 搜索组件
-├── pages/                   # 页面组件
-├── stores/                  # Pinia 状态仓库
-├── services/                # Tauri API 封装
-├── router/                  # Vue Router
-└── styles/                  # 全局样式
+## 参与贡献
 
-src-tauri/                   # Rust 后端
-├── src/
-│   ├── lib.rs               # Tauri 插件注册
-│   └── commands/            # Tauri 命令（文件读写等）
-└── Cargo.toml
-```
+欢迎通过 Issue 和 Pull Request 参与。请先阅读 [贡献指南](CONTRIBUTING.md) 和 [行为准则](CODE_OF_CONDUCT.md)。
 
-## 参与和许可
+请勿提交真实家谱、照片、住址或其他个人信息；安全漏洞请按 [安全政策](SECURITY.md) 私下报告。
 
-欢迎通过 Issue 和 Pull Request 参与。参与前请阅读 [贡献指南](CONTRIBUTING.md) 和 [行为准则](CODE_OF_CONDUCT.md)；请勿提交真实家庭数据，漏洞请按 [安全政策](SECURITY.md) 私下报告。
+## 许可
 
 本项目采用 [MIT License](LICENSE)。
