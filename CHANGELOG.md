@@ -16,6 +16,7 @@
 - 照片编辑改为保存后提交、取消时回收暂存文件。
 - `FamilyCanvas` 的纯场景模型和诊断展示从编排组件拆出。
 - Tauri 权限收紧为目录选择、必要窗口操作和受控 Rust 命令。
+- README 改为面向使用者和外部贡献者的公开入口，并加入完全虚构的应用截图。
 
 ### Security
 
@@ -23,3 +24,5 @@
 - 本地照片改由 Rust 校验项目根和媒体 ID 后返回字节。
 - 升级 `uuid` 到已修复当前安全公告的版本，并将 npm 锁文件归一到官方 registry。
 - 升级 Vite、`quick-xml` 和 `anyhow` 到已修复当前安全公告的版本，并加入 npm、RustSec 依赖审计门禁。
+- 生产 CSP 移除开发服务器 WebSocket，GitHub Actions 固定到完整提交 SHA。
+- 默认忽略真实 `.family` 项目、环境文件和常见签名凭据。

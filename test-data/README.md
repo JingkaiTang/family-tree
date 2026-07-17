@@ -9,6 +9,12 @@
 - 含当前配偶、历史配偶、收养、继亲和干亲关系
 - 所有成员均为虚构数据，不对应任何真实人物
 
+## 来源与许可
+
+家谱数据由仓库脚本使用固定随机种子生成。头像图集通过 Codex 内置图像生成工具为本项目专门生成，没有使用外部照片数据集；生成方式和原始提示词记录在 [`source-assets/synthetic-avatar-atlas.prompt.md`](source-assets/synthetic-avatar-atlas.prompt.md)。
+
+`test-data/` 下的生成脚本、虚构数据、图集和头像切片随本仓库按 [MIT License](../LICENSE) 提供。贡献测试素材时也必须使用虚构人物，并在此记录来源和许可，不得提交真实个人照片或家谱。
+
 重新生成项目数据：
 
 ```bash

@@ -3,6 +3,18 @@ dist
 dist-ssr
 *.local
 
+# local family data; only the synthetic fixture under test-data is public
+*.family/
+!test-data/synthetic-family-200-6.family/
+!test-data/synthetic-family-200-6.family/**
+
+# local secrets and signing credentials
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+
 # editor
 .vscode/*
 !.vscode/extensions.json
