@@ -44,5 +44,6 @@ coverage
 
 # superpowers
 .superpowers
+docs/plans/
 docs/superpowers/
 .worktrees
