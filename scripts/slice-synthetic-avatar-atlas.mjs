@@ -6,6 +6,10 @@ import {
   SYNTHETIC_AVATARS_PER_GENERATION,
   SYNTHETIC_GENERATION_COUNTS,
 } from './synthetic-family.mjs'
+import {
+  detectSegmentBoundaries,
+  parseEdgeProfile,
+} from './avatar-atlas-grid.mjs'
 
 const atlasArg = process.argv[2]
 if (!atlasArg) {
@@ -30,12 +34,25 @@ if (!Number.isFinite(width) || !Number.isFinite(height)) {
 
 const columns = SYNTHETIC_AVATARS_PER_GENERATION
 const rows = SYNTHETIC_GENERATION_COUNTS.length
+const seamInset = 2
+const edgeOutput = runMagick([
+  atlasPath,
+  '-colorspace', 'gray',
+  '-edge', '1',
+  '-filter', 'box',
+  '-resize', `1x${height}!`,
+  '-depth', '8',
+  'txt:-',
+])
+const edgeProfile = parseEdgeProfile(edgeOutput, height)
+const { boundaries: rowBoundaries } = detectSegmentBoundaries(edgeProfile, rows)
+
 for (let row = 0; row < rows; row += 1) {
   for (let column = 0; column < columns; column += 1) {
     const left = Math.round(column * width / columns)
     const right = Math.round((column + 1) * width / columns)
-    const top = Math.round(row * height / rows)
-    const bottom = Math.round((row + 1) * height / rows)
+    const top = rowBoundaries[row] + (row === 0 ? 0 : seamInset)
+    const bottom = rowBoundaries[row + 1] - (row === rows - 1 ? 0 : seamInset)
     const cellWidth = right - left
     const cellHeight = bottom - top
     const cropSize = Math.min(cellWidth, cellHeight)
@@ -63,6 +80,7 @@ for (let row = 0; row < rows; row += 1) {
   }
 }
 
+console.log(`Detected atlas row boundaries: ${rowBoundaries.join(', ')}`)
 console.log(`Sliced ${columns * rows} avatars from ${basename(atlasPath)}`)
 
 function runMagick(args) {

@@ -32,3 +32,5 @@ npm run generate:test-family
 ```bash
 npm run slice:test-avatars -- /absolute/path/to/synthetic-avatar-atlas.png
 ```
+
+该命令需要 ImageMagick 7 的 `magick` CLI。生成式图像可能看似规则网格、实际行高却不相等；切片脚本会先检测水平分隔缝，再按真实行边界裁剪，并在无法识别清晰分隔缝时直接失败，避免误切结果进入测试数据。
