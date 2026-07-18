@@ -119,7 +119,7 @@ export const FamilyData = z.object({
   childLayoutAssignments: ChildLayoutAssignments.default({}),
   /** @deprecated V2 slot order 仅为兼容旧文件保留，新写入使用 layoutPreferences。 */
   gridLayoutOverrides: GridLayoutOverrides.default({}),
-  layoutPreferences: PersistedLayoutPreferences.default({}),
+  layoutPreferences: PersistedLayoutPreferences.prefault({}),
   rootMemberId: z.string().optional(),
   /** 上次使用的视角成员 id；打开项目时自动恢复并聚焦到该节点 */
   defaultViewpointId: z.string().optional(),

@@ -53,6 +53,19 @@ describe('migrate', () => {
     })
   })
 
+  it('materializes nested layout defaults when current data omits layoutPreferences', () => {
+    const raw: Record<string, unknown> = { ...createEmptyFamily() }
+    delete raw.layoutPreferences
+
+    expect(FamilyData.parse(raw).layoutPreferences).toEqual({
+      rootOrders: [],
+      rowOrders: [],
+      bridgeOrders: [],
+      rootAccentAssignments: {},
+      familyAccentAssignments: {},
+    })
+  })
+
   it('adds V2 grid fields while preserving legacy manualPositions', () => {
     const a = member('a')
     const raw = rawFamily([a], { manualPositions: { a: { cx: 10, top: 20 } } })
