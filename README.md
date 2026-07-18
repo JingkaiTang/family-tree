@@ -25,7 +25,7 @@
 
 ### 环境要求
 
-- Node.js 20 或更高版本
+- Node.js 20.19+ 或 22.12+
 - Rust stable（推荐通过 [rustup](https://rustup.rs/) 安装）
 - 当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
 
