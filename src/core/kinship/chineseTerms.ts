@@ -16,7 +16,7 @@ type TargetGender = 'male' | 'female' | 'other'
  * 5. 末尾 spouse（仅1个spouse）→ 姻亲后缀（某亲属的配偶）
  * 6. 开头 spouse（仅1个spouse）→ 姻亲前缀（配偶的亲属）
  * 7. 两端 spouse（2个spouse）→ 妯娌/连襟等
- * 8. 其他 → 回退为"亲戚"
+ * 8. 其他 → 回退为“远房亲戚”
  *
  * 父系/母系判定：看第一步 parent 走向的是男还是女（toGender）
  * 长幼判定：利用 members 中的 birthDate 比较，无 birthDate 时回退到合并标签
@@ -39,7 +39,14 @@ export function describeRelation(
 
   // --- 配偶 ---
   if (kinds.length === 1 && kinds[0] === 'spouse') {
-    return targetGender === 'female' ? '妻子' : '丈夫'
+    if (path[0].relType === 'divorced') {
+      if (targetGender === 'female') return '前妻'
+      if (targetGender === 'male') return '前夫'
+      return '前配偶'
+    }
+    if (targetGender === 'female') return '妻子'
+    if (targetGender === 'male') return '丈夫'
+    return '配偶'
   }
 
   // --- 直系祖先：parent × N ---
@@ -80,7 +87,7 @@ export function describeRelation(
     const innerPath = path.slice(0, -1)
     const innerTargetId = innerPath[innerPath.length - 1].toId
     const innerLabel = describeRelation(innerPath, selfId, innerTargetId, members)
-    return inLawByInner(innerLabel, targetGender, selfId, members)
+    return inLawByInner(innerLabel, targetGender, path[path.length - 1].relType)
   }
 
   // --- 开头是 spouse 的姻亲（路径中仅1个spouse）---
@@ -93,11 +100,11 @@ export function describeRelation(
 
   // --- 两端 spouse 或多处 spouse → 妯娌/连襟等 ---
   if (spouseCount >= 2) {
-    return multiSpouseLabel(path, selfId, targetId, targetGender, selfGender, members)
+    return multiSpouseLabel(path)
   }
 
   // 回退
-  return '亲戚'
+  return '远房亲戚'
 }
 
 // ==================== 年龄比较工具 ====================
@@ -268,7 +275,7 @@ function collateralLabel(
     // 祖父母辈（genDiff=2）
     if (genDiff === 2) {
       if (up === 3 && down === 1) {
-        return grandCollateralLabel(path, paternal, targetGender)
+        return grandCollateralLabel(path, paternal, targetGender, members)
       }
       // 祖辈的堂/表兄弟姐妹（如：up=4,down=2）
       const prefix = branchIsMale ? '堂' : '表'
@@ -332,15 +339,34 @@ function grandCollateralLabel(
   path: PathStep[],
   paternal: boolean,
   targetGender: TargetGender,
+  members: Record<string, Member>,
 ): string {
+  const grandparentGender = path[1]?.toGender
+  const grandparentId = path[1]?.toId
+
   if (paternal) {
-    const grandparentGender = path[1]?.toGender
     if (grandparentGender === 'female') {
-      return targetGender === 'female' ? '姨奶奶' : '舅公'
+      return targetGender === 'female' ? '姨奶奶' : '舅爷爷'
     }
-    return targetGender === 'female' ? '姑奶奶' : '叔公'
+    if (targetGender === 'female') return '姑奶奶'
+    const ageOrder = grandparentId
+      ? compareAgeById(targetId(path), grandparentId, members)
+      : 'unknown'
+    if (ageOrder === 'older') return '伯公'
+    if (ageOrder === 'younger') return '叔公'
+    return '伯叔公'
   }
-  return targetGender === 'female' ? '姨姥' : '舅姥爷'
+
+  if (grandparentGender === 'female') {
+    return targetGender === 'female' ? '姨外婆' : '舅外公'
+  }
+  if (targetGender === 'female') return '姑外婆'
+  const ageOrder = grandparentId
+    ? compareAgeById(targetId(path), grandparentId, members)
+    : 'unknown'
+  if (ageOrder === 'older') return '伯外公'
+  if (ageOrder === 'younger') return '叔外公'
+  return '伯叔外公'
 }
 
 /** 从 path 获取最终目标 ID */
@@ -460,8 +486,7 @@ function unclePaternalLabel(
 function inLawByInner(
   innerLabel: string,
   targetGender: TargetGender,
-  selfId: string,
-  members: Record<string, Member>,
+  spouseType: RelType | undefined,
 ): string {
   // 兄弟姐妹的配偶
   if (innerLabel === '哥哥') return targetGender === 'female' ? '嫂子' : '哥哥'
@@ -482,11 +507,23 @@ function inLawByInner(
   if (innerLabel === '孙女') return targetGender === 'female' ? '孙女' : '孙女婿'
   if (innerLabel === '外孙') return targetGender === 'female' ? '外孙媳' : '外孙'
   if (innerLabel === '外孙女') return targetGender === 'female' ? '外孙女' : '外孙女婿'
+  if (innerLabel === '曾孙') return targetGender === 'female' ? '曾孙妇' : '曾孙'
+  if (innerLabel === '曾孙女') return targetGender === 'female' ? '曾孙女' : '曾孙女婿'
+  if (innerLabel === '外曾孙') return targetGender === 'female' ? '外曾孙媳妇' : '外曾孙'
+  if (innerLabel === '外曾孙女') return targetGender === 'female' ? '外曾孙女' : '外曾孙女婿'
+  if (innerLabel === '玄孙') return targetGender === 'female' ? '玄孙媳妇' : '玄孙'
+  if (innerLabel === '玄孙女') return targetGender === 'female' ? '玄孙女' : '玄孙女婿'
+  if (innerLabel === '外玄孙') return targetGender === 'female' ? '外玄孙媳妇' : '外玄孙'
+  if (innerLabel === '外玄孙女') return targetGender === 'female' ? '外玄孙女' : '外玄孙女婿'
   // 侄辈的配偶
   if (innerLabel === '侄子') return targetGender === 'female' ? '侄媳' : '侄子'
   if (innerLabel === '侄女') return targetGender === 'female' ? '侄女' : '侄女婿'
   if (innerLabel === '外甥') return targetGender === 'female' ? '甥媳' : '外甥'
   if (innerLabel === '外甥女') return targetGender === 'female' ? '外甥女' : '甥女婿'
+  if (innerLabel === '侄孙') return targetGender === 'female' ? '侄孙妇' : '侄孙'
+  if (innerLabel === '侄孙女') return targetGender === 'female' ? '侄孙女' : '侄孙婿'
+  if (innerLabel === '外甥孙') return targetGender === 'female' ? '甥孙妇' : '外甥孙'
+  if (innerLabel === '外甥孙女') return targetGender === 'female' ? '外甥孙女' : '甥孙婿'
   // 叔伯配偶
   if (innerLabel === '伯父') return targetGender === 'female' ? '伯母' : '伯父'
   if (innerLabel === '叔叔') return targetGender === 'female' ? '婶婶' : '叔叔'
@@ -495,10 +532,18 @@ function inLawByInner(
   if (innerLabel === '舅舅') return targetGender === 'female' ? '舅妈' : '舅舅'
   if (innerLabel === '姨') return targetGender === 'female' ? '姨' : '姨父'
   // 祖辈旁系亲属的配偶
+  if (innerLabel === '伯公') return targetGender === 'female' ? '伯婆' : '伯公'
   if (innerLabel === '叔公') return targetGender === 'female' ? '叔婆' : '叔公'
+  if (innerLabel === '伯叔公') return targetGender === 'female' ? '伯叔婆' : '伯叔公'
   if (innerLabel === '姑奶奶') return targetGender === 'female' ? '姑奶奶' : '姑爷爷'
-  if (innerLabel === '舅姥爷') return targetGender === 'female' ? '舅姥姥' : '舅姥爷'
-  if (innerLabel === '姨姥') return targetGender === 'female' ? '姨姥' : '姨姥爷'
+  if (innerLabel === '舅爷爷') return targetGender === 'female' ? '舅奶奶' : '舅爷爷'
+  if (innerLabel === '姨奶奶') return targetGender === 'female' ? '姨奶奶' : '姨爷爷'
+  if (innerLabel === '伯外公') return targetGender === 'female' ? '伯外婆' : '伯外公'
+  if (innerLabel === '叔外公') return targetGender === 'female' ? '叔外婆' : '叔外公'
+  if (innerLabel === '伯叔外公') return targetGender === 'female' ? '伯叔外婆' : '伯叔外公'
+  if (innerLabel === '姑外婆') return targetGender === 'female' ? '姑外婆' : '姑外公'
+  if (innerLabel === '舅外公') return targetGender === 'female' ? '舅外婆' : '舅外公'
+  if (innerLabel === '姨外婆') return targetGender === 'female' ? '姨外婆' : '姨外公'
   // 堂/表祖辈旁系亲属的配偶
   if (innerLabel === '堂叔公') return targetGender === 'female' ? '堂叔婆' : '堂叔公'
   if (innerLabel === '堂姑奶奶') return targetGender === 'female' ? '堂姑奶奶' : '堂姑爷爷'
@@ -517,6 +562,9 @@ function inLawByInner(
   if (innerLabel === '表姨') return targetGender === 'female' ? '表姨' : '表姨父'
   if (innerLabel === '堂叔') return targetGender === 'female' ? '堂婶' : '堂叔'
   if (innerLabel === '堂伯') return targetGender === 'female' ? '堂伯母' : '堂伯'
+  if (innerLabel === '堂姑') return targetGender === 'female' ? '堂姑' : '堂姑丈'
+  if (innerLabel === '堂舅') return targetGender === 'female' ? '堂舅妈' : '堂舅'
+  if (innerLabel === '堂姨') return targetGender === 'female' ? '堂姨' : '堂姨丈'
   // 堂/表兄弟姐妹的配偶
   if (innerLabel === '堂兄弟') return targetGender === 'female' ? '堂嫂' : '堂兄弟'
   if (innerLabel === '堂兄') return targetGender === 'female' ? '堂嫂' : '堂兄'
@@ -530,6 +578,10 @@ function inLawByInner(
   if (innerLabel === '表姐妹') return targetGender === 'female' ? '表姐妹' : '表姐夫/妹夫'
   if (innerLabel === '表姐') return targetGender === 'female' ? '表姐' : '表姐夫'
   if (innerLabel === '表妹') return targetGender === 'female' ? '表妹' : '表妹夫'
+  if (innerLabel === '远房堂兄弟') return targetGender === 'female' ? '远房堂嫂/弟媳' : '远房堂兄弟'
+  if (innerLabel === '远房堂姐妹') return targetGender === 'female' ? '远房堂姐妹' : '远房堂姐夫/妹夫'
+  if (innerLabel === '远房表兄弟') return targetGender === 'female' ? '远房表嫂/弟媳' : '远房表兄弟'
+  if (innerLabel === '远房表姐妹') return targetGender === 'female' ? '远房表姐妹' : '远房表姐夫/妹夫'
   // 堂/表侄辈的配偶
   if (innerLabel === '堂侄') return targetGender === 'female' ? '堂侄媳' : '堂侄'
   if (innerLabel === '堂侄女') return targetGender === 'female' ? '堂侄女' : '堂侄女婿'
@@ -537,13 +589,73 @@ function inLawByInner(
   if (innerLabel === '表侄女') return targetGender === 'female' ? '表侄女' : '表侄女婿'
   if (innerLabel === '表外甥') return targetGender === 'female' ? '表甥媳' : '表外甥'
   if (innerLabel === '表外甥女') return targetGender === 'female' ? '表外甥女' : '表甥女婿'
-  // 父母的配偶
-  if (innerLabel === '父亲') return targetGender === 'female' ? '母亲（或继母）' : '父亲'
-  if (innerLabel === '母亲') return targetGender === 'female' ? '母亲' : '父亲（或继父）'
+  if (innerLabel === '表侄孙') return targetGender === 'female' ? '表侄孙妇' : '表侄孙'
+  if (innerLabel === '表侄孙女') return targetGender === 'female' ? '表侄孙女' : '表侄孙婿'
+  if (innerLabel === '表外甥孙') return targetGender === 'female' ? '表甥孙妇' : '表外甥孙'
+  if (innerLabel === '表外甥孙女') return targetGender === 'female' ? '表外甥孙女' : '表甥孙婿'
+  if (innerLabel === '堂外甥') return targetGender === 'female' ? '堂甥媳' : '堂外甥'
+  if (innerLabel === '堂外甥女') return targetGender === 'female' ? '堂外甥女' : '堂甥女婿'
+  // 父母的配偶：家谱可能尚未补全另一方亲子边，不能仅凭缺边推断为继配。
+  if (innerLabel === '父亲') {
+    if (spouseType === 'divorced') {
+      if (targetGender === 'female') return '父亲的前妻'
+      if (targetGender === 'male') return '父亲的前夫'
+      return '父亲的前伴侣'
+    }
+    if (targetGender === 'female') return '父亲的妻子'
+    if (targetGender === 'male') return '父亲的丈夫'
+    return '父亲的伴侣'
+  }
+  if (innerLabel === '母亲') {
+    if (spouseType === 'divorced') {
+      if (targetGender === 'male') return '母亲的前夫'
+      if (targetGender === 'female') return '母亲的前妻'
+      return '母亲的前伴侣'
+    }
+    if (targetGender === 'male') return '母亲的丈夫'
+    if (targetGender === 'female') return '母亲的妻子'
+    return '母亲的伴侣'
+  }
   if (innerLabel === '继父') return targetGender === 'female' ? '继母' : '继父'
   if (innerLabel === '继母') return targetGender === 'female' ? '继母' : '继父'
-  // 通用
-  return `${innerLabel}的配偶`
+  const ancestorSpouse = ancestorSpouseLabel(innerLabel, targetGender, spouseType)
+  if (ancestorSpouse) return ancestorSpouse
+  return '远房亲戚'
+}
+
+function ancestorSpouseLabel(
+  innerLabel: string,
+  targetGender: TargetGender,
+  spouseType: RelType | undefined,
+): string | null {
+  const formalNames: Record<string, { male: string; female: string }> = {
+    爷爷: { male: '祖父', female: '祖母' },
+    奶奶: { male: '祖父', female: '祖母' },
+    外公: { male: '外祖父', female: '外祖母' },
+    外婆: { male: '外祖父', female: '外祖母' },
+    曾祖父: { male: '曾祖父', female: '曾祖母' },
+    曾祖母: { male: '曾祖父', female: '曾祖母' },
+    外曾祖父: { male: '外曾祖父', female: '外曾祖母' },
+    外曾祖母: { male: '外曾祖父', female: '外曾祖母' },
+    高祖父: { male: '高祖父', female: '高祖母' },
+    高祖母: { male: '高祖父', female: '高祖母' },
+    外高祖父: { male: '外高祖父', female: '外高祖母' },
+    外高祖母: { male: '外高祖父', female: '外高祖母' },
+  }
+  const names = formalNames[innerLabel]
+  if (!names) return null
+
+  const innerGender = innerLabel.endsWith('父') || innerLabel === '爷爷' || innerLabel === '外公'
+    ? 'male'
+    : 'female'
+  if (spouseType === 'divorced') {
+    if (targetGender === 'female') return `${names[innerGender]}的前妻`
+    if (targetGender === 'male') return `${names[innerGender]}的前夫`
+    return `${names[innerGender]}的前伴侣`
+  }
+  if (targetGender === 'female') return `${names[innerGender]}的妻子`
+  if (targetGender === 'male') return `${names[innerGender]}的丈夫`
+  return `${names[innerGender]}的伴侣`
 }
 
 // ==================== 姻亲：开头 spouse（配偶的亲属）====================
@@ -569,27 +681,17 @@ function viaSpouseLabel(
       innerLabel === '堂姐' || innerLabel === '堂妹' || innerLabel === '堂姐妹') {
     return selfGender === 'female' ? '大姑子/小姑子' : '大姨子/小姨子'
   }
-  // 表系亲属
-  if (innerLabel.startsWith('表')) {
-    return `配偶的${innerLabel}`
-  }
-  return `配偶的${innerLabel}`
+  return '远房亲戚'
 }
 
 // ==================== 多 spouse 路径：妯娌/连襟等 ====================
 
-function multiSpouseLabel(
-  path: PathStep[],
-  selfId: string,
-  targetId: string,
-  targetGender: TargetGender,
-  selfGender: TargetGender,
-  members: Record<string, Member>,
-): string {
+function multiSpouseLabel(path: PathStep[]): string {
   const kinds = path.map((s) => s.kind)
 
   if (kinds[0] === 'spouse' && kinds[kinds.length - 1] === 'spouse') {
     const innerPath = path.slice(1, -1)
+    if (innerPath.length === 0) return '远房亲戚'
     const innerKinds = innerPath.map((s) => s.kind)
 
     const noSpouseInner = !innerKinds.includes('spouse')
@@ -612,13 +714,10 @@ function multiSpouseLabel(
       }
     }
 
-    const spouseId = path[0].toId
-    const innerTargetId = innerPath[innerPath.length - 1].toId
-    const innerLabel = describeRelation(innerPath, spouseId, innerTargetId, members)
-    return `${innerLabel}的配偶`
+    return '远房亲戚'
   }
 
-  return '亲戚'
+  return '远房亲戚'
 }
 
 // ==================== sibling 未展开兜底 ====================
@@ -633,5 +732,5 @@ function siblingFallbackLabel(
     const selfVsTarget = compareAgeById(path[0].toId, selfId, members)
     return siblingLabel(targetGender, selfVsTarget, path[0].relType)
   }
-  return '亲戚'
+  return '远房亲戚'
 }

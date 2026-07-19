@@ -271,7 +271,7 @@ describe('L3 称谓全量回归 — 跨代/旁系', () => {
   })
 
   it('self 的子女 → 舅舅', () => {
-    expect(getKinship('son', 'uncle_m', m)).toBe('舅公')
+    expect(getKinship('son', 'uncle_m', m)).toBe('舅爷爷')
   })
 })
 
