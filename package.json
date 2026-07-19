@@ -32,7 +32,7 @@
   "dependencies": {
     "@panzoom/panzoom": "^4.6.2",
     "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "pinia": "^4.0.2",
     "uuid": "^14.0.1",
     "vue": "^3.5.40",
@@ -46,7 +46,7 @@
     "@types/node": "^22.20.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.11",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^20.11.0",
     "postcss": "^8.5.19",
     "relatives-tree": "^3.2.2",
     "tailwindcss": "^4.3.3",
