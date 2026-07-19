@@ -20,6 +20,11 @@ import type {
   RowOrderPreference,
 } from '@/core/schema'
 import { createEmptyFamily } from '@/core/schema'
+import {
+  listSiblingOrderGroups,
+  orderSiblingIds,
+  reconcileSiblingOrders,
+} from '@/core/siblingOrder'
 import { setLastProjectPath } from '@/services/prefs'
 
 /**
@@ -94,6 +99,7 @@ export const useFamilyStore = defineStore('family', () => {
 
   function upsertMember(member: Member) {
     data.value.members[member.id] = member
+    data.value.siblingOrders = reconcileSiblingOrders(data.value)
     markDirty()
   }
 
@@ -132,6 +138,7 @@ export const useFamilyStore = defineStore('family', () => {
       delete data.value.manualPositions[id]
     }
     delete data.value.members[id]
+    data.value.siblingOrders = reconcileSiblingOrders(data.value)
     data.value.layoutPreferences = reconcileLayoutPreferences(data.value)
     markDirty()
   }
@@ -242,6 +249,9 @@ export const useFamilyStore = defineStore('family', () => {
       ensure(me.godchildren, { id: otherId, type: 'godchild' })
       ensure(other.godparents, { id: memberId, type: 'godparent' })
     }
+    if (kind === 'parent' || kind === 'child') {
+      data.value.siblingOrders = reconcileSiblingOrders(data.value)
+    }
     markDirty()
   }
 
@@ -269,6 +279,26 @@ export const useFamilyStore = defineStore('family', () => {
       me.godchildren = me.godchildren.filter((r) => r.id !== otherId)
       other.godparents = other.godparents.filter((r) => r.id !== memberId)
     }
+    if (kind === 'parent' || kind === 'child') {
+      data.value.siblingOrders = reconcileSiblingOrders(data.value)
+    }
+    markDirty()
+  }
+
+  function setSiblingOrder(parentageId: string, memberIds: string[] | null) {
+    const group = listSiblingOrderGroups(data.value).find(value => value.id === parentageId)
+    if (group === undefined) return
+
+    if (memberIds === null) {
+      if (data.value.siblingOrders[parentageId] === undefined) return
+      delete data.value.siblingOrders[parentageId]
+      markDirty()
+      return
+    }
+
+    const nextOrder = orderSiblingIds(group.memberIds, data.value.members, memberIds)
+    if (JSON.stringify(data.value.siblingOrders[parentageId]) === JSON.stringify(nextOrder)) return
+    data.value.siblingOrders[parentageId] = nextOrder
     markDirty()
   }
 
@@ -406,6 +436,7 @@ export const useFamilyStore = defineStore('family', () => {
     linkCurrentSpouse,
     linkRelation,
     unlinkRelation,
+    setSiblingOrder,
     setNicknameOverride,
     setRootMember,
     setDefaultViewpoint,

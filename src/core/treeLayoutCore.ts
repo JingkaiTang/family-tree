@@ -29,6 +29,7 @@ export function layoutFamilyTreeSync(
     facts: normalized.facts,
     view: mergeViewPolicy(data, normalized.facts.parentages, options.view),
     preferences: toLayoutPreferences(data),
+    siblingOrders: data.siblingOrders,
     metrics: { ...DEFAULT_LAYOUT_METRICS },
     inputDiagnostics: normalized.diagnostics,
     previousScene: options.previousScene,

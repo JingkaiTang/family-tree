@@ -14,8 +14,11 @@ import type {
 } from './types'
 
 interface ParentageEdge {
+  groupId: string
   sourceId: string
   childId: string
+  order: number
+  hasExplicitSiblingOrder: boolean
 }
 
 interface DomainRow extends PlacedRow {
@@ -402,6 +405,7 @@ function orderDomainRows(
   const domainEdges = edges.filter(edge => (
     domainUnitIds.has(edge.sourceId) && domainUnitIds.has(edge.childId)
   ))
+  const siblingOrderIndex = buildSiblingOrderIndex(domainEdges)
   const previousDomain = [
     ...(input.previousScene?.rootDomains ?? []),
     ...(input.previousScene?.bridgeDomains ?? []),
@@ -429,6 +433,13 @@ function orderDomainRows(
         preference?.unitIds.map((unitId, index) => [unitId, index]) ?? [],
       )
       let unitIds = rowUnits.map(unit => unit.id).sort((left, right) => {
+        const explicitSiblingOrder = compareSiblingOrder(
+          left,
+          right,
+          siblingOrderIndex,
+          true,
+        )
+        if (explicitSiblingOrder !== 0) return explicitSiblingOrder
         const leftPreference = preferenceIndex.get(left)
         const rightPreference = preferenceIndex.get(right)
         if (leftPreference !== undefined || rightPreference !== undefined) {
@@ -436,6 +447,13 @@ function orderDomainRows(
           if (rightPreference === undefined) return -1
           if (leftPreference !== rightPreference) return leftPreference - rightPreference
         }
+        const automaticSiblingOrder = compareSiblingOrder(
+          left,
+          right,
+          siblingOrderIndex,
+          false,
+        )
+        if (automaticSiblingOrder !== 0) return automaticSiblingOrder
         const leftPrevious = previousXByUnitId.get(left)
         const rightPrevious = previousXByUnitId.get(right)
         if (leftPrevious !== undefined || rightPrevious !== undefined) {
@@ -655,15 +673,23 @@ function buildParentageEdges(
 ): ParentageEdge[] {
   const edgeById = new Map<string, ParentageEdge>()
   for (const group of [...groups].sort((left, right) => left.id.localeCompare(right.id))) {
-    for (const childPersonId of group.childPersonIds) {
+    for (const [order, childPersonId] of group.childPersonIds.entries()) {
       const childId = unitIdByPersonId.get(childPersonId)
       if (childId === undefined || childId === group.sourceUnitId) continue
       const id = `${group.sourceUnitId}\0${childId}`
-      edgeById.set(id, { sourceId: group.sourceUnitId, childId })
+      edgeById.set(id, {
+        groupId: group.id,
+        sourceId: group.sourceUnitId,
+        childId,
+        order,
+        hasExplicitSiblingOrder: group.hasExplicitSiblingOrder === true,
+      })
     }
   }
   return [...edgeById.values()].sort((left, right) => (
     left.sourceId.localeCompare(right.sourceId)
+    || left.groupId.localeCompare(right.groupId)
+    || left.order - right.order
     || left.childId.localeCompare(right.childId)
   ))
 }
@@ -687,7 +713,7 @@ function contiguateSiblingUnits(
   let result = [...unitIds]
   const childrenBySourceId = childrenBySource(edges)
   for (const childIds of childrenBySourceId.values()) {
-    const siblings = result.filter(unitId => childIds.includes(unitId))
+    const siblings = childIds.filter(unitId => result.includes(unitId))
     if (siblings.length < 2) continue
     const siblingSet = new Set(siblings)
     const firstIndex = Math.min(...siblings.map(unitId => result.indexOf(unitId)))
@@ -695,6 +721,46 @@ function contiguateSiblingUnits(
     result.splice(firstIndex, 0, ...siblings)
   }
   return result
+}
+
+interface SiblingOrderEntry {
+  groupId: string
+  order: number
+  hasExplicitSiblingOrder: boolean
+}
+
+function buildSiblingOrderIndex(
+  edges: ParentageEdge[],
+): Map<string, SiblingOrderEntry[]> {
+  const result = new Map<string, SiblingOrderEntry[]>()
+  for (const edge of edges) {
+    const entries = result.get(edge.childId) ?? []
+    entries.push({
+      groupId: edge.groupId,
+      order: edge.order,
+      hasExplicitSiblingOrder: edge.hasExplicitSiblingOrder,
+    })
+    result.set(edge.childId, entries)
+  }
+  return result
+}
+
+function compareSiblingOrder(
+  leftId: string,
+  rightId: string,
+  index: ReadonlyMap<string, SiblingOrderEntry[]>,
+  explicitOnly: boolean,
+): number {
+  const leftEntries = index.get(leftId) ?? []
+  const rightEntries = index.get(rightId) ?? []
+  for (const left of leftEntries) {
+    if (explicitOnly && !left.hasExplicitSiblingOrder) continue
+    const right = rightEntries.find(entry => entry.groupId === left.groupId)
+    if (right === undefined) continue
+    if (explicitOnly && !right.hasExplicitSiblingOrder) continue
+    if (left.order !== right.order) return left.order - right.order
+  }
+  return 0
 }
 
 function siblingBlocks(unitIds: string[], edges: ParentageEdge[]): string[][] {

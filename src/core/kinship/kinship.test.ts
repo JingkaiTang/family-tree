@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getKinship } from './index'
-import type { Member } from '@/core/schema'
+import type { Member, SiblingOrders } from '@/core/schema'
 import { addParent, addSpouse, extendedFamily, mk } from '@/__tests__/fixtures/families'
 
 /**
@@ -765,6 +765,44 @@ describe('getKinship — P2: 长幼区分（有 birthDate）', () => {
       expect(getKinship(from, to, m)).toBe(expected)
     })
   }
+})
+
+describe('getKinship — 共享兄弟姐妹顺序参与长幼判断', () => {
+  it('没有 birthDate 时区分兄弟姐妹', () => {
+    const m = buildFixture()
+    const siblingOrders: SiblingOrders = {
+      'parentage:dad+mom': ['bro', 'self', 'sis'],
+    }
+
+    expect(getKinship('self', 'bro', m, {}, siblingOrders)).toBe('哥哥')
+    expect(getKinship('self', 'sis', m, {}, siblingOrders)).toBe('妹妹')
+  })
+
+  it('手动顺序优先于 birthDate，并传递到叔伯和姻亲称呼', () => {
+    const m = buildAgeAwareFixture()
+    const siblingOrders: SiblingOrders = {
+      'parentage:dad+mom': [
+        'younger_bro',
+        'self',
+        'older_bro',
+        'older_sis',
+        'younger_sis',
+      ],
+      'parentage:gma+gpa': [
+        'younger_uncle',
+        'dad',
+        'older_uncle',
+        'aunt_p',
+      ],
+    }
+
+    expect(getKinship('self', 'younger_bro', m, {}, siblingOrders)).toBe('哥哥')
+    expect(getKinship('self', 'older_bro', m, {}, siblingOrders)).toBe('弟弟')
+    expect(getKinship('self', 'younger_bro_wife', m, {}, siblingOrders)).toBe('嫂子')
+    expect(getKinship('self', 'older_bro_wife', m, {}, siblingOrders)).toBe('弟媳')
+    expect(getKinship('self', 'younger_uncle', m, {}, siblingOrders)).toBe('伯父')
+    expect(getKinship('self', 'older_uncle', m, {}, siblingOrders)).toBe('叔叔')
+  })
 })
 
 describe('getKinship — P2: 长幼区分 - 兄弟姐妹的配偶', () => {

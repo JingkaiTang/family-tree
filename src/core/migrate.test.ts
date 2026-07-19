@@ -66,6 +66,14 @@ describe('migrate', () => {
     })
   })
 
+  it('materializes an empty sibling order map for existing V4 projects', () => {
+    const raw: Record<string, unknown> = { ...createEmptyFamily() }
+    delete raw.siblingOrders
+
+    expect(migrate(raw).siblingOrders).toEqual({})
+    expect(FamilyData.parse(raw).siblingOrders).toEqual({})
+  })
+
   it('adds V2 grid fields while preserving legacy manualPositions', () => {
     const a = member('a')
     const raw = rawFamily([a], { manualPositions: { a: { cx: 10, top: 20 } } })

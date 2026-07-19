@@ -67,6 +67,28 @@ describe('buildFamilyUnits', () => {
     }])
   })
 
+  it('uses the shared sibling order before birth dates', () => {
+    const parent = member('parent')
+    const older = member('older', { birthDate: '1990-01-01' })
+    const younger = member('younger', { birthDate: '2000-01-01' })
+    linkParent(older, parent)
+    linkParent(younger, parent)
+    const { facts } = normalizeFacts(familyData([parent, older, younger]))
+
+    const built = buildFamilyUnits(
+      projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
+      EMPTY_LAYOUT_PREFERENCES,
+      DEFAULT_LAYOUT_METRICS,
+      { 'parentage:parent': ['younger', 'older'] },
+    )
+
+    expect(built.parentageGroups[0]).toMatchObject({
+      id: 'parentage:parent',
+      childPersonIds: ['younger', 'older'],
+      hasExplicitSiblingOrder: true,
+    })
+  })
+
   it('chooses the unit containing the most parents and uses stable id to break ties', () => {
     const parentA = member('a')
     const parentB = member('b')

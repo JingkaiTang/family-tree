@@ -8,6 +8,7 @@ import { flushNow } from '@/services/autosave'
 import { deletePhoto } from '@/services/tauriApi'
 import MemberForm from '@/components/member/MemberForm.vue'
 import RelationEditor from '@/components/member/RelationEditor.vue'
+import SiblingOrderEditor from '@/components/member/SiblingOrderEditor.vue'
 import { getKinship } from '@/core/kinship'
 import type { Member } from '@/core/schema'
 
@@ -37,7 +38,13 @@ watch(
 const viewpointMember = computed(() => (viewpointId.value ? family.getMember(viewpointId.value) : null))
 const autoKinship = computed(() => {
   if (!viewpointId.value || viewpointId.value === props.id) return null
-  return getKinship(viewpointId.value, props.id, data.value.members, data.value.nicknameOverrides)
+  return getKinship(
+    viewpointId.value,
+    props.id,
+    data.value.members,
+    data.value.nicknameOverrides,
+    data.value.siblingOrders,
+  )
 })
 const overrideValue = computed(() => {
   if (!viewpointId.value) return ''
@@ -161,6 +168,7 @@ onBeforeUnmount(() => {
       <aside class="w-96 overflow-auto bg-slate-50 p-6">
         <h3 class="mb-3 font-semibold">家庭关系</h3>
         <RelationEditor v-if="member" :member-id="id" />
+        <SiblingOrderEditor v-if="member" :member-id="id" />
 
         <div
           v-if="viewpointMember && viewpointId !== id"

@@ -1,4 +1,5 @@
-import type { Member } from '@/core/schema'
+import type { Member, SiblingOrders } from '@/core/schema'
+import { compareSiblingOrderIds } from '@/core/siblingOrder'
 import type { PathStep, RelType } from './pathFinder'
 
 type TargetGender = 'male' | 'female' | 'other'
@@ -19,7 +20,7 @@ type TargetGender = 'male' | 'female' | 'other'
  * 8. 其他 → 回退为“远房亲戚”
  *
  * 父系/母系判定：看第一步 parent 走向的是男还是女（toGender）
- * 长幼判定：利用 members 中的 birthDate 比较，无 birthDate 时回退到合并标签
+ * 长幼判定：优先使用同父母组共享顺序，再比较 birthDate；均不可用时回退到合并标签
  */
 
 export function describeRelation(
@@ -27,6 +28,7 @@ export function describeRelation(
   selfId: string,
   targetId: string,
   members: Record<string, Member>,
+  siblingOrders: SiblingOrders = {},
 ): string {
   if (path.length === 0) return '自己'
   if (selfId === targetId) return '自己'
@@ -61,7 +63,7 @@ export function describeRelation(
 
   // --- 含有未展开的 sibling 边 ---
   if (kinds.includes('sibling')) {
-    return siblingFallbackLabel(path, targetGender, selfId, members)
+    return siblingFallbackLabel(path, targetGender, selfId, members, siblingOrders)
   }
 
   // --- 旁系：先若干 parent，然后若干 child（中间不能有 spouse）---
@@ -78,7 +80,16 @@ export function describeRelation(
     const up = firstChildIdx
     const down = kinds.length - firstChildIdx
     const paternal = path[0].toGender === 'male'
-    return collateralLabel(up, down, paternal, targetGender, path, selfId, members)
+    return collateralLabel(
+      up,
+      down,
+      paternal,
+      targetGender,
+      path,
+      selfId,
+      members,
+      siblingOrders,
+    )
   }
 
   // --- 末尾是 spouse 的姻亲（路径中仅1个spouse）---
@@ -86,7 +97,13 @@ export function describeRelation(
   if (kinds[kinds.length - 1] === 'spouse' && spouseCount === 1) {
     const innerPath = path.slice(0, -1)
     const innerTargetId = innerPath[innerPath.length - 1].toId
-    const innerLabel = describeRelation(innerPath, selfId, innerTargetId, members)
+    const innerLabel = describeRelation(
+      innerPath,
+      selfId,
+      innerTargetId,
+      members,
+      siblingOrders,
+    )
     return inLawByInner(innerLabel, targetGender, path[path.length - 1].relType)
   }
 
@@ -94,7 +111,13 @@ export function describeRelation(
   if (kinds[0] === 'spouse' && spouseCount === 1) {
     const innerPath = path.slice(1)
     const innerTargetId = innerPath[innerPath.length - 1].toId
-    const innerLabel = describeRelation(innerPath, path[0].toId, innerTargetId, members)
+    const innerLabel = describeRelation(
+      innerPath,
+      path[0].toId,
+      innerTargetId,
+      members,
+      siblingOrders,
+    )
     return viaSpouseLabel(innerLabel, targetGender, selfGender)
   }
 
@@ -118,7 +141,14 @@ function compareAge(a: Member | undefined, b: Member | undefined): AgeOrder {
   return 'unknown'
 }
 
-function compareAgeById(aId: string, bId: string, members: Record<string, Member>): AgeOrder {
+function compareAgeById(
+  aId: string,
+  bId: string,
+  members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
+): AgeOrder {
+  const siblingOrder = compareSiblingOrderIds(aId, bId, siblingOrders)
+  if (siblingOrder !== null) return siblingOrder < 0 ? 'older' : 'younger'
   return compareAge(members[aId], members[bId])
 }
 
@@ -221,6 +251,7 @@ function collateralLabel(
   path: PathStep[],
   selfId: string,
   members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
 ): string {
   const genDiff = up - down  // 代际差：正=长辈，0=同辈，负=晚辈
 
@@ -236,12 +267,12 @@ function collateralLabel(
   if (genDiff === 0) {
     if (up === 1) {
       // 兄弟姐妹
-      const selfVsTarget = compareAgeById(targetId(path), selfId, members)
+      const selfVsTarget = compareAgeById(targetId(path), selfId, members, siblingOrders)
       return siblingLabel(targetGender, selfVsTarget, path[1]?.relType)
     }
     if (up === 2) {
       const prefix = sameGenerationTang ? '堂' : '表'
-      const ageOrder = compareAgeById(targetId(path), selfId, members)
+      const ageOrder = compareAgeById(targetId(path), selfId, members, siblingOrders)
       if (targetGender === 'female') {
         if (ageOrder === 'older') return `${prefix}姐`
         if (ageOrder === 'younger') return `${prefix}妹`
@@ -263,19 +294,27 @@ function collateralLabel(
         // 父母的兄弟姐妹
         if (paternal) {
           if (targetGender === 'female') return '姑姑'
-          return unclePaternalLabel(path, selfId, members)
+          return unclePaternalLabel(path, selfId, members, siblingOrders)
         }
         return targetGender === 'female' ? '姨' : '舅舅'
       }
       // up=3,down=2 等其他 genDiff=1 的组合
       // 例如：父亲的表兄弟（up=3,down=2）
-      return collateralUncleLabel(paternal, branchIsMale, targetGender, path, selfId, members)
+      return collateralUncleLabel(
+        paternal,
+        branchIsMale,
+        targetGender,
+        path,
+        selfId,
+        members,
+        siblingOrders,
+      )
     }
 
     // 祖父母辈（genDiff=2）
     if (genDiff === 2) {
       if (up === 3 && down === 1) {
-        return grandCollateralLabel(path, paternal, targetGender, members)
+        return grandCollateralLabel(path, paternal, targetGender, members, siblingOrders)
       }
       // 祖辈的堂/表兄弟姐妹（如：up=4,down=2）
       const prefix = branchIsMale ? '堂' : '表'
@@ -340,6 +379,7 @@ function grandCollateralLabel(
   paternal: boolean,
   targetGender: TargetGender,
   members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
 ): string {
   const grandparentGender = path[1]?.toGender
   const grandparentId = path[1]?.toId
@@ -350,7 +390,7 @@ function grandCollateralLabel(
     }
     if (targetGender === 'female') return '姑奶奶'
     const ageOrder = grandparentId
-      ? compareAgeById(targetId(path), grandparentId, members)
+      ? compareAgeById(targetId(path), grandparentId, members, siblingOrders)
       : 'unknown'
     if (ageOrder === 'older') return '伯公'
     if (ageOrder === 'younger') return '叔公'
@@ -362,7 +402,7 @@ function grandCollateralLabel(
   }
   if (targetGender === 'female') return '姑外婆'
   const ageOrder = grandparentId
-    ? compareAgeById(targetId(path), grandparentId, members)
+    ? compareAgeById(targetId(path), grandparentId, members, siblingOrders)
     : 'unknown'
   if (ageOrder === 'older') return '伯外公'
   if (ageOrder === 'younger') return '叔外公'
@@ -388,6 +428,7 @@ function collateralUncleLabel(
   path: PathStep[],
   selfId: string,
   members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
 ): string {
   // 分叉点是男性 → 堂系（同姓旁系）；分叉点是女性 → 表系（异姓旁系）
   const prefix = branchIsMale ? '堂' : '表'
@@ -400,7 +441,7 @@ function collateralUncleLabel(
     // 男：区分伯/叔（比较目标和父亲的年龄）
     const parentId = path[0].toId // 第一步 parent = 父亲
     const uncleId = targetId(path)
-    const ageOrder = compareAgeById(uncleId, parentId, members)
+    const ageOrder = compareAgeById(uncleId, parentId, members, siblingOrders)
     if (ageOrder === 'older') return `${prefix}伯`
     if (ageOrder === 'younger') return `${prefix}叔`
     return `${prefix}叔伯`
@@ -472,10 +513,11 @@ function unclePaternalLabel(
   path: PathStep[],
   selfId: string,
   members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
 ): string {
   const parentId = path[0].toId
   const uncleId = targetId(path)
-  const ageOrder = compareAgeById(uncleId, parentId, members)
+  const ageOrder = compareAgeById(uncleId, parentId, members, siblingOrders)
   if (ageOrder === 'older') return '伯父'
   if (ageOrder === 'younger') return '叔叔'
   return '叔伯'
@@ -727,9 +769,10 @@ function siblingFallbackLabel(
   targetGender: TargetGender,
   selfId: string,
   members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
 ): string {
   if (path.length === 1 && path[0].kind === 'sibling') {
-    const selfVsTarget = compareAgeById(path[0].toId, selfId, members)
+    const selfVsTarget = compareAgeById(path[0].toId, selfId, members, siblingOrders)
     return siblingLabel(targetGender, selfVsTarget, path[0].relType)
   }
   return '远房亲戚'

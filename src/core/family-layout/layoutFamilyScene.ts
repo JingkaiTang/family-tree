@@ -32,7 +32,12 @@ const UNSAFE_CODES = new Set<LayoutDiagnostic['code']>([
 
 export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
   const projected = projectView(request.facts, request.view)
-  const built = buildFamilyUnits(projected, request.preferences, request.metrics)
+  const built = buildFamilyUnits(
+    projected,
+    request.preferences,
+    request.metrics,
+    request.siblingOrders,
+  )
   const generations = assignGenerations(projected, built)
   const baseUnits = built.units.map(unit => ({
     ...unit,

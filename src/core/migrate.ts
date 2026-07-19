@@ -8,11 +8,13 @@ import {
   PersistedLayoutPreferences,
   SCHEMA_VERSION,
 } from './schema'
+import { reconcileSiblingOrders } from './siblingOrder'
 import { z } from 'zod'
 
 type MutableFamily = Record<string, unknown> & {
   schemaVersion: number
   members?: Record<string, Member>
+  siblingOrders?: FamilyData['siblingOrders']
   childLayoutAssignments?: FamilyData['childLayoutAssignments']
   gridLayoutOverrides?: FamilyData['gridLayoutOverrides']
   layoutPreferences?: unknown
@@ -51,10 +53,12 @@ export function migrate(raw: unknown): FamilyData {
 
   current.schemaVersion = SCHEMA_VERSION
   current.members = current.members ?? {}
+  current.siblingOrders = current.siblingOrders ?? {}
   current.childLayoutAssignments = current.childLayoutAssignments ?? {}
   current.gridLayoutOverrides = current.gridLayoutOverrides ?? {}
   current.layoutPreferences = parseLayoutPreferences(current.layoutPreferences)
   current.layoutPreferences = reconcileLayoutPreferences(current as unknown as FamilyData)
+  current.siblingOrders = reconcileSiblingOrders(current as unknown as FamilyData)
   return current as unknown as FamilyData
 }
 

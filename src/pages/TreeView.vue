@@ -106,7 +106,13 @@ onMounted(() => {
 })
 
 function kinshipResolver(fromId: string, toId: string): string | null {
-  return getKinship(fromId, toId, data.value.members, data.value.nicknameOverrides)
+  return getKinship(
+    fromId,
+    toId,
+    data.value.members,
+    data.value.nicknameOverrides,
+    data.value.siblingOrders,
+  )
 }
 
 async function onGcMedia() {

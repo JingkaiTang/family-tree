@@ -179,6 +179,40 @@ describe('layoutFamilyTree', () => {
     expect(scene.units[0]).toMatchObject({ id: unitId, accent: '#123456' })
   })
 
+  it('places siblings in their shared manual order without birth dates', async () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const childA = member('child-a')
+    const childB = member('child-b')
+    const childC = member('child-c')
+    linkSpouse(parentA, parentB)
+    for (const child of [childA, childB, childC]) {
+      linkParent(child, parentA)
+      linkParent(child, parentB)
+    }
+    const data = familyData([parentA, parentB, childA, childB, childC])
+    const previousScene = await layoutFamilyTree(Object.values(data.members), { data })
+    data.siblingOrders['parentage:parent-a+parent-b'] = [
+      'child-c',
+      'child-a',
+      'child-b',
+    ]
+
+    const scene = await layoutFamilyTree(Object.values(data.members), {
+      data,
+      previousScene,
+    })
+    const xById = new Map(scene.cards.map(card => [card.id, card.rect.x]))
+
+    expect(scene.primaryParentageGroups![0].childPersonIds).toEqual([
+      'child-c',
+      'child-a',
+      'child-b',
+    ])
+    expect(xById.get('child-c')!).toBeLessThan(xById.get('child-a')!)
+    expect(xById.get('child-a')!).toBeLessThan(xById.get('child-b')!)
+  })
+
   it('passes normalization diagnostics through the public facade', async () => {
     const child = member('child', {
       parents: [{ id: 'missing-parent', type: 'blood' }],

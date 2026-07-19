@@ -41,6 +41,7 @@ MyFamily.family/
 | `schemaVersion` | 格式版本，保存时必须等于 4 |
 | `members` | `memberId -> Member` 映射，键必须等于成员内部 `id` |
 | `nicknameOverrides` | 指定两名成员之间的自定义称谓 |
+| `siblingOrders` | 按规范化亲子组保存的共享兄弟姐妹顺序，用于布局和长幼称呼；未设置时按出生日期排序 |
 | `layoutPreferences` | 根域、行、桥域顺序和稳定配色偏好 |
 | `childLayoutAssignments` | 旧格式兼容的主父母布局选择 |
 | `manualPositions` | 已废弃的旧手工坐标，仅为兼容保留 |
