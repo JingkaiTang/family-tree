@@ -5,6 +5,11 @@ import type {
   ParentageGroup,
   ProjectedFamily,
 } from './types'
+import type { SiblingOrders } from '@/core/schema'
+import {
+  findSiblingOrderForMembers,
+  orderSiblingIds,
+} from '@/core/siblingOrder'
 
 export interface BuiltFamilyUnits {
   units: FamilyUnit[]
@@ -30,6 +35,7 @@ export function buildFamilyUnits(
   projected: ProjectedFamily,
   preferences: LayoutPreferences,
   metrics: LayoutMetrics,
+  siblingOrders: SiblingOrders = {},
 ): BuiltFamilyUnits {
   const unitIdByPersonId: Record<string, string> = {}
   const units: FamilyUnit[] = []
@@ -83,6 +89,11 @@ export function buildFamilyUnits(
       const sourceAnchorPersonId = sourceParentIds.length === 1
         ? sourceParentIds[0]
         : undefined
+      const siblingOrder = findSiblingOrderForMembers(
+        parentage.childIds,
+        siblingOrders,
+        1,
+      )
 
       return [{
         id: parentage.id,
@@ -91,15 +102,15 @@ export function buildFamilyUnits(
           sourceHubId: `hub:${parentage.id}`,
           sourceAnchorPersonId,
         } : {}),
-        childPersonIds: [...parentage.childIds].sort((a, b) => {
-          const aBirthDate = memberById.get(a)?.birthDate
-          const bBirthDate = memberById.get(b)?.birthDate
-          if (aBirthDate && bBirthDate && aBirthDate !== bBirthDate) {
-            return aBirthDate.localeCompare(bBirthDate)
-          }
-          if (aBirthDate && !bBirthDate) return -1
-          if (!aBirthDate && bBirthDate) return 1
-          return a.localeCompare(b)
+        childPersonIds: orderSiblingIds(
+          parentage.childIds,
+          memberById,
+          siblingOrder?.memberIds,
+        ),
+        ...(siblingOrder === undefined ? {} : {
+          siblingOrderId: siblingOrder.groupId,
+          siblingOrderPersonIds: siblingOrder.memberIds,
+          hasExplicitSiblingOrder: true,
         }),
       }]
     })

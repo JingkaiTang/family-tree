@@ -220,5 +220,51 @@ export function normalizePath(
     })
     currentId = step.toId
   }
-  return out
+  return markInferredHalfSiblings(out, members, selfId)
+}
+
+function markInferredHalfSiblings(
+  path: PathStep[],
+  members: Record<string, Member>,
+  selfId: string,
+): PathStep[] {
+  const result = path.map(step => ({ ...step }))
+  let currentId = selfId
+
+  for (let index = 0; index < result.length - 1; index += 1) {
+    const step = result[index]
+    const next = result[index + 1]
+    if (step.kind === 'parent' && next.kind === 'child') {
+      const explicitSibling = members[currentId]?.siblings
+        .find(sibling => sibling.id === next.toId)
+      const currentParentIds = bloodParentIds(members[currentId])
+      const targetParentIds = bloodParentIds(members[next.toId])
+      const hasCommonParent = currentParentIds.some(parentId => (
+        targetParentIds.includes(parentId)
+      ))
+      if (
+        explicitSibling?.type !== 'blood'
+        && currentParentIds.length >= 2
+        && targetParentIds.length >= 2
+        && hasCommonParent
+        && !sameMemberIds(currentParentIds, targetParentIds)
+      ) {
+        next.relType = 'half'
+      }
+    }
+    currentId = step.toId
+  }
+  return result
+}
+
+function bloodParentIds(member: Member | undefined): string[] {
+  return [...new Set(member?.parents
+    .filter(parent => parent.type === 'blood')
+    .map(parent => parent.id) ?? [])]
+    .sort((left, right) => left.localeCompare(right))
+}
+
+function sameMemberIds(left: string[], right: string[]): boolean {
+  return left.length === right.length
+    && left.every((memberId, index) => memberId === right[index])
 }

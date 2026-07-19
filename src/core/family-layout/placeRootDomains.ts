@@ -14,8 +14,11 @@ import type {
 } from './types'
 
 interface ParentageEdge {
+  groupId: string
   sourceId: string
   childId: string
+  order: number
+  hasExplicitSiblingOrder: boolean
 }
 
 interface DomainRow extends PlacedRow {
@@ -447,9 +450,11 @@ function orderDomainRows(
           - (domainOrder.get(right) ?? Number.POSITIVE_INFINITY)
           || left.localeCompare(right)
       })
-      if (preference === undefined) {
-        unitIds = contiguateSiblingUnits(unitIds, domainEdges)
-      }
+      unitIds = applySiblingUnitOrders(
+        unitIds,
+        domainEdges,
+        preference !== undefined,
+      )
       return {
         id: `row:${domain.id}:${generation}`,
         domainId: domain.id,
@@ -655,15 +660,27 @@ function buildParentageEdges(
 ): ParentageEdge[] {
   const edgeById = new Map<string, ParentageEdge>()
   for (const group of [...groups].sort((left, right) => left.id.localeCompare(right.id))) {
-    for (const childPersonId of group.childPersonIds) {
+    const siblingOrderByPersonId = new Map(
+      (group.siblingOrderPersonIds ?? group.childPersonIds)
+        .map((personId, index) => [personId, index] as const),
+    )
+    for (const [fallbackOrder, childPersonId] of group.childPersonIds.entries()) {
       const childId = unitIdByPersonId.get(childPersonId)
       if (childId === undefined || childId === group.sourceUnitId) continue
       const id = `${group.sourceUnitId}\0${childId}`
-      edgeById.set(id, { sourceId: group.sourceUnitId, childId })
+      edgeById.set(id, {
+        groupId: group.siblingOrderId ?? group.id,
+        sourceId: group.sourceUnitId,
+        childId,
+        order: siblingOrderByPersonId.get(childPersonId) ?? fallbackOrder,
+        hasExplicitSiblingOrder: group.hasExplicitSiblingOrder === true,
+      })
     }
   }
   return [...edgeById.values()].sort((left, right) => (
     left.sourceId.localeCompare(right.sourceId)
+    || left.groupId.localeCompare(right.groupId)
+    || left.order - right.order
     || left.childId.localeCompare(right.childId)
   ))
 }
@@ -680,14 +697,26 @@ function groupUnitsByGeneration<T extends RootedFamilyUnit>(
   return unitsByGeneration
 }
 
-function contiguateSiblingUnits(
+function applySiblingUnitOrders(
   unitIds: string[],
   edges: ParentageEdge[],
+  explicitOnly: boolean,
 ): string[] {
   let result = [...unitIds]
-  const childrenBySourceId = childrenBySource(edges)
-  for (const childIds of childrenBySourceId.values()) {
-    const siblings = result.filter(unitId => childIds.includes(unitId))
+  const edgesByGroupId = new Map<string, ParentageEdge[]>()
+  for (const edge of edges) {
+    const groupEdges = edgesByGroupId.get(edge.groupId) ?? []
+    groupEdges.push(edge)
+    edgesByGroupId.set(edge.groupId, groupEdges)
+  }
+
+  for (const [, groupEdges] of [...edgesByGroupId]
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    if (explicitOnly && !groupEdges.some(edge => edge.hasExplicitSiblingOrder)) continue
+    const siblings = [...new Set([...groupEdges]
+      .sort((left, right) => left.order - right.order || left.childId.localeCompare(right.childId))
+      .map(edge => edge.childId))]
+      .filter(unitId => result.includes(unitId))
     if (siblings.length < 2) continue
     const siblingSet = new Set(siblings)
     const firstIndex = Math.min(...siblings.map(unitId => result.indexOf(unitId)))
@@ -714,6 +743,19 @@ function siblingBlocks(unitIds: string[], edges: ParentageEdge[]): string[][] {
   }
 
   for (const childIds of childrenBySource(edges).values()) {
+    const rowChildren = childIds.filter(unitId => unitIds.includes(unitId))
+    if (rowChildren.length < 2) continue
+    for (let index = 1; index < rowChildren.length; index += 1) {
+      union(rowChildren[0], rowChildren[index])
+    }
+  }
+  const childrenByGroupId = new Map<string, string[]>()
+  for (const edge of edges) {
+    const childIds = childrenByGroupId.get(edge.groupId) ?? []
+    if (!childIds.includes(edge.childId)) childIds.push(edge.childId)
+    childrenByGroupId.set(edge.groupId, childIds)
+  }
+  for (const childIds of childrenByGroupId.values()) {
     const rowChildren = childIds.filter(unitId => unitIds.includes(unitId))
     if (rowChildren.length < 2) continue
     for (let index = 1; index < rowChildren.length; index += 1) {

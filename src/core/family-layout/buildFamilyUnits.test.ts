@@ -67,6 +67,69 @@ describe('buildFamilyUnits', () => {
     }])
   })
 
+  it('uses the shared sibling order before birth dates', () => {
+    const parent = member('parent')
+    const older = member('older', { birthDate: '1990-01-01' })
+    const younger = member('younger', { birthDate: '2000-01-01' })
+    linkParent(older, parent)
+    linkParent(younger, parent)
+    const { facts } = normalizeFacts(familyData([parent, older, younger]))
+
+    const built = buildFamilyUnits(
+      projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
+      EMPTY_LAYOUT_PREFERENCES,
+      DEFAULT_LAYOUT_METRICS,
+      { 'parentage:parent': ['younger', 'older'] },
+    )
+
+    expect(built.parentageGroups[0]).toMatchObject({
+      id: 'parentage:parent',
+      childPersonIds: ['younger', 'older'],
+      hasExplicitSiblingOrder: true,
+    })
+  })
+
+  it('propagates one explicit order across different parentage groups', () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const childA = member('child-a')
+    const childB = member('child-b')
+    const { facts } = normalizeFacts(familyData([parentA, parentB, childA, childB]))
+    facts.parentages = [{
+      id: 'parentage:parent-a',
+      parentIds: ['parent-a'],
+      childIds: ['child-a'],
+      typeByChildId: { 'child-a': 'blood' },
+    }, {
+      id: 'parentage:parent-b',
+      parentIds: ['parent-b'],
+      childIds: ['child-b'],
+      typeByChildId: { 'child-b': 'blood' },
+    }]
+
+    const built = buildFamilyUnits(
+      projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
+      EMPTY_LAYOUT_PREFERENCES,
+      DEFAULT_LAYOUT_METRICS,
+      { 'siblings:child-a+child-b': ['child-b', 'child-a'] },
+    )
+
+    expect(built.parentageGroups).toEqual([
+      expect.objectContaining({
+        id: 'parentage:parent-a',
+        siblingOrderId: 'siblings:child-a+child-b',
+        siblingOrderPersonIds: ['child-b', 'child-a'],
+        hasExplicitSiblingOrder: true,
+      }),
+      expect.objectContaining({
+        id: 'parentage:parent-b',
+        siblingOrderId: 'siblings:child-a+child-b',
+        siblingOrderPersonIds: ['child-b', 'child-a'],
+        hasExplicitSiblingOrder: true,
+      }),
+    ])
+  })
+
   it('chooses the unit containing the most parents and uses stable id to break ties', () => {
     const parentA = member('a')
     const parentB = member('b')

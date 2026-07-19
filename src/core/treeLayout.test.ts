@@ -34,6 +34,11 @@ function linkParent(child: Member, parent: Member) {
   parent.children.push({ id: child.id, type: 'blood' })
 }
 
+function linkSibling(left: Member, right: Member) {
+  left.siblings.push({ id: right.id, type: 'blood' })
+  right.siblings.push({ id: left.id, type: 'blood' })
+}
+
 function buildUserFixture(): Member[] {
   const tangJingkai = member('tang_jingkai')
   const tangYuelin = member('tang_yuelin')
@@ -72,6 +77,27 @@ function familyData(members: Member[]): FamilyData {
 }
 
 describe('layoutFamilyTree', () => {
+  it('orders explicit siblings without parent data as adjacent root domains', async () => {
+    const siblingA = member('sibling-a')
+    const siblingB = member('sibling-b')
+    const siblingC = member('sibling-c')
+    linkSibling(siblingA, siblingB)
+    linkSibling(siblingB, siblingC)
+    const data = familyData([siblingA, siblingB, siblingC])
+    data.siblingOrders['siblings:sibling-a+sibling-b+sibling-c'] = [
+      'sibling-c',
+      'sibling-a',
+      'sibling-b',
+    ]
+
+    const scene = await layoutFamilyTree(Object.values(data.members), { data })
+
+    expect([...scene.rootDomains]
+      .sort((left, right) => left.rect.x - right.rect.x)
+      .map(domain => domain.personIds[0]))
+      .toEqual(['sibling-c', 'sibling-a', 'sibling-b'])
+  })
+
   it('returns continuous root and bridge domains through the public facade', async () => {
     const data = twoRootMarriageFamilyData()
     const scene = await layoutFamilyTree(Object.values(data.members), { data })
@@ -177,6 +203,40 @@ describe('layoutFamilyTree', () => {
 
     expect(scene.units).toHaveLength(1)
     expect(scene.units[0]).toMatchObject({ id: unitId, accent: '#123456' })
+  })
+
+  it('places siblings in their shared manual order without birth dates', async () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const childA = member('child-a')
+    const childB = member('child-b')
+    const childC = member('child-c')
+    linkSpouse(parentA, parentB)
+    for (const child of [childA, childB, childC]) {
+      linkParent(child, parentA)
+      linkParent(child, parentB)
+    }
+    const data = familyData([parentA, parentB, childA, childB, childC])
+    const previousScene = await layoutFamilyTree(Object.values(data.members), { data })
+    data.siblingOrders['parentage:parent-a+parent-b'] = [
+      'child-c',
+      'child-a',
+      'child-b',
+    ]
+
+    const scene = await layoutFamilyTree(Object.values(data.members), {
+      data,
+      previousScene,
+    })
+    const xById = new Map(scene.cards.map(card => [card.id, card.rect.x]))
+
+    expect(scene.primaryParentageGroups![0].childPersonIds).toEqual([
+      'child-c',
+      'child-a',
+      'child-b',
+    ])
+    expect(xById.get('child-c')!).toBeLessThan(xById.get('child-a')!)
+    expect(xById.get('child-a')!).toBeLessThan(xById.get('child-b')!)
   })
 
   it('passes normalization diagnostics through the public facade', async () => {

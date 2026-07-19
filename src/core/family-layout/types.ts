@@ -1,4 +1,4 @@
-import type { Member, PersistedLayoutPreferences } from '@/core/schema'
+import type { Member, PersistedLayoutPreferences, SiblingOrders } from '@/core/schema'
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
@@ -98,6 +98,7 @@ export interface LayoutRequest {
   facts: FamilyFacts
   view: FamilyViewPolicy
   preferences: LayoutPreferences
+  siblingOrders?: SiblingOrders
   metrics: LayoutMetrics
   inputDiagnostics: LayoutDiagnostic[]
   previousScene?: LayoutScene
@@ -186,6 +187,7 @@ export interface BuildRootDomainsInput {
   signatures: RootSignatureResult
   accents: Record<string, string>
   preferences: LayoutPreferences
+  siblingOrders?: SiblingOrders
   previousScene?: RootAccentSceneSnapshot
   previousRootIdByRootId?: Record<string, string>
   preferredComponentPersonId?: string
@@ -235,6 +237,9 @@ export interface ParentageGroup {
   sourceHubId?: string
   sourceAnchorPersonId?: string
   childPersonIds: string[]
+  siblingOrderId?: string
+  siblingOrderPersonIds?: string[]
+  hasExplicitSiblingOrder?: boolean
 }
 export interface AuxiliaryRelation {
   id: string

@@ -11,13 +11,15 @@ import { describeRelation } from './chineseTerms'
  *    - 对方在我的 godchildren → 干儿子/干女儿
  *    不做嵌套链路（"干爹的妈妈"不走干亲再血缘，继续看有没有血缘连通）
  * 3. 否则按“谱系 → 单层姻亲 → 普通最短路”的语义优先级选路，规范化后翻译
- * 4. 找不到路径 → null
+ * 4. 翻译中的长幼判断优先使用 siblingOrders，再回退 birthDate
+ * 5. 找不到路径 → null
  */
 export function getKinship(
   fromId: string,
   toId: string,
   members: Record<string, Member>,
   overrides: FamilyData['nicknameOverrides'] = {},
+  siblingOrders: FamilyData['siblingOrders'] = {},
 ): string | null {
   if (!members[fromId] || !members[toId]) return null
   if (fromId === toId) return '本人'
@@ -37,7 +39,7 @@ export function getKinship(
   const path = findPreferredKinshipPath(fromId, toId, members)
   if (!path) return null
   const normalized = normalizePath(path, members, fromId)
-  return describeRelation(normalized, fromId, toId, members)
+  return describeRelation(normalized, fromId, toId, members, siblingOrders)
 }
 
 export * from './pathFinder'

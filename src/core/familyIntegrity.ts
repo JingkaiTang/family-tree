@@ -91,6 +91,16 @@ export function validateFamilyIntegrity(family: FamilyData): string[] {
       validateMemberPointer(toId, `nicknameOverrides.${fromId}.${toId}`, members, addIssue)
     }
   }
+  for (const [groupId, memberIds] of Object.entries(family.siblingOrders ?? {})) {
+    const seen = new Set<string>()
+    for (const memberId of memberIds) {
+      if (seen.has(memberId)) {
+        addIssue(`siblingOrders.${groupId} 重复引用 ${memberId}`)
+      }
+      seen.add(memberId)
+      validateMemberPointer(memberId, `siblingOrders.${groupId}`, members, addIssue)
+    }
+  }
   for (const memberId of Object.keys(family.manualPositions)) {
     validateMemberPointer(memberId, `manualPositions.${memberId}`, members, addIssue)
   }

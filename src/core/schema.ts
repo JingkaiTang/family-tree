@@ -58,6 +58,10 @@ export const NicknameOverrides = z.record(
 )
 export type NicknameOverrides = z.infer<typeof NicknameOverrides>
 
+/** 同一兄弟姐妹关系组共享的顺序。key 使用 parentage id 或规范化的 siblings id。 */
+export const SiblingOrders = z.record(z.string(), z.array(z.string()))
+export type SiblingOrders = z.infer<typeof SiblingOrders>
+
 /** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */
 export const ManualPosition = z.object({
   cx: z.number(),
@@ -114,6 +118,7 @@ export const FamilyData = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   members: z.record(z.string(), Member),
   nicknameOverrides: NicknameOverrides.default({}),
+  siblingOrders: SiblingOrders.default({}),
   /** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */
   manualPositions: ManualPositions.default({}),
   childLayoutAssignments: ChildLayoutAssignments.default({}),
@@ -141,6 +146,7 @@ export function createEmptyFamily(): FamilyData {
     schemaVersion: SCHEMA_VERSION,
     members: {},
     nicknameOverrides: {},
+    siblingOrders: {},
     manualPositions: {},
     childLayoutAssignments: {},
     gridLayoutOverrides: {},

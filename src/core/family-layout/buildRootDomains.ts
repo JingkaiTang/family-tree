@@ -241,7 +241,7 @@ function buildStableRootOrder(
     return leftX - rightX || left.localeCompare(right)
   })
 
-  return componentIds.flatMap(componentId => {
+  const stableOrder = componentIds.flatMap(componentId => {
     const roots = rootsByComponentId.get(componentId) ?? []
     const preferredRootIds = input.preferences.rootOrders
       .find(preference => preference.componentId === componentId)
@@ -263,6 +263,32 @@ function buildStableRootOrder(
     })
     return optimizeRootOrder(seed, edges, preferredRootIds)
   })
+  return applySiblingRootOrders(stableOrder, input.roots, input.siblingOrders ?? {})
+}
+
+function applySiblingRootOrders(
+  rootIds: string[],
+  roots: RootFamily[],
+  siblingOrders: Readonly<Record<string, string[]>>,
+): string[] {
+  let result = [...rootIds]
+  const rootIdByPersonId = new Map(roots.flatMap(root => (
+    root.seedPersonIds.map(personId => [personId, root.id] as const)
+  )))
+
+  for (const [, personIds] of Object.entries(siblingOrders)
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    const orderedRootIds = [...new Set(personIds
+      .map(personId => rootIdByPersonId.get(personId))
+      .filter((rootId): rootId is string => rootId !== undefined))]
+      .filter(rootId => result.includes(rootId))
+    if (orderedRootIds.length < 2) continue
+    const siblingRootSet = new Set(orderedRootIds)
+    const firstIndex = Math.min(...orderedRootIds.map(rootId => result.indexOf(rootId)))
+    result = result.filter(rootId => !siblingRootSet.has(rootId))
+    result.splice(firstIndex, 0, ...orderedRootIds)
+  }
+  return result
 }
 
 function optimizeRootOrder(
