@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { syntheticFamily200 } from '@/__tests__/fixtures/syntheticFamily200'
 import { getKinship } from './index'
-import { findShortestLineagePath, normalizePath } from './pathFinder'
+import { findPreferredKinshipPath, findShortestLineagePath, normalizePath } from './pathFinder'
 
 describe('kinship audit', () => {
   it('现有 200 人测试家族中，所有谱系亲属都不得使用配偶称呼', () => {
@@ -43,6 +43,26 @@ describe('kinship audit', () => {
         if (label?.includes('的配偶') || label === '姻亲') {
           failures.push(`${fromId} -> ${toId}: ${label}`)
         }
+      }
+    }
+
+    expect(failures).toEqual([])
+  })
+
+  it('单层末端配偶关系不能用“亲戚”掩盖未解析状态', () => {
+    const members = syntheticFamily200().members
+    const ids = Object.keys(members)
+    const failures: string[] = []
+
+    for (const fromId of ids) {
+      for (const toId of ids) {
+        const rawPath = findPreferredKinshipPath(fromId, toId, members)
+        if (!rawPath) continue
+        const path = normalizePath(rawPath, members, fromId)
+        const spouseCount = path.filter(step => step.kind === 'spouse').length
+        if (spouseCount !== 1 || path.at(-1)?.kind !== 'spouse') continue
+        const label = getKinship(fromId, toId, members)
+        if (label === '亲戚') failures.push(`${fromId} -> ${toId}`)
       }
     }
 

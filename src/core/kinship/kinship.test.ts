@@ -1475,6 +1475,43 @@ describe('getKinship — 祖辈旁系亲属的配偶', () => {
 })
 
 describe('getKinship — 血亲与姻亲路径同时存在', () => {
+  it('直接配偶同时也是远房血亲时仍优先称为配偶', () => {
+    const members = Object.fromEntries([
+      mk('self', { gender: 'male' }),
+      mk('wife', { gender: 'female' }),
+      mk('dad', { gender: 'male' }),
+      mk('wife-dad', { gender: 'male' }),
+      mk('gpa', { gender: 'male' }),
+    ].map(member => [member.id, member]))
+
+    addParent(members.self, members.dad)
+    addParent(members.wife, members['wife-dad'])
+    addParent(members.dad, members.gpa)
+    addParent(members['wife-dad'], members.gpa)
+    addSpouse(members.self, members.wife)
+
+    expect(getKinship('self', 'wife', members)).toBe('妻子')
+  })
+
+  it('离异配偶同时也是远房血亲时称为前配偶', () => {
+    const members = Object.fromEntries([
+      mk('self', { gender: 'male' }),
+      mk('former-wife', { gender: 'female' }),
+      mk('dad', { gender: 'male' }),
+      mk('former-wife-dad', { gender: 'male' }),
+      mk('gpa', { gender: 'male' }),
+    ].map(member => [member.id, member]))
+
+    addParent(members.self, members.dad)
+    addParent(members['former-wife'], members['former-wife-dad'])
+    addParent(members.dad, members.gpa)
+    addParent(members['former-wife-dad'], members.gpa)
+    members.self.spouses.push({ id: 'former-wife', type: 'divorced' })
+    members['former-wife'].spouses.push({ id: 'self', type: 'divorced' })
+
+    expect(getKinship('self', 'former-wife', members)).toBe('前妻')
+  })
+
   it('向上三代的远房表亲不被更短的配偶路径覆盖', () => {
     const members = extendedFamily()
     const extra = [
@@ -1530,5 +1567,36 @@ describe('getKinship — 血亲与姻亲路径同时存在', () => {
     addSpouse(members['second-cousin'], members['third-cousin'])
 
     expect(getKinship('self', 'third-cousin', members)).toBe('远房表姐妹')
+  })
+})
+
+describe('getKinship — 祖先的配偶与前配偶', () => {
+  it('亲子边不完整时保持为祖父的妻子，不擅自推断继配', () => {
+    const members = Object.fromEntries([
+      mk('self', { gender: 'male' }),
+      mk('dad', { gender: 'male' }),
+      mk('gpa', { gender: 'male' }),
+      mk('step-gma', { gender: 'female' }),
+    ].map(member => [member.id, member]))
+    addParent(members.self, members.dad)
+    addParent(members.dad, members.gpa)
+    addSpouse(members.gpa, members['step-gma'])
+
+    expect(getKinship('self', 'step-gma', members)).toBe('祖父的妻子')
+  })
+
+  it('祖父的离异配偶不会被误称为祖母', () => {
+    const members = Object.fromEntries([
+      mk('self', { gender: 'male' }),
+      mk('dad', { gender: 'male' }),
+      mk('gpa', { gender: 'male' }),
+      mk('former-wife', { gender: 'female' }),
+    ].map(member => [member.id, member]))
+    addParent(members.self, members.dad)
+    addParent(members.dad, members.gpa)
+    members.gpa.spouses.push({ id: 'former-wife', type: 'divorced' })
+    members['former-wife'].spouses.push({ id: 'gpa', type: 'divorced' })
+
+    expect(getKinship('self', 'former-wife', members)).toBe('祖父的前妻')
   })
 })

@@ -39,7 +39,14 @@ export function describeRelation(
 
   // --- 配偶 ---
   if (kinds.length === 1 && kinds[0] === 'spouse') {
-    return targetGender === 'female' ? '妻子' : '丈夫'
+    if (path[0].relType === 'divorced') {
+      if (targetGender === 'female') return '前妻'
+      if (targetGender === 'male') return '前夫'
+      return '前配偶'
+    }
+    if (targetGender === 'female') return '妻子'
+    if (targetGender === 'male') return '丈夫'
+    return '配偶'
   }
 
   // --- 直系祖先：parent × N ---
@@ -80,7 +87,7 @@ export function describeRelation(
     const innerPath = path.slice(0, -1)
     const innerTargetId = innerPath[innerPath.length - 1].toId
     const innerLabel = describeRelation(innerPath, selfId, innerTargetId, members)
-    return inLawByInner(innerLabel, targetGender, selfId, members)
+    return inLawByInner(innerLabel, targetGender, path[path.length - 1].relType)
   }
 
   // --- 开头是 spouse 的姻亲（路径中仅1个spouse）---
@@ -479,8 +486,7 @@ function unclePaternalLabel(
 function inLawByInner(
   innerLabel: string,
   targetGender: TargetGender,
-  selfId: string,
-  members: Record<string, Member>,
+  spouseType: RelType | undefined,
 ): string {
   // 兄弟姐妹的配偶
   if (innerLabel === '哥哥') return targetGender === 'female' ? '嫂子' : '哥哥'
@@ -589,25 +595,68 @@ function inLawByInner(
   if (innerLabel === '表外甥孙女') return targetGender === 'female' ? '表外甥孙女' : '表甥孙婿'
   if (innerLabel === '堂外甥') return targetGender === 'female' ? '堂甥媳' : '堂外甥'
   if (innerLabel === '堂外甥女') return targetGender === 'female' ? '堂外甥女' : '堂甥女婿'
-  // 父母的配偶
-  if (innerLabel === '父亲') return targetGender === 'female' ? '母亲（或继母）' : '父亲'
-  if (innerLabel === '母亲') return targetGender === 'female' ? '母亲' : '父亲（或继父）'
+  // 父母的配偶：家谱可能尚未补全另一方亲子边，不能仅凭缺边推断为继配。
+  if (innerLabel === '父亲') {
+    if (spouseType === 'divorced') {
+      if (targetGender === 'female') return '父亲的前妻'
+      if (targetGender === 'male') return '父亲的前夫'
+      return '父亲的前伴侣'
+    }
+    if (targetGender === 'female') return '父亲的妻子'
+    if (targetGender === 'male') return '父亲的丈夫'
+    return '父亲的伴侣'
+  }
+  if (innerLabel === '母亲') {
+    if (spouseType === 'divorced') {
+      if (targetGender === 'male') return '母亲的前夫'
+      if (targetGender === 'female') return '母亲的前妻'
+      return '母亲的前伴侣'
+    }
+    if (targetGender === 'male') return '母亲的丈夫'
+    if (targetGender === 'female') return '母亲的妻子'
+    return '母亲的伴侣'
+  }
   if (innerLabel === '继父') return targetGender === 'female' ? '继母' : '继父'
   if (innerLabel === '继母') return targetGender === 'female' ? '继母' : '继父'
-  if (innerLabel === '爷爷') return targetGender === 'female' ? '奶奶' : '爷爷'
-  if (innerLabel === '奶奶') return targetGender === 'female' ? '奶奶' : '爷爷'
-  if (innerLabel === '外公') return targetGender === 'female' ? '外婆' : '外公'
-  if (innerLabel === '外婆') return targetGender === 'female' ? '外婆' : '外公'
-  if (innerLabel === '曾祖父') return targetGender === 'female' ? '曾祖母' : '曾祖父'
-  if (innerLabel === '曾祖母') return targetGender === 'female' ? '曾祖母' : '曾祖父'
-  if (innerLabel === '外曾祖父') return targetGender === 'female' ? '外曾祖母' : '外曾祖父'
-  if (innerLabel === '外曾祖母') return targetGender === 'female' ? '外曾祖母' : '外曾祖父'
-  if (innerLabel === '高祖父') return targetGender === 'female' ? '高祖母' : '高祖父'
-  if (innerLabel === '高祖母') return targetGender === 'female' ? '高祖母' : '高祖父'
-  if (innerLabel === '外高祖父') return targetGender === 'female' ? '外高祖母' : '外高祖父'
-  if (innerLabel === '外高祖母') return targetGender === 'female' ? '外高祖母' : '外高祖父'
-  // 无可靠专名时保持为未细分亲戚，不伪造称谓。
-  return '亲戚'
+  const ancestorSpouse = ancestorSpouseLabel(innerLabel, targetGender, spouseType)
+  if (ancestorSpouse) return ancestorSpouse
+  // 无可靠专名时明确标记为未收录，避免用“亲戚”伪装成已正确解析。
+  return '未收录称谓'
+}
+
+function ancestorSpouseLabel(
+  innerLabel: string,
+  targetGender: TargetGender,
+  spouseType: RelType | undefined,
+): string | null {
+  const formalNames: Record<string, { male: string; female: string }> = {
+    爷爷: { male: '祖父', female: '祖母' },
+    奶奶: { male: '祖父', female: '祖母' },
+    外公: { male: '外祖父', female: '外祖母' },
+    外婆: { male: '外祖父', female: '外祖母' },
+    曾祖父: { male: '曾祖父', female: '曾祖母' },
+    曾祖母: { male: '曾祖父', female: '曾祖母' },
+    外曾祖父: { male: '外曾祖父', female: '外曾祖母' },
+    外曾祖母: { male: '外曾祖父', female: '外曾祖母' },
+    高祖父: { male: '高祖父', female: '高祖母' },
+    高祖母: { male: '高祖父', female: '高祖母' },
+    外高祖父: { male: '外高祖父', female: '外高祖母' },
+    外高祖母: { male: '外高祖父', female: '外高祖母' },
+  }
+  const names = formalNames[innerLabel]
+  if (!names) return null
+
+  const innerGender = innerLabel.endsWith('父') || innerLabel === '爷爷' || innerLabel === '外公'
+    ? 'male'
+    : 'female'
+  if (spouseType === 'divorced') {
+    if (targetGender === 'female') return `${names[innerGender]}的前妻`
+    if (targetGender === 'male') return `${names[innerGender]}的前夫`
+    return `${names[innerGender]}的前伴侣`
+  }
+  if (targetGender === 'female') return `${names[innerGender]}的妻子`
+  if (targetGender === 'male') return `${names[innerGender]}的丈夫`
+  return `${names[innerGender]}的伴侣`
 }
 
 // ==================== 姻亲：开头 spouse（配偶的亲属）====================

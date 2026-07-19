@@ -61,12 +61,24 @@ export function findPreferredKinshipPath(
   members: Record<string, Member>,
   maxDepth = 10,
 ): PathStep[] | null {
-  const lineagePath = findShortestLineagePath(fromId, toId, members, maxDepth)
-  if (lineagePath) return lineagePath
-
   const from = members[fromId]
   const target = members[toId]
   if (!from || !target) return null
+
+  // 直接配偶是最明确的一跳关系；即使夫妻之间另有远房血缘，也不能被覆盖。
+  const directSpouse = from.spouses.find(spouseRef => spouseRef.id === toId)
+    ?? target.spouses.find(spouseRef => spouseRef.id === fromId)
+  if (directSpouse) {
+    return [{
+      kind: 'spouse',
+      toId,
+      toGender: target.gender,
+      relType: directSpouse.type as RelType,
+    }]
+  }
+
+  const lineagePath = findShortestLineagePath(fromId, toId, members, maxDepth)
+  if (lineagePath) return lineagePath
 
   const affinityPaths: PathStep[][] = []
 
