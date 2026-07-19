@@ -89,6 +89,47 @@ describe('buildFamilyUnits', () => {
     })
   })
 
+  it('propagates one explicit order across different parentage groups', () => {
+    const parentA = member('parent-a')
+    const parentB = member('parent-b')
+    const childA = member('child-a')
+    const childB = member('child-b')
+    const { facts } = normalizeFacts(familyData([parentA, parentB, childA, childB]))
+    facts.parentages = [{
+      id: 'parentage:parent-a',
+      parentIds: ['parent-a'],
+      childIds: ['child-a'],
+      typeByChildId: { 'child-a': 'blood' },
+    }, {
+      id: 'parentage:parent-b',
+      parentIds: ['parent-b'],
+      childIds: ['child-b'],
+      typeByChildId: { 'child-b': 'blood' },
+    }]
+
+    const built = buildFamilyUnits(
+      projectView(facts, DEFAULT_FAMILY_VIEW_POLICY),
+      EMPTY_LAYOUT_PREFERENCES,
+      DEFAULT_LAYOUT_METRICS,
+      { 'siblings:child-a+child-b': ['child-b', 'child-a'] },
+    )
+
+    expect(built.parentageGroups).toEqual([
+      expect.objectContaining({
+        id: 'parentage:parent-a',
+        siblingOrderId: 'siblings:child-a+child-b',
+        siblingOrderPersonIds: ['child-b', 'child-a'],
+        hasExplicitSiblingOrder: true,
+      }),
+      expect.objectContaining({
+        id: 'parentage:parent-b',
+        siblingOrderId: 'siblings:child-a+child-b',
+        siblingOrderPersonIds: ['child-b', 'child-a'],
+        hasExplicitSiblingOrder: true,
+      }),
+    ])
+  })
+
   it('chooses the unit containing the most parents and uses stable id to break ties', () => {
     const parentA = member('a')
     const parentB = member('b')

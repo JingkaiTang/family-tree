@@ -107,6 +107,9 @@ export const useFamilyStore = defineStore('family', () => {
     const m = data.value.members[id]
     if (!m) return
     data.value.members[id] = { ...m, ...patch }
+    if (patch.parents !== undefined || patch.siblings !== undefined) {
+      data.value.siblingOrders = reconcileSiblingOrders(data.value)
+    }
     markDirty()
   }
 
@@ -249,7 +252,7 @@ export const useFamilyStore = defineStore('family', () => {
       ensure(me.godchildren, { id: otherId, type: 'godchild' })
       ensure(other.godparents, { id: memberId, type: 'godparent' })
     }
-    if (kind === 'parent' || kind === 'child') {
+    if (kind === 'parent' || kind === 'child' || kind === 'sibling') {
       data.value.siblingOrders = reconcileSiblingOrders(data.value)
     }
     markDirty()
@@ -279,7 +282,7 @@ export const useFamilyStore = defineStore('family', () => {
       me.godchildren = me.godchildren.filter((r) => r.id !== otherId)
       other.godparents = other.godparents.filter((r) => r.id !== memberId)
     }
-    if (kind === 'parent' || kind === 'child') {
+    if (kind === 'parent' || kind === 'child' || kind === 'sibling') {
       data.value.siblingOrders = reconcileSiblingOrders(data.value)
     }
     markDirty()

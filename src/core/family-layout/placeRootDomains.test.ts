@@ -97,6 +97,69 @@ describe('placeRootDomains', () => {
       .toEqual({ id: `row:${domain.id}:${generation}`, generation, unitIds })
   })
 
+  it('applies explicit sibling order as one block over a saved row order', () => {
+    const input = preparedWideThreeFamiliesLayout()
+    const domain = input.domains.find(value => value.kind === 'root')!
+    const generation = 2
+    const preferredUnitIds = [
+      'unit:person:branch-a-child-1',
+      'unit:person:branch-b-child-1',
+      'unit:person:branch-c-child-1',
+      'unit:person:branch-c-child-2',
+      'unit:person:branch-a-child-2',
+      'unit:person:branch-b-child-2',
+    ]
+    const siblingOrderId = 'siblings:branch-a-child-1+branch-c-child-2'
+    const siblingOrderPersonIds = ['branch-c-child-2', 'branch-a-child-1']
+    const scene = placeRootDomains({
+      ...input,
+      parentageGroups: input.parentageGroups.map(group => {
+        if (group.id === 'parentage:branch-a+branch-a-spouse') {
+          return {
+            ...group,
+            childPersonIds: ['branch-a-child-1'],
+            siblingOrderId,
+            siblingOrderPersonIds,
+            hasExplicitSiblingOrder: true,
+          }
+        }
+        if (group.id === 'parentage:branch-c+branch-c-spouse') {
+          return {
+            ...group,
+            childPersonIds: ['branch-c-child-2'],
+            siblingOrderId,
+            siblingOrderPersonIds,
+            hasExplicitSiblingOrder: true,
+          }
+        }
+        return group
+      }),
+      preferences: {
+        ...input.preferences,
+        rowOrders: [{
+          id: `row:${domain.id}:${generation}`,
+          domainId: domain.id,
+          generation,
+          unitIds: preferredUnitIds,
+        }],
+      },
+    })
+
+    expect(scene.rows.find(row => row.id === `row:${domain.id}:${generation}`))
+      .toEqual({
+        id: `row:${domain.id}:${generation}`,
+        generation,
+        unitIds: [
+          'unit:person:branch-c-child-2',
+          'unit:person:branch-a-child-1',
+          'unit:person:branch-b-child-1',
+          'unit:person:branch-c-child-1',
+          'unit:person:branch-a-child-2',
+          'unit:person:branch-b-child-2',
+        ],
+      })
+  })
+
   it('places a single family unit at its persisted grid column', () => {
     const input = preparedAsymmetricRootLayout()
     const domain = input.domains.find(value => value.kind === 'root')!

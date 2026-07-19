@@ -58,7 +58,7 @@ export const NicknameOverrides = z.record(
 )
 export type NicknameOverrides = z.infer<typeof NicknameOverrides>
 
-/** 同一父母组共享的兄弟姐妹顺序。key 使用规范化后的 parentage id。 */
+/** 同一兄弟姐妹关系组共享的顺序。key 使用 parentage id 或规范化的 siblings id。 */
 export const SiblingOrders = z.record(z.string(), z.array(z.string()))
 export type SiblingOrders = z.infer<typeof SiblingOrders>
 

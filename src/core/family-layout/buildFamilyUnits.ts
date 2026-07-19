@@ -6,7 +6,10 @@ import type {
   ProjectedFamily,
 } from './types'
 import type { SiblingOrders } from '@/core/schema'
-import { orderSiblingIds } from '@/core/siblingOrder'
+import {
+  findSiblingOrderForMembers,
+  orderSiblingIds,
+} from '@/core/siblingOrder'
 
 export interface BuiltFamilyUnits {
   units: FamilyUnit[]
@@ -86,6 +89,11 @@ export function buildFamilyUnits(
       const sourceAnchorPersonId = sourceParentIds.length === 1
         ? sourceParentIds[0]
         : undefined
+      const siblingOrder = findSiblingOrderForMembers(
+        parentage.childIds,
+        siblingOrders,
+        1,
+      )
 
       return [{
         id: parentage.id,
@@ -97,11 +105,13 @@ export function buildFamilyUnits(
         childPersonIds: orderSiblingIds(
           parentage.childIds,
           memberById,
-          siblingOrders[parentage.id],
+          siblingOrder?.memberIds,
         ),
-        ...(siblingOrders[parentage.id] === undefined
-          ? {}
-          : { hasExplicitSiblingOrder: true }),
+        ...(siblingOrder === undefined ? {} : {
+          siblingOrderId: siblingOrder.groupId,
+          siblingOrderPersonIds: siblingOrder.memberIds,
+          hasExplicitSiblingOrder: true,
+        }),
       }]
     })
 

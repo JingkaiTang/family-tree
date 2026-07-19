@@ -68,6 +68,7 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
     signatures,
     accents,
     preferences: request.preferences,
+    siblingOrders: request.siblingOrders,
     previousScene: request.previousScene,
     previousRootIdByRootId: discovery.previousRootIdByRootId,
     preferredComponentPersonId: request.preferredComponentPersonId,

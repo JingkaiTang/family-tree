@@ -16,11 +16,12 @@ function groupMembers(group: SiblingOrderGroup): Member[] {
 }
 
 function parentLabel(group: SiblingOrderGroup): string {
-  return group.parentIds
+  const label = group.parentIds
     .map(id => family.getMember(id))
     .filter((member): member is Member => member !== undefined)
     .map(fullName)
     .join(' + ')
+  return label || '显式兄弟姐妹关系'
 }
 
 function move(group: SiblingOrderGroup, index: number, offset: -1 | 1) {
@@ -44,11 +45,11 @@ function fullName(member: Member): string {
   <section class="mt-6 border-t border-slate-200 pt-5" data-testid="sibling-order-editor">
     <h3 class="font-semibold">兄弟姐妹排序</h3>
     <p class="mt-1 text-xs leading-5 text-slate-500">
-      同一父母组共用一份顺序；从任意兄弟姐妹的详情中调整都会同步。
+      同一兄弟姐妹关系组共用一份顺序；从任意成员的详情中调整都会同步。
     </p>
 
     <p v-if="groups.length === 0" class="mt-3 text-xs text-slate-400">
-      暂无可排序的同父母兄弟姐妹。
+      暂无可排序的兄弟姐妹。
     </p>
 
     <div
@@ -59,7 +60,7 @@ function fullName(member: Member): string {
     >
       <div class="mb-2 flex items-start justify-between gap-2">
         <div>
-          <div class="text-xs font-medium text-slate-600">父母组</div>
+          <div class="text-xs font-medium text-slate-600">关系组</div>
           <div class="text-xs text-slate-500">{{ parentLabel(group) }}</div>
         </div>
         <button

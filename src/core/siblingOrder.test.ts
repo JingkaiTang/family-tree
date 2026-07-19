@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyFamily } from './schema'
-import { addParent, mk } from '@/__tests__/fixtures/families'
+import { addParent, addSibling, mk } from '@/__tests__/fixtures/families'
 import {
   reconcileSiblingOrders,
   siblingOrderGroupsForMember,
@@ -51,5 +51,65 @@ describe('siblingOrder', () => {
     expect(reconcileSiblingOrders(data)).toEqual({
       'parentage:parent': ['younger', 'older'],
     })
+  })
+
+  it('shares one order for explicit siblings without parent data', () => {
+    const siblingA = mk('sibling-a')
+    const siblingB = mk('sibling-b')
+    const siblingC = mk('sibling-c')
+    addSibling(siblingA, siblingB)
+    addSibling(siblingB, siblingC)
+    const data = createEmptyFamily()
+    data.members = Object.fromEntries(
+      [siblingA, siblingB, siblingC].map(member => [member.id, member]),
+    )
+    data.siblingOrders['siblings:sibling-a+sibling-b+sibling-c'] = [
+      'sibling-c',
+      'sibling-a',
+      'sibling-b',
+    ]
+
+    expect(siblingOrderGroupsForMember(data, 'sibling-a')).toEqual([{
+      id: 'siblings:sibling-a+sibling-b+sibling-c',
+      parentIds: [],
+      memberIds: ['sibling-c', 'sibling-a', 'sibling-b'],
+    }])
+    expect(siblingOrderGroupsForMember(data, 'sibling-c')[0].memberIds).toEqual([
+      'sibling-c',
+      'sibling-a',
+      'sibling-b',
+    ])
+  })
+
+  it('merges half siblings from different parentages into one order', () => {
+    const sharedParent = mk('shared-parent')
+    const otherParentA = mk('other-parent-a')
+    const otherParentB = mk('other-parent-b')
+    const siblingA = mk('sibling-a')
+    const siblingB = mk('sibling-b')
+    addParent(siblingA, sharedParent)
+    addParent(siblingA, otherParentA)
+    addParent(siblingB, sharedParent)
+    addParent(siblingB, otherParentB)
+    const data = createEmptyFamily()
+    data.members = Object.fromEntries([
+      sharedParent,
+      otherParentA,
+      otherParentB,
+      siblingA,
+      siblingB,
+    ].map(member => [member.id, member]))
+
+    const groups = siblingOrderGroupsForMember(data, 'sibling-a')
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toMatchObject({
+      id: 'siblings:sibling-a+sibling-b',
+      memberIds: ['sibling-a', 'sibling-b'],
+    })
+    expect(groups[0].parentIds).toEqual([
+      'other-parent-a',
+      'other-parent-b',
+      'shared-parent',
+    ])
   })
 })

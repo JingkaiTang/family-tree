@@ -946,6 +946,7 @@ describe('getKinship — P2: 半亲兄弟姐妹（half sibling）', () => {
       self: mk('self', 'male', '1990-01-01'),
       dad: mk('dad', 'male'),
       mom: mk('mom', 'female'),
+      other_mom: mk('other_mom', 'female'),
       // 同父异母的兄弟（年长）
       half_older_bro: mk('half_older_bro', 'male', '1985-01-01'),
       // 同父异母的妹妹（年幼）
@@ -958,24 +959,19 @@ describe('getKinship — P2: 半亲兄弟姐妹（half sibling）', () => {
       child.parents.push({ id: parent.id, type })
       parent.children.push({ id: child.id, type })
     }
-    const addSibling = (a: Member, b: Member, type: 'blood' | 'half' = 'blood') => {
-      a.siblings.push({ id: b.id, type })
-      b.siblings.push({ id: a.id, type })
-    }
-
     // self 的父母
     addParent(m.self, m.dad)
     addParent(m.self, m.mom)
 
     // 半亲兄弟（只有共同父亲）
     addParent(m.half_older_bro, m.dad)
-    addSibling(m.self, m.half_older_bro, 'half')
+    addParent(m.half_older_bro, m.other_mom)
 
     addParent(m.half_younger_sis, m.dad)
-    addSibling(m.self, m.half_younger_sis, 'half')
+    addParent(m.half_younger_sis, m.other_mom)
 
     addParent(m.half_bro_no_date, m.dad)
-    addSibling(m.self, m.half_bro_no_date, 'half')
+    addParent(m.half_bro_no_date, m.other_mom)
 
     return m
   }
@@ -988,6 +984,24 @@ describe('getKinship — P2: 半亲兄弟姐妹（half sibling）', () => {
   })
   it('half sibling 无 birthDate → 半亲兄弟', () => {
     expect(getKinship('self', 'half_bro_no_date', m)).toBe('半亲兄弟')
+  })
+  it('共享顺序可在无 birthDate 时区分半亲兄弟长幼', () => {
+    const siblingOrders: SiblingOrders = {
+      'siblings:half_bro_no_date+half_older_bro+half_younger_sis+self': [
+        'half_bro_no_date',
+        'self',
+        'half_older_bro',
+        'half_younger_sis',
+      ],
+    }
+    expect(getKinship('self', 'half_bro_no_date', m, {}, siblingOrders))
+      .toBe('半亲哥哥')
+  })
+  it('一方父母资料不完整时不推断为半亲', () => {
+    const incomplete = structuredClone(m)
+    incomplete.half_older_bro.parents = [{ id: 'dad', type: 'blood' }]
+
+    expect(getKinship('self', 'half_older_bro', incomplete)).toBe('哥哥')
   })
 })
 

@@ -187,6 +187,7 @@ export interface BuildRootDomainsInput {
   signatures: RootSignatureResult
   accents: Record<string, string>
   preferences: LayoutPreferences
+  siblingOrders?: SiblingOrders
   previousScene?: RootAccentSceneSnapshot
   previousRootIdByRootId?: Record<string, string>
   preferredComponentPersonId?: string
@@ -236,6 +237,8 @@ export interface ParentageGroup {
   sourceHubId?: string
   sourceAnchorPersonId?: string
   childPersonIds: string[]
+  siblingOrderId?: string
+  siblingOrderPersonIds?: string[]
   hasExplicitSiblingOrder?: boolean
 }
 export interface AuxiliaryRelation {

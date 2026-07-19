@@ -6,7 +6,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import SiblingOrderEditor from '@/components/member/SiblingOrderEditor.vue'
 import { createEmptyFamily } from '@/core/schema'
-import { addParent, mk } from '@/__tests__/fixtures/families'
+import { addParent, addSibling, mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 
 describe('SiblingOrderEditor', () => {
@@ -47,6 +47,33 @@ describe('SiblingOrderEditor', () => {
     await wrapper.get('button').trigger('click')
     expect(family.data.siblingOrders).toEqual({})
     expect(orderedItemIds(wrapper)).toEqual(['child-a', 'child-b', 'child-c'])
+  })
+
+  it('allows explicit siblings without parent data to share one order', async () => {
+    const family = useFamilyStore()
+    const siblingA = mk('sibling-a', { firstName: '甲' })
+    const siblingB = mk('sibling-b', { firstName: '乙' })
+    addSibling(siblingA, siblingB)
+    const data = createEmptyFamily()
+    data.members = Object.fromEntries(
+      [siblingA, siblingB].map(member => [member.id, member]),
+    )
+    family.$patch(state => {
+      state.data = data
+    })
+
+    const wrapper = mount(SiblingOrderEditor, {
+      props: { memberId: 'sibling-a' },
+    })
+    await wrapper.get('[aria-label="下移甲"]').trigger('click')
+
+    expect(family.data.siblingOrders['siblings:sibling-a+sibling-b']).toEqual([
+      'sibling-b',
+      'sibling-a',
+    ])
+    await wrapper.setProps({ memberId: 'sibling-b' })
+    expect(orderedItemIds(wrapper)).toEqual(['sibling-b', 'sibling-a'])
+    expect(wrapper.text()).toContain('显式兄弟姐妹关系')
   })
 })
 
