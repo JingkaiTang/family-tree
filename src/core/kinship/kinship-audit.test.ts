@@ -49,7 +49,7 @@ describe('kinship audit', () => {
     expect(failures).toEqual([])
   })
 
-  it('单层末端配偶关系不能用“亲戚”掩盖未解析状态', () => {
+  it('未解析关系不再暴露旧兜底文案', () => {
     const members = syntheticFamily200().members
     const ids = Object.keys(members)
     const failures: string[] = []
@@ -59,10 +59,10 @@ describe('kinship audit', () => {
         const rawPath = findPreferredKinshipPath(fromId, toId, members)
         if (!rawPath) continue
         const path = normalizePath(rawPath, members, fromId)
-        const spouseCount = path.filter(step => step.kind === 'spouse').length
-        if (spouseCount !== 1 || path.at(-1)?.kind !== 'spouse') continue
         const label = getKinship(fromId, toId, members)
-        if (label === '亲戚') failures.push(`${fromId} -> ${toId}`)
+        if (label === '亲戚' || label === '未收录称谓' || label?.startsWith('配偶的')) {
+          failures.push(`${fromId} -> ${toId}: ${label} (${path.map(step => step.kind).join('>')})`)
+        }
       }
     }
 

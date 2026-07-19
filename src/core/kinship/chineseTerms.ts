@@ -16,7 +16,7 @@ type TargetGender = 'male' | 'female' | 'other'
  * 5. 末尾 spouse（仅1个spouse）→ 姻亲后缀（某亲属的配偶）
  * 6. 开头 spouse（仅1个spouse）→ 姻亲前缀（配偶的亲属）
  * 7. 两端 spouse（2个spouse）→ 妯娌/连襟等
- * 8. 其他 → 回退为"亲戚"
+ * 8. 其他 → 回退为“远房亲戚”
  *
  * 父系/母系判定：看第一步 parent 走向的是男还是女（toGender）
  * 长幼判定：利用 members 中的 birthDate 比较，无 birthDate 时回退到合并标签
@@ -104,7 +104,7 @@ export function describeRelation(
   }
 
   // 回退
-  return '亲戚'
+  return '远房亲戚'
 }
 
 // ==================== 年龄比较工具 ====================
@@ -620,8 +620,7 @@ function inLawByInner(
   if (innerLabel === '继母') return targetGender === 'female' ? '继母' : '继父'
   const ancestorSpouse = ancestorSpouseLabel(innerLabel, targetGender, spouseType)
   if (ancestorSpouse) return ancestorSpouse
-  // 无可靠专名时明确标记为未收录，避免用“亲戚”伪装成已正确解析。
-  return '未收录称谓'
+  return '远房亲戚'
 }
 
 function ancestorSpouseLabel(
@@ -682,11 +681,7 @@ function viaSpouseLabel(
       innerLabel === '堂姐' || innerLabel === '堂妹' || innerLabel === '堂姐妹') {
     return selfGender === 'female' ? '大姑子/小姑子' : '大姨子/小姨子'
   }
-  // 表系亲属
-  if (innerLabel.startsWith('表')) {
-    return `配偶的${innerLabel}`
-  }
-  return `配偶的${innerLabel}`
+  return '远房亲戚'
 }
 
 // ==================== 多 spouse 路径：妯娌/连襟等 ====================
@@ -696,7 +691,7 @@ function multiSpouseLabel(path: PathStep[]): string {
 
   if (kinds[0] === 'spouse' && kinds[kinds.length - 1] === 'spouse') {
     const innerPath = path.slice(1, -1)
-    if (innerPath.length === 0) return '亲戚'
+    if (innerPath.length === 0) return '远房亲戚'
     const innerKinds = innerPath.map((s) => s.kind)
 
     const noSpouseInner = !innerKinds.includes('spouse')
@@ -719,10 +714,10 @@ function multiSpouseLabel(path: PathStep[]): string {
       }
     }
 
-    return '亲戚'
+    return '远房亲戚'
   }
 
-  return '亲戚'
+  return '远房亲戚'
 }
 
 // ==================== sibling 未展开兜底 ====================
@@ -737,5 +732,5 @@ function siblingFallbackLabel(
     const selfVsTarget = compareAgeById(path[0].toId, selfId, members)
     return siblingLabel(targetGender, selfVsTarget, path[0].relType)
   }
-  return '亲戚'
+  return '远房亲戚'
 }

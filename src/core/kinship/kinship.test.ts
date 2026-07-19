@@ -1600,3 +1600,17 @@ describe('getKinship — 祖先的配偶与前配偶', () => {
     expect(getKinship('self', 'former-wife', members)).toBe('祖父的前妻')
   })
 })
+
+describe('getKinship — 统一兜底称谓', () => {
+  it('无法细分的多重姻亲关系统一称为远房亲戚', () => {
+    const members = Object.fromEntries([
+      mk('self', { gender: 'male' }),
+      mk('wife', { gender: 'female' }),
+      mk('wife-spouse', { gender: 'male' }),
+    ].map(member => [member.id, member]))
+    addSpouse(members.self, members.wife)
+    addSpouse(members.wife, members['wife-spouse'])
+
+    expect(getKinship('self', 'wife-spouse', members)).toBe('远房亲戚')
+  })
+})
