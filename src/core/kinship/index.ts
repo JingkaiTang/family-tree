@@ -1,5 +1,5 @@
 import type { FamilyData, Member } from '@/core/schema'
-import { findShortestPath, normalizePath } from './pathFinder'
+import { findPreferredKinshipPath, normalizePath } from './pathFinder'
 import { describeRelation } from './chineseTerms'
 
 /**
@@ -10,7 +10,7 @@ import { describeRelation } from './chineseTerms'
  *    - 对方在我的 godparents → 干爹/干妈
  *    - 对方在我的 godchildren → 干儿子/干女儿
  *    不做嵌套链路（"干爹的妈妈"不走干亲再血缘，继续看有没有血缘连通）
- * 3. 否则 BFS 找最短路径，规范化后翻译
+ * 3. 否则按“谱系 → 单层姻亲 → 普通最短路”的语义优先级选路，规范化后翻译
  * 4. 找不到路径 → null
  */
 export function getKinship(
@@ -34,7 +34,7 @@ export function getKinship(
     return target.gender === 'female' ? '干女儿' : '干儿子'
   }
 
-  const path = findShortestPath(fromId, toId, members)
+  const path = findPreferredKinshipPath(fromId, toId, members)
   if (!path) return null
   const normalized = normalizePath(path, members, fromId)
   return describeRelation(normalized, fromId, toId, members)

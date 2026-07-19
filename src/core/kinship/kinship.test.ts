@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { getKinship } from './index'
 import type { Member } from '@/core/schema'
+import { addParent, addSpouse, extendedFamily, mk } from '@/__tests__/fixtures/families'
 
 /**
  * 构造辅助：定义一个固定的家族 fixture，覆盖常见关系。
@@ -1342,22 +1343,36 @@ describe('getKinship — 祖辈旁系亲属的配偶', () => {
       gma: mk('gma', 'female'),
       great_gpa: mk('great_gpa', 'male'),
       great_gma: mk('great_gma', 'female'),
-      // 爷爷的兄弟 = 叔公
+      // 爷爷的兄弟（无出生日期）= 伯叔公
       granduncle: mk('granduncle', 'male'),
       granduncle_wife: mk('granduncle_wife', 'female'),
       // 爷爷的姐妹 = 姑奶奶
       grandaunt: mk('grandaunt', 'female'),
       grandaunt_husb: mk('grandaunt_husb', 'male'),
-      // 外公的兄弟 = 舅姥爷
+      // 奶奶的兄弟姐妹
+      gma_father: mk('gma_father', 'male'),
+      gma_mother: mk('gma_mother', 'female'),
+      gma_brother: mk('gma_brother', 'male'),
+      gma_brother_wife: mk('gma_brother_wife', 'female'),
+      gma_sister: mk('gma_sister', 'female'),
+      gma_sister_husb: mk('gma_sister_husb', 'male'),
+      // 外公的兄弟（无出生日期）= 伯叔外公
       granduncle_m: mk('granduncle_m', 'male'),
       granduncle_m_wife: mk('granduncle_m_wife', 'female'),
-      // 外公的姐妹 = 姨姥
+      // 外公的姐妹 = 姑外婆
       grandaunt_m: mk('grandaunt_m', 'female'),
       grandaunt_m_husb: mk('grandaunt_m_husb', 'male'),
       mgp: mk('mgp', 'male'),
       mgm: mk('mgm', 'female'),
       mgp_father: mk('mgp_father', 'male'),
       mgp_mother: mk('mgp_mother', 'female'),
+      // 外婆的兄弟姐妹
+      mgm_father: mk('mgm_father', 'male'),
+      mgm_mother: mk('mgm_mother', 'female'),
+      mgm_brother: mk('mgm_brother', 'male'),
+      mgm_brother_wife: mk('mgm_brother_wife', 'female'),
+      mgm_sister: mk('mgm_sister', 'female'),
+      mgm_sister_husb: mk('mgm_sister_husb', 'male'),
     }
     const addParent = (child: Member, parent: Member) => {
       child.parents.push({ id: parent.id, type: 'blood' })
@@ -1391,6 +1406,17 @@ describe('getKinship — 祖辈旁系亲属的配偶', () => {
     addParent(m.grandaunt, m.great_gma)
     addSibling(m.grandaunt, m.gpa)
     addSpouse(m.grandaunt, m.grandaunt_husb)
+    // 奶奶的兄弟姐妹
+    addParent(m.gma, m.gma_father)
+    addParent(m.gma, m.gma_mother)
+    addParent(m.gma_brother, m.gma_father)
+    addParent(m.gma_brother, m.gma_mother)
+    addSibling(m.gma_brother, m.gma)
+    addSpouse(m.gma_brother, m.gma_brother_wife)
+    addParent(m.gma_sister, m.gma_father)
+    addParent(m.gma_sister, m.gma_mother)
+    addSibling(m.gma_sister, m.gma)
+    addSpouse(m.gma_sister, m.gma_sister_husb)
     // 母系
     addParent(m.mom, m.mgp)
     addParent(m.mom, m.mgm)
@@ -1408,23 +1434,101 @@ describe('getKinship — 祖辈旁系亲属的配偶', () => {
     addParent(m.grandaunt_m, m.mgp_mother)
     addSibling(m.grandaunt_m, m.mgp)
     addSpouse(m.grandaunt_m, m.grandaunt_m_husb)
+    // 外婆的兄弟姐妹
+    addParent(m.mgm, m.mgm_father)
+    addParent(m.mgm, m.mgm_mother)
+    addParent(m.mgm_brother, m.mgm_father)
+    addParent(m.mgm_brother, m.mgm_mother)
+    addSibling(m.mgm_brother, m.mgm)
+    addSpouse(m.mgm_brother, m.mgm_brother_wife)
+    addParent(m.mgm_sister, m.mgm_father)
+    addParent(m.mgm_sister, m.mgm_mother)
+    addSibling(m.mgm_sister, m.mgm)
+    addSpouse(m.mgm_sister, m.mgm_sister_husb)
     return m
   }
 
   const m = buildGrandUncleSpouseFixture()
   const cases: Array<[string, string, string]> = [
-    ['self', 'granduncle', '叔公'],
-    ['self', 'granduncle_wife', '叔婆'],
+    ['self', 'granduncle', '伯叔公'],
+    ['self', 'granduncle_wife', '伯叔婆'],
     ['self', 'grandaunt', '姑奶奶'],
     ['self', 'grandaunt_husb', '姑爷爷'],
-    ['self', 'granduncle_m', '舅姥爷'],
-    ['self', 'granduncle_m_wife', '舅姥姥'],
-    ['self', 'grandaunt_m', '姨姥'],
-    ['self', 'grandaunt_m_husb', '姨姥爷'],
+    ['self', 'gma_brother', '舅爷爷'],
+    ['self', 'gma_brother_wife', '舅奶奶'],
+    ['self', 'gma_sister', '姨奶奶'],
+    ['self', 'gma_sister_husb', '姨爷爷'],
+    ['self', 'granduncle_m', '伯叔外公'],
+    ['self', 'granduncle_m_wife', '伯叔外婆'],
+    ['self', 'grandaunt_m', '姑外婆'],
+    ['self', 'grandaunt_m_husb', '姑外公'],
+    ['self', 'mgm_brother', '舅外公'],
+    ['self', 'mgm_brother_wife', '舅外婆'],
+    ['self', 'mgm_sister', '姨外婆'],
+    ['self', 'mgm_sister_husb', '姨外公'],
   ]
   for (const [from, to, expected] of cases) {
     it(`${from} → ${to} = ${expected}`, () => {
       expect(getKinship(from, to, m)).toBe(expected)
     })
   }
+})
+
+describe('getKinship — 血亲与姻亲路径同时存在', () => {
+  it('向上三代的远房表亲不被更短的配偶路径覆盖', () => {
+    const members = extendedFamily()
+    const extra = [
+      mk('great-gpa', { gender: 'male' }),
+      mk('first-cousin', { gender: 'male' }),
+      mk('second-branch-1', { gender: 'female' }),
+      mk('second-branch-2', { gender: 'male' }),
+      mk('second-cousin', { gender: 'female' }),
+    ]
+    Object.assign(members, Object.fromEntries(extra.map(member => [member.id, member])))
+
+    addParent(members.gpa, members['great-gpa'])
+    addParent(members['first-cousin'], members.aunt_p)
+    addParent(members['second-branch-1'], members['great-gpa'])
+    addParent(members['second-branch-2'], members['second-branch-1'])
+    addParent(members['second-cousin'], members['second-branch-2'])
+    addSpouse(members['first-cousin'], members['second-cousin'])
+
+    expect(getKinship('self', 'second-cousin', members)).toBe('远房表姐妹')
+  })
+
+  it('优先按向上四代的表亲血缘称呼，不回退为较近表亲的配偶', () => {
+    const members = extendedFamily()
+    const extra = [
+      mk('great-gpa', { gender: 'male' }),
+      mk('great-great-gpa', { gender: 'male' }),
+      mk('second-branch-1', { gender: 'female' }),
+      mk('second-branch-2', { gender: 'male' }),
+      mk('second-cousin', { gender: 'male' }),
+      mk('third-branch-1', { gender: 'female' }),
+      mk('third-branch-2', { gender: 'male' }),
+      mk('third-branch-3', { gender: 'male' }),
+      mk('third-cousin', { gender: 'female' }),
+    ]
+    Object.assign(members, Object.fromEntries(extra.map(member => [member.id, member])))
+
+    // self 向上四代到 great-great-gpa。
+    addParent(members.gpa, members['great-gpa'])
+    addParent(members['great-gpa'], members['great-great-gpa'])
+
+    // 较近的远房表亲：共同祖先在向上三代。
+    addParent(members['second-branch-1'], members['great-gpa'])
+    addParent(members['second-branch-2'], members['second-branch-1'])
+    addParent(members['second-cousin'], members['second-branch-2'])
+
+    // 目标本人也是血亲：共同祖先在向上四代。
+    addParent(members['third-branch-1'], members['great-great-gpa'])
+    addParent(members['third-branch-2'], members['third-branch-1'])
+    addParent(members['third-branch-3'], members['third-branch-2'])
+    addParent(members['third-cousin'], members['third-branch-3'])
+
+    // 同时存在更短的姻亲路径，旧实现会返回“远房表兄弟的配偶”。
+    addSpouse(members['second-cousin'], members['third-cousin'])
+
+    expect(getKinship('self', 'third-cousin', members)).toBe('远房表姐妹')
+  })
 })

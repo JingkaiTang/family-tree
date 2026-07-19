@@ -30,18 +30,92 @@ export function findShortestPath(
   members: Record<string, Member>,
   maxDepth = 10,
 ): PathStep[] | null {
+  return findPath(fromId, toId, members, maxDepth, true)
+}
+
+/**
+ * 只沿亲子/兄弟姐妹边查找路径。
+ *
+ * 当两人同时存在谱系和姻亲路径时，称谓应优先使用谱系路径，
+ * 即使它比经过配偶的路径更长。
+ */
+export function findShortestLineagePath(
+  fromId: string,
+  toId: string,
+  members: Record<string, Member>,
+  maxDepth = 10,
+): PathStep[] | null {
+  return findPath(fromId, toId, members, maxDepth, false)
+}
+
+/**
+ * 按称谓语义选择路径：直系/旁系谱系优先，其次是“血亲的配偶”或
+ * “配偶的血亲”，最后才使用不受约束的图最短路。
+ *
+ * 图最短路可能为了少一条边而在不同支系间上下折返，虽然拓扑可达，
+ * 却不是人们推导亲属称谓时使用的关系链。
+ */
+export function findPreferredKinshipPath(
+  fromId: string,
+  toId: string,
+  members: Record<string, Member>,
+  maxDepth = 10,
+): PathStep[] | null {
+  const lineagePath = findShortestLineagePath(fromId, toId, members, maxDepth)
+  if (lineagePath) return lineagePath
+
+  const from = members[fromId]
+  const target = members[toId]
+  if (!from || !target) return null
+
+  const affinityPaths: PathStep[][] = []
+
+  // 目标是某位谱系亲属的配偶。
+  for (const spouseRef of target.spouses) {
+    const innerPath = findShortestLineagePath(fromId, spouseRef.id, members, maxDepth - 1)
+    if (!innerPath || innerPath.length >= maxDepth) continue
+    affinityPaths.push([
+      ...innerPath,
+      { kind: 'spouse', toId, toGender: target.gender, relType: spouseRef.type as RelType },
+    ])
+  }
+
+  // 目标是本人配偶一侧的谱系亲属。
+  for (const spouseRef of from.spouses) {
+    const innerPath = findShortestLineagePath(spouseRef.id, toId, members, maxDepth - 1)
+    if (!innerPath || innerPath.length >= maxDepth) continue
+    const spouse = members[spouseRef.id]
+    if (!spouse) continue
+    affinityPaths.push([
+      { kind: 'spouse', toId: spouse.id, toGender: spouse.gender, relType: spouseRef.type as RelType },
+      ...innerPath,
+    ])
+  }
+
+  affinityPaths.sort((a, b) => a.length - b.length)
+  return affinityPaths[0] ?? findShortestPath(fromId, toId, members, maxDepth)
+}
+
+function findPath(
+  fromId: string,
+  toId: string,
+  members: Record<string, Member>,
+  maxDepth: number,
+  includeSpouses: boolean,
+): PathStep[] | null {
   if (fromId === toId) return []
   if (!members[fromId] || !members[toId]) return null
 
   interface QueueItem {
     id: string
     path: PathStep[]
+    phase: 'up' | 'down'
   }
-  const queue: QueueItem[] = [{ id: fromId, path: [] }]
-  const visited = new Set<string>([fromId])
+  const queue: QueueItem[] = [{ id: fromId, path: [], phase: 'up' }]
+  const visited = new Set<string>([`${fromId}:up`])
 
   while (queue.length > 0) {
-    const { id, path } = queue.shift()!
+    const { id, path, phase } = queue.shift()!
     if (path.length >= maxDepth) continue
     const m = members[id]
     if (!m) continue
@@ -50,24 +124,32 @@ export function findShortestPath(
     // sibling 中的 id 集合：这些人不应该通过 child 边到达，
     // 因为 sibling 展开后保留更准确的代际信息
     const siblingIds = new Set(m.siblings.map((s) => s.id))
-    for (const r of m.parents) neighbors.push(['parent', r.id, r.type as RelType])
+    if (includeSpouses || phase === 'up') {
+      for (const r of m.parents) neighbors.push(['parent', r.id, r.type as RelType])
+    }
     for (const r of m.children) {
       if (siblingIds.has(r.id)) continue
       neighbors.push(['child', r.id, r.type as RelType])
     }
-    for (const r of m.spouses) neighbors.push(['spouse', r.id, r.type as RelType])
+    if (includeSpouses) {
+      for (const r of m.spouses) neighbors.push(['spouse', r.id, r.type as RelType])
+    }
     for (const r of m.siblings) neighbors.push(['sibling', r.id, r.type as RelType])
 
     for (const [kind, nid, relType] of neighbors) {
-      if (visited.has(nid)) continue
+      const nextPhase = !includeSpouses && (phase === 'down' || kind === 'child' || kind === 'sibling')
+        ? 'down'
+        : phase
+      const visitKey = includeSpouses ? nid : `${nid}:${nextPhase}`
+      if (visited.has(visitKey)) continue
       const target = members[nid]
       if (!target) continue
       const step: PathStep = { kind, toId: nid, toGender: target.gender, relType }
       if (nid === toId) {
         return [...path, step]
       }
-      visited.add(nid)
-      queue.push({ id: nid, path: [...path, step] })
+      visited.add(visitKey)
+      queue.push({ id: nid, path: [...path, step], phase: nextPhase })
     }
   }
   return null
