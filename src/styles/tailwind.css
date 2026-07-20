@@ -17,4 +17,49 @@ body,
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+  overscroll-behavior: none;
+}
+
+.app-safe-area {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.app-safe-area-padded {
+  box-sizing: border-box;
+  padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+  padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+}
+
+.safe-area-toast {
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .app-safe-area-padded {
+    padding-top: max(2rem, env(safe-area-inset-top, 0px));
+    padding-right: max(2rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(2rem, env(safe-area-inset-left, 0px));
+  }
+}
+
+@media (pointer: coarse) {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
 }

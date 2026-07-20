@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import {
   detectDefaultLayoutMode,
   resolveLayoutMode,
+  type LayoutMode,
   type LayoutModePreference,
 } from '@/core/layoutMode'
 import {
@@ -51,6 +52,9 @@ export const useUiStore = defineStore('ui', () => {
   function setLayoutModePreference(preference: LayoutModePreference) {
     layoutModePreference.value = preference
     persistLayoutModePreference(preference)
+  }
+  function setDefaultLayoutMode(mode: LayoutMode) {
+    defaultLayoutMode.value = mode
   }
   function setLayoutFocus(id: string | null) {
     layoutFocusId.value = id
@@ -101,6 +105,7 @@ export const useUiStore = defineStore('ui', () => {
     setSearch,
     setShowAuxiliaryRelations,
     setLayoutModePreference,
+    setDefaultLayoutMode,
     setLayoutFocus,
     toggleFocusFlowBranch,
     setFocusFlowScrollTop,

@@ -22,6 +22,38 @@ interface AutosaveOptions {
   onBackgroundError?: (error: unknown) => void
 }
 
+type LifecycleDocument = Pick<
+  Document,
+  'addEventListener' | 'removeEventListener' | 'visibilityState'
+>
+type LifecycleWindow = Pick<Window, 'addEventListener' | 'removeEventListener'>
+
+/**
+ * 移动端 WebView 进入后台后可能很快被冻结，因此在 pagehide 和页面隐藏时立即发起保存。
+ */
+export function installPageLifecycleFlush(
+  flush: () => Promise<void>,
+  shouldFlush: () => boolean,
+  onError: (error: unknown) => void,
+  windowTarget: LifecycleWindow = window,
+  documentTarget: LifecycleDocument = document,
+): () => void {
+  const flushIfNeeded = () => {
+    if (!shouldFlush()) return
+    void flush().catch(onError)
+  }
+  const onVisibilityChange = () => {
+    if (documentTarget.visibilityState === 'hidden') flushIfNeeded()
+  }
+
+  windowTarget.addEventListener('pagehide', flushIfNeeded)
+  documentTarget.addEventListener('visibilitychange', onVisibilityChange)
+  return () => {
+    windowTarget.removeEventListener('pagehide', flushIfNeeded)
+    documentTarget.removeEventListener('visibilitychange', onVisibilityChange)
+  }
+}
+
 export function createAutosaveController(
   family: FamilyStore,
   options: AutosaveOptions = {},
@@ -128,12 +160,13 @@ export function startAutosave() {
 
   const family = useFamilyStore()
   const ui = useUiStore()
+  const reportSaveError = (error: unknown) => {
+    const msg = error instanceof Error ? error.message : String(error)
+    ui.showToast('error', '保存失败：' + msg)
+    console.error('[autosave] save failed:', error)
+  }
   controller = createAutosaveController(family, {
-    onBackgroundError: e => {
-      const msg = e instanceof Error ? e.message : String(e)
-      ui.showToast('error', '保存失败：' + msg)
-      console.error('[autosave] save failed:', e)
-    },
+    onBackgroundError: reportSaveError,
   })
   controller.start()
 
@@ -145,6 +178,11 @@ export function startAutosave() {
         event.preventDefault()
       }
     })
+    installPageLifecycleFlush(
+      () => controller?.flushNow() ?? Promise.resolve(),
+      () => Boolean(family.isDirty && family.projectRef),
+      reportSaveError,
+    )
 
     if ('__TAURI_INTERNALS__' in window) {
       void installTauriCloseGuard(family, ui)

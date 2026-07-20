@@ -261,7 +261,7 @@ function fullName(m: Member) {
     <!-- 添加关系 -->
     <div class="rounded-md border border-slate-200 bg-white p-2">
       <div class="mb-2 text-xs font-medium text-slate-500">添加关系</div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
         <select v-model="addKind" class="rounded border border-slate-300 px-2 py-1">
           <option value="parent">父母</option>
           <option value="spouse">配偶</option>
@@ -270,7 +270,7 @@ function fullName(m: Member) {
           <option value="godparent">干爹/干妈</option>
           <option value="godchild">干儿子/干女儿</option>
         </select>
-        <select v-model="addTargetId" class="flex-1 rounded border border-slate-300 px-2 py-1">
+        <select v-model="addTargetId" class="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1">
           <option value="">选择成员…</option>
           <option v-for="m in candidates" :key="m.id" :value="m.id">
             {{ fullName(m) }}

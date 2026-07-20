@@ -141,6 +141,9 @@ function formatUpdatedAt(value: string): string {
 onMounted(async () => {
   try {
     runtimePlatform.value = await getRuntimePlatform()
+    if (runtimePlatform.value !== 'web') {
+      ui.setDefaultLayoutMode(isMobile.value ? 'focus-flow' : 'family-grid')
+    }
     if (isMobile.value) {
       mobileProjects.value = await listManagedProjects()
     }
@@ -166,7 +169,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col items-center justify-center gap-6 overflow-auto p-6 sm:p-8">
+  <div class="app-safe-area-padded flex h-full flex-col items-center justify-center gap-6 overflow-auto">
     <div class="text-center">
       <h1 class="text-4xl font-bold tracking-tight">家族树</h1>
       <p class="mt-3 text-slate-500">记录家族成员、关系与故事</p>

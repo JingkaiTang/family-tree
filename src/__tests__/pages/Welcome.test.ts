@@ -8,6 +8,7 @@ import Welcome from '@/pages/Welcome.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import { managedProjectRef } from '@/services/projectRef'
 import { useFamilyStore } from '@/stores/family'
+import { useUiStore } from '@/stores/ui'
 
 const mocks = vi.hoisted(() => ({
   runtimePlatform: vi.fn(),
@@ -65,6 +66,7 @@ describe('Welcome mobile project library', () => {
     expect(wrapper.text()).toContain('移动家族')
     expect(wrapper.text()).not.toContain('打开已有家族')
     expect(mocks.listManagedProjects).toHaveBeenCalledOnce()
+    expect(useUiStore().defaultLayoutMode).toBe('focus-flow')
   })
 
   it('creates and opens a managed project from the mobile form', async () => {
@@ -116,5 +118,6 @@ describe('Welcome mobile project library', () => {
 
     expect(wrapper.text()).toContain('打开已有家族')
     expect(mocks.listManagedProjects).not.toHaveBeenCalled()
+    expect(useUiStore().defaultLayoutMode).toBe('family-grid')
   })
 })

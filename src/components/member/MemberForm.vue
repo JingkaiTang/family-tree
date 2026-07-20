@@ -44,7 +44,7 @@ function onPhotoChange(photoId: string | undefined) {
       @stage="emit('media-stage', $event)"
     />
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label class="flex flex-col gap-1">
         <span class="text-xs text-slate-500">姓</span>
         <input
@@ -63,7 +63,7 @@ function onPhotoChange(photoId: string | undefined) {
       </label>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label class="flex flex-col gap-1">
         <span class="text-xs text-slate-500">小名 / 曾用名</span>
         <input
@@ -86,7 +86,7 @@ function onPhotoChange(photoId: string | undefined) {
       </label>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label class="flex flex-col gap-1">
         <span class="text-xs text-slate-500">出生日期</span>
         <input
@@ -116,7 +116,7 @@ function onPhotoChange(photoId: string | undefined) {
       />
     </label>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label class="flex flex-col gap-1">
         <span class="text-xs text-slate-500">职业</span>
         <input
@@ -154,7 +154,7 @@ function onPhotoChange(photoId: string | undefined) {
       ></textarea>
     </label>
 
-    <div class="flex justify-between">
+    <div class="flex flex-wrap justify-between gap-3">
       <button
         type="button"
         class="rounded border border-rose-300 bg-white px-3 py-1 text-sm text-rose-600 hover:bg-rose-50"

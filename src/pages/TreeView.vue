@@ -248,7 +248,7 @@ function seedFixture() {
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
+  <div class="app-safe-area flex h-full flex-col">
     <header class="flex flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
       <div class="flex min-w-0 items-center justify-between gap-3">
         <div class="min-w-0">
@@ -382,7 +382,7 @@ function seedFixture() {
 
     <div
       v-if="ui.toast"
-      class="pointer-events-none fixed bottom-4 left-1/2 -translate-x-1/2 rounded-md px-4 py-2 text-sm text-white shadow"
+      class="safe-area-toast pointer-events-none fixed left-1/2 -translate-x-1/2 rounded-md px-4 py-2 text-sm text-white shadow"
       :class="{
         'bg-emerald-600': ui.toast.type === 'success',
         'bg-rose-600': ui.toast.type === 'error',

@@ -1,9 +1,10 @@
+/** @vitest-environment happy-dom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createEmptyFamily, createEmptyMeta, type FamilyData } from '@/core/schema'
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
-import { createAutosaveController } from './autosave'
+import { createAutosaveController, installPageLifecycleFlush } from './autosave'
 import { externalProjectRef } from './projectRef'
 import type { ProjectRef } from './projectRef'
 
@@ -14,6 +15,7 @@ describe('autosave coordinator', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('debounces every revision instead of only the first dirty transition', async () => {
@@ -81,6 +83,39 @@ describe('autosave coordinator', () => {
     await expect(controller.flushNow()).rejects.toThrow('disk full')
 
     expect(family.isDirty).toBe(true)
+  })
+
+  it('flushes dirty data when the page is hidden or moved to the background', async () => {
+    const flush = vi.fn().mockResolvedValue(undefined)
+    let dirty = true
+    const onError = vi.fn()
+    const cleanup = installPageLifecycleFlush(flush, () => dirty, onError)
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('pagehide'))
+    await vi.waitFor(() => expect(flush).toHaveBeenCalledTimes(2))
+
+    dirty = false
+    window.dispatchEvent(new Event('pagehide'))
+    expect(flush).toHaveBeenCalledTimes(2)
+    expect(onError).not.toHaveBeenCalled()
+    cleanup()
+  })
+
+  it('reports a lifecycle flush failure without losing the dirty state', async () => {
+    const error = new Error('background write failed')
+    const onError = vi.fn()
+    const cleanup = installPageLifecycleFlush(
+      vi.fn().mockRejectedValue(error),
+      () => true,
+      onError,
+    )
+
+    window.dispatchEvent(new Event('pagehide'))
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(error))
+    cleanup()
   })
 })
 
