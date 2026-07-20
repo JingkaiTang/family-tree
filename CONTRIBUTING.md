@@ -32,6 +32,7 @@ cargo audit
 
 - Windows 请使用 MSVC Rust 工具链，并按 Tauri 文档安装 Visual Studio C++ 构建工具。若从 Git Bash 启动时命中了同名的 Unix `link`，请改用已初始化 Visual Studio 环境的 PowerShell 或 Developer Command Prompt。
 - macOS 的 CI、沙箱或其他无 GUI 环境无法运行 DMG 的 Finder 美化脚本时，可使用 `CI=true npm run tauri:build`；安装包仍会生成，但不包含自定义 Finder 排版。
+- iOS/Android 需要额外原生工具链；初始化、构建、AppData/备份语义和真机验收清单见 [移动端开发说明](docs/mobile-development.md)。
 
 编辑器应遵守仓库根目录的 `.editorconfig`。前端目前没有全仓自动格式化命令，请延续现有 TypeScript/Vue 风格并避免格式化无关文件；Rust 代码以 `cargo fmt` 结果为准。
 
