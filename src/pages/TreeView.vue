@@ -1,21 +1,32 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { flushNow } from '@/services/autosave'
-import FamilyCanvas from '@/components/tree/FamilyCanvas.vue'
+import TreeLayoutHost from '@/components/tree/TreeLayoutHost.vue'
 import SearchBar from '@/components/search/SearchBar.vue'
 import { getKinship } from '@/core/kinship'
 import { gcMedia } from '@/services/tauriApi'
 import { v4 as uuidv4 } from 'uuid'
+import type { LayoutModePreference } from '@/core/layoutMode'
 
 const router = useRouter()
 const family = useFamilyStore()
 const ui = useUiStore()
 const { projectMeta, projectPath, memberCount, isDirty, membersArray, data } = storeToRefs(family)
-const { viewpointId, selectedId, showAuxiliaryRelations } = storeToRefs(ui)
+const {
+  viewpointId,
+  selectedId,
+  showAuxiliaryRelations,
+  defaultLayoutMode,
+  layoutModePreference,
+  resolvedLayoutMode,
+  layoutFocusId,
+  focusFlowExpandedBranchIds,
+  focusFlowScrollTop,
+} = storeToRefs(ui)
 
 const saveStatus = computed(() => {
   if (!family.projectPath) return ''
@@ -39,6 +50,27 @@ function restoreDefaultLayout() {
   layoutResetVersion.value += 1
 }
 
+function onLayoutModeChange(event: Event) {
+  ui.setLayoutModePreference((event.target as HTMLSelectElement).value as LayoutModePreference)
+}
+
+function setLayoutFocus(id: string) {
+  if (!family.getMember(id)) return
+  ui.setLayoutFocus(id)
+  ui.setFocusFlowScrollTop(0)
+}
+
+function ensureLayoutFocus() {
+  if (layoutFocusId.value && family.getMember(layoutFocusId.value)) return
+  const fallback = [
+    selectedId.value,
+    viewpointId.value,
+    data.value.rootMemberId,
+    ...Object.keys(data.value.members).sort((left, right) => left.localeCompare(right)),
+  ].find((id): id is string => Boolean(id) && family.getMember(id!) !== undefined)
+  ui.setLayoutFocus(fallback ?? null)
+}
+
 async function onBack() {
   try {
     await flushNow()
@@ -46,6 +78,7 @@ async function onBack() {
     ui.setSelected(null)
     ui.setShowAuxiliaryRelations(false)
     ui.setCanvasView(null)
+    ui.resetFocusFlowState()
     family.closeProject()
     await router.push('/')
   } catch (e) {
@@ -83,7 +116,7 @@ function clearViewpoint() {
 
 /**
  * 进入 TreeView 时若项目里存了 defaultViewpointId，恢复到 UI store。
- * FamilyCanvas 的 viewpointId watcher 会聚焦到该节点。
+ * 称呼视角与纵流聚焦点分别维护，避免选择或切换布局时互相覆盖。
  *
  * 会话策略：
  *   - UI 里已有视角且仍然有效 → 保留（从 MemberDetail 返回时不重置画布位置）
@@ -95,15 +128,21 @@ onMounted(() => {
   if (ui.viewpointId && !family.getMember(ui.viewpointId)) {
     ui.setViewpoint(null)
   }
-  if (ui.viewpointId) return
-  const stored = data.value.defaultViewpointId
-  if (!stored) return
-  if (!family.getMember(stored)) {
-    family.setDefaultViewpoint(undefined)
-    return
+  if (!ui.viewpointId) {
+    const stored = data.value.defaultViewpointId
+    if (stored && !family.getMember(stored)) {
+      family.setDefaultViewpoint(undefined)
+    } else if (stored) {
+      ui.setViewpoint(stored)
+    }
   }
-  ui.setViewpoint(stored)
+  ensureLayoutFocus()
 })
+
+watch(
+  () => Object.keys(data.value.members).sort((left, right) => left.localeCompare(right)).join('\u0000'),
+  ensureLayoutFocus,
+)
 
 function kinshipResolver(fromId: string, toId: string): string | null {
   return getKinship(
@@ -194,13 +233,29 @@ function seedFixture() {
 
 <template>
   <div class="flex h-full flex-col">
-    <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-      <div>
-        <h2 class="text-lg font-semibold">{{ projectMeta?.name ?? '（未打开项目）' }}</h2>
-        <p class="text-xs text-slate-400">{{ projectPath }}</p>
+    <header class="flex flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <div class="flex min-w-0 items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="truncate text-lg font-semibold">{{ projectMeta?.name ?? '（未打开项目）' }}</h2>
+          <p class="hidden truncate text-xs text-slate-400 md:block">{{ projectPath }}</p>
+        </div>
+        <button class="shrink-0 text-sm text-slate-500 hover:text-slate-900 sm:hidden" @click="onBack">返回</button>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
         <SearchBar :on-jump="onSelect" />
+        <label class="flex min-h-9 items-center gap-1 text-sm text-slate-600">
+          <span>布局</span>
+          <select
+            data-testid="layout-mode-select"
+            class="rounded border border-slate-300 bg-white px-2 py-1"
+            :value="layoutModePreference"
+            @change="onLayoutModeChange"
+          >
+            <option value="auto">自动（{{ defaultLayoutMode === 'focus-flow' ? '纵流' : '网格' }}）</option>
+            <option value="focus-flow">聚焦纵流</option>
+            <option value="family-grid">家族网格</option>
+          </select>
+        </label>
         <label class="flex items-center gap-1 text-sm text-slate-600">
           <input
             data-testid="auxiliary-relations-toggle"
@@ -218,6 +273,13 @@ function seedFixture() {
           + 新建成员
         </button>
         <button
+          v-if="resolvedLayoutMode === 'focus-flow' && selectedId && layoutFocusId !== selectedId"
+          class="rounded border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm text-emerald-700 hover:bg-emerald-100"
+          @click="setLayoutFocus(selectedId)"
+        >
+          聚焦选中
+        </button>
+        <button
           v-if="selectedId && viewpointId !== selectedId"
           class="rounded border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm text-emerald-700 hover:bg-emerald-100"
           @click="setViewpoint"
@@ -232,6 +294,7 @@ function seedFixture() {
           清除视角
         </button>
         <button
+          v-if="resolvedLayoutMode === 'family-grid'"
           data-testid="restore-default-layout"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="!canRestoreDefaultLayout"
@@ -263,23 +326,30 @@ function seedFixture() {
         >
           清理未用照片
         </button>
-        <button class="text-sm text-slate-500 hover:text-slate-900" @click="onBack">返回</button>
+        <button class="hidden text-sm text-slate-500 hover:text-slate-900 sm:inline" @click="onBack">返回</button>
       </div>
     </header>
 
-    <main class="flex-1">
-      <FamilyCanvas
+    <main class="min-h-0 flex-1">
+      <TreeLayoutHost
+        :mode="resolvedLayoutMode"
         :data="family.data"
         :root-id="rootId"
         :selected-id="selectedId"
         :viewpoint-id="viewpointId"
+        :layout-focus-id="layoutFocusId"
         :get-kinship="kinshipResolver"
-        :initial-view="ui.canvasView"
+        :initial-grid-view="ui.canvasView"
+        :initial-focus-scroll-top="focusFlowScrollTop"
+        :expanded-branch-ids="focusFlowExpandedBranchIds"
         :layout-reset-version="layoutResetVersion"
         :show-auxiliary-relations="showAuxiliaryRelations"
         @select="onSelect"
         @open="onOpen"
-        @view-change="ui.setCanvasView"
+        @grid-view-change="ui.setCanvasView"
+        @focus-scroll-change="ui.setFocusFlowScrollTop"
+        @layout-focus-change="setLayoutFocus"
+        @focus-branch-toggle="ui.toggleFocusFlowBranch"
         @domain-row-order-change="family.setDomainRowOrderPreference"
         @bridge-order-change="family.setBridgeOrderPreference"
         @root-order-change="family.setRootOrderPreference"

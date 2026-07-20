@@ -9,12 +9,14 @@ Vue pages/components
         │ 用户意图、展示、交互编排
         ▼
 Pinia stores ───────────────► core/* 领域纯函数
-        │                         │
-        │ 修订号快照               ├─ kinship 称谓计算
-        ▼                         └─ family-layout 确定性布局
-autosave / projectService              │
-        │ schema + 图完整性校验          ▼
-        ▼                         Web Worker
+        │                         ├─ kinship 称谓计算
+        │                         └─ family-graph 共享家庭事实
+        │                                   ├─ family-layout 家族网格 ─► Web Worker
+        │ 修订号快照                       └─ focus-flow 聚焦纵流
+        ▼
+autosave / projectService
+        │ schema + 图完整性校验
+        ▼
 tauriApi
         │ 最小 IPC 命令
         ▼
@@ -34,7 +36,13 @@ Rust commands
 
 ## 家族布局
 
-`src/core/treeLayout.ts` 是异步门面。在浏览器中，它通过原生 Web Worker 调用 `treeLayoutCore.ts`；Worker 不可用或崩溃时退回同步纯函数，保证功能可用。每个请求由 ID 匹配，`FamilyCanvas` 还使用自己的请求序号丢弃过期结果。
+`TreeLayoutHost.vue` 是两套布局的 UI 边界：桌面默认使用家族网格，窄屏触控设备默认使用聚焦纵流，用户可在“自动 / 聚焦纵流 / 家族网格”之间切换。选择保存在设备本地，不写入 `.family` 项目，也不会产生自动保存脏状态。网格的 pan/zoom 与纵流的聚焦点、展开分支和滚动位置分别保存，切换时互不转换。
+
+两套布局只共享 `src/core/family-graph` 产出的规范化家庭事实。`selectedId`（选中成员）、`viewpointId`（称谓视角）和 `layoutFocusId`（纵流锚点）是三个独立状态。
+
+### 家族网格
+
+`src/core/treeLayout.ts` 是网格布局的异步门面。在浏览器中，它通过原生 Web Worker 调用 `treeLayoutCore.ts`；Worker 不可用或崩溃时退回同步纯函数，保证功能可用。每个请求由 ID 匹配，`FamilyCanvas` 还使用自己的请求序号丢弃过期结果。
 
 核心流水线位于 `src/core/family-layout`：
 
@@ -52,6 +60,12 @@ Rust commands
 - 无法安全布线时产生诊断并使用安全回退场景。
 
 `FamilyCanvas.vue` 只保留布局生命周期、视口和事件编排。`familyCanvasModel.ts` 负责可单测的索引、命中判断和拖拽预览，`LayoutDiagnostics.vue` 负责诊断展示。
+
+### 聚焦纵流
+
+`src/core/focus-flow/layoutFocusFlow.ts` 是独立的同步纯函数引擎。它围绕聚焦成员投影父母家庭、当前家庭、兄弟姐妹家庭和子女家庭；更早祖辈、更晚后代、历史伴侣和干亲以分支摘要渐进展开。夫妻始终位于同一个家庭块，排序复用项目级 `siblingOrders`，其余回退到出生日期和成员 ID。
+
+纵流场景使用普通文档流，由 `FocusFlowView.vue` 渲染，不依赖绝对坐标、网格偏好、pan/zoom 或网格 Worker。默认场景大小由聚焦邻域决定；宽分支只先展示四个家庭，用户显式展开后才物化其余块。
 
 ## 持久化与一致性
 
@@ -79,7 +93,7 @@ Rust commands
 
 ## 测试层次
 
-- 领域单元测试：schema、迁移、关系、称谓和布局阶段。
+- 领域单元测试：schema、迁移、关系、称谓、共享家庭事实和两套布局阶段。
 - 组件测试：Vue 交互、拖拽、视口和保存失败路径。
 - Rust 单元测试：项目目录、版本、媒体导入/GC 和路径穿越。
 - 性能门禁：确定性的 500 人家谱，CI p95 预算 1000ms。

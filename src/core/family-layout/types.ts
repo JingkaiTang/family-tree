@@ -1,10 +1,25 @@
-import type { Member, PersistedLayoutPreferences, SiblingOrders } from '@/core/schema'
+import type { PersistedLayoutPreferences, SiblingOrders } from '@/core/schema'
+import type {
+  FamilyFacts,
+  FamilyGraphDiagnostic,
+  NormalizedFamilyFactsResult,
+  ParentageFact,
+  PartnershipFact,
+  PersonFact,
+} from '@/core/family-graph/types'
+
+export type {
+  FamilyFacts,
+  ParentageFact,
+  PartnershipFact,
+  PersonFact,
+} from '@/core/family-graph/types'
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
 
 export type LayoutDiagnosticCode =
-  | 'MISSING_REFERENCE'
+  | FamilyGraphDiagnostic['code']
   | 'PARENTAGE_CYCLE'
   | 'INVALID_PRIMARY_PARTNERSHIP'
   | 'INVALID_PRIMARY_PARENTAGE'
@@ -20,27 +35,7 @@ export interface LayoutDiagnostic {
   message: string
 }
 
-export interface PersonFact { id: string; member: Member }
-export interface PartnershipFact {
-  id: string
-  partnerIds: string[]
-  status: 'current' | 'historical'
-}
-export interface ParentageFact {
-  id: string
-  parentIds: string[]
-  childIds: string[]
-  typeByChildId: Record<string, 'blood' | 'adopted' | 'step'>
-}
-export interface FamilyFacts {
-  people: PersonFact[]
-  partnerships: PartnershipFact[]
-  parentages: ParentageFact[]
-}
-export interface NormalizedFactsResult {
-  facts: FamilyFacts
-  diagnostics: LayoutDiagnostic[]
-}
+export type NormalizedFactsResult = NormalizedFamilyFactsResult
 
 export interface FamilyViewPolicy {
   primaryPartnershipByPerson: Record<string, string>
