@@ -14,6 +14,7 @@ import { startAutosave } from '@/services/autosave'
 import { getLastProjectRef, setLastProjectRef } from '@/services/prefs'
 import { externalProjectRef, projectRefName, type ProjectRef } from '@/services/projectRef'
 import type { ManagedProjectSummary } from '@/services/projectRepository'
+import { importProjectBundle } from '@/services/projectTransfer'
 import {
   getRuntimePlatform,
   isMobilePlatform,
@@ -107,6 +108,21 @@ async function onOpenExternal() {
   await tryOpen(externalProjectRef(dir))
 }
 
+async function onImportManaged() {
+  error.value = null
+  try {
+    busy.value = true
+    const imported = await importProjectBundle()
+    if (!imported) return
+    mobileProjects.value = await listManagedProjects()
+    await tryOpen(imported.project)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    busy.value = false
+  }
+}
+
 async function onOpenLast() {
   if (!lastProject.value) return
   await tryOpen(lastProject.value)
@@ -177,6 +193,14 @@ onMounted(async () => {
           新建
         </button>
       </form>
+
+      <button
+        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm active:bg-slate-50 disabled:opacity-50"
+        :disabled="busy"
+        @click="onImportManaged"
+      >
+        导入家族备份
+      </button>
 
       <section class="flex flex-col gap-2" aria-label="本机家族项目">
         <h2 class="text-sm font-medium text-slate-500">本机家族</h2>

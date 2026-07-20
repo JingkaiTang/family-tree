@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   createManagedProject: vi.fn(),
   createProject: vi.fn(),
   openProject: vi.fn(),
+  importProjectBundle: vi.fn(),
   routerPush: vi.fn(),
   startAutosave: vi.fn(),
 }))
@@ -31,6 +32,9 @@ vi.mock('@/services/projectService', () => ({
   openProject: mocks.openProject,
 }))
 vi.mock('@/services/autosave', () => ({ startAutosave: mocks.startAutosave }))
+vi.mock('@/services/projectTransfer', () => ({
+  importProjectBundle: mocks.importProjectBundle,
+}))
 vi.mock('@/services/prefs', () => ({
   getLastProjectRef: () => null,
   setLastProjectRef: vi.fn(),
@@ -79,6 +83,28 @@ describe('Welcome mobile project library', () => {
     expect(mocks.createManagedProject).toHaveBeenCalledWith('新家族')
     expect(useFamilyStore().projectRef).toEqual(project)
     expect(mocks.startAutosave).toHaveBeenCalledOnce()
+    expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
+  })
+
+  it('imports a backup into managed storage and opens it', async () => {
+    const project = managedProjectRef('00000000-0000-0000-0000-000000000003')
+    const meta = createEmptyMeta('导入家族')
+    const familyData = createEmptyFamily()
+    mocks.runtimePlatform.mockResolvedValue('ios')
+    mocks.importProjectBundle.mockResolvedValue({ project, meta })
+    mocks.openProject.mockResolvedValue({ project, meta, family: familyData })
+
+    const wrapper = mount(Welcome)
+    await flushPromises()
+    const importButton = wrapper.findAll('button')
+      .find(button => button.text() === '导入家族备份')!
+    await importButton.trigger('click')
+    await flushPromises()
+
+    expect(mocks.importProjectBundle).toHaveBeenCalledOnce()
+    expect(mocks.listManagedProjects).toHaveBeenCalledTimes(2)
+    expect(mocks.openProject).toHaveBeenCalledWith(project)
+    expect(useFamilyStore().projectRef).toEqual(project)
     expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
   })
 

@@ -13,9 +13,16 @@ export interface ManagedProjectSummary {
   meta: ProjectMeta
 }
 
+export interface BundleExport {
+  transferName: string
+  suggestedName: string
+}
+
 export interface ProjectRepository {
   create(project: ProjectRef, name: string): Promise<ProjectMeta>
   listManaged(): Promise<ManagedProjectSummary[]>
+  exportBundle(project: ProjectRef): Promise<BundleExport>
+  importBundle(transferName: string): Promise<ManagedProjectSummary>
   load(project: ProjectRef): Promise<LoadedProject>
   save(project: ProjectRef, family: FamilyData): Promise<void>
   importPhoto(
@@ -35,6 +42,14 @@ export const projectRepository: ProjectRepository = {
 
   async listManaged() {
     return invoke<ManagedProjectSummary[]>('list_managed_projects')
+  },
+
+  async exportBundle(project) {
+    return invoke<BundleExport>('export_project_bundle', { project })
+  },
+
+  async importBundle(transferName) {
+    return invoke<ManagedProjectSummary>('import_project_bundle', { transferName })
   },
 
   async load(project) {

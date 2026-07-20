@@ -43,4 +43,19 @@ describe('Tauri project repository', () => {
     await expect(projectRepository.listManaged()).resolves.toEqual([])
     expect(invoke).toHaveBeenCalledWith('list_managed_projects')
   })
+
+  it('uses cache transfer tokens for bundle import and export', async () => {
+    const project = externalProjectRef('/tmp/test.family')
+    invoke
+      .mockResolvedValueOnce({ transferName: 'token.familybundle', suggestedName: '测试.familybundle' })
+      .mockResolvedValueOnce({ project: { kind: 'managed', id: 'managed-id' }, meta: createEmptyMeta('测试') })
+
+    await projectRepository.exportBundle(project)
+    await projectRepository.importBundle('token.familybundle')
+
+    expect(invoke).toHaveBeenNthCalledWith(1, 'export_project_bundle', { project })
+    expect(invoke).toHaveBeenNthCalledWith(2, 'import_project_bundle', {
+      transferName: 'token.familybundle',
+    })
+  })
 })

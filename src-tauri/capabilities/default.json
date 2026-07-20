@@ -6,6 +6,17 @@
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-copy-file",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$APPCACHE/transfers" },
+        { "path": "$APPCACHE/transfers/**" }
+      ]
+    }
   ]
 }

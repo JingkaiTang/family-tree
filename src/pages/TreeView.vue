@@ -11,6 +11,7 @@ import { getKinship } from '@/core/kinship'
 import { projectRepository } from '@/services/projectRepository'
 import { v4 as uuidv4 } from 'uuid'
 import type { LayoutModePreference } from '@/core/layoutMode'
+import { exportProjectBundle } from '@/services/projectTransfer'
 
 const router = useRouter()
 const family = useFamilyStore()
@@ -36,6 +37,7 @@ const saveStatus = computed(() => {
 
 const rootId = computed(() => data.value.rootMemberId)
 const layoutResetVersion = ref(0)
+const exporting = ref(false)
 const canRestoreDefaultLayout = computed(() => {
   const preferences = data.value.layoutPreferences
   return preferences.rootOrders.length > 0
@@ -92,6 +94,20 @@ async function onSaveNow() {
     ui.showToast('success', '已保存')
   } catch (e) {
     ui.showToast('error', '保存失败：' + (e instanceof Error ? e.message : String(e)))
+  }
+}
+
+async function onExportBundle() {
+  if (!family.projectRef || exporting.value) return
+  try {
+    exporting.value = true
+    await flushNow()
+    const exported = await exportProjectBundle(family.projectRef)
+    if (exported) ui.showToast('success', '家族备份已导出')
+  } catch (e) {
+    ui.showToast('error', '导出失败：' + (e instanceof Error ? e.message : String(e)))
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -318,6 +334,13 @@ function seedFixture() {
           @click="onSaveNow"
         >
           立即保存
+        </button>
+        <button
+          class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50"
+          :disabled="exporting"
+          @click="onExportBundle"
+        >
+          {{ exporting ? '导出中…' : '导出备份' }}
         </button>
         <button
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"

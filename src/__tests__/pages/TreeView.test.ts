@@ -11,13 +11,17 @@ import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
 import { externalProjectRef } from '@/services/projectRef'
 
-const { flushNowMock, routerPush } = vi.hoisted(() => ({
+const { exportProjectBundleMock, flushNowMock, routerPush } = vi.hoisted(() => ({
+  exportProjectBundleMock: vi.fn(),
   flushNowMock: vi.fn(),
   routerPush: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
+vi.mock('@/services/projectTransfer', () => ({
+  exportProjectBundle: exportProjectBundleMock,
+}))
 vi.mock('@/services/projectRepository', () => ({
   projectRepository: { gcMedia: vi.fn() },
 }))
@@ -116,6 +120,8 @@ describe('TreeView row order integration', () => {
   beforeEach(() => {
     flushNowMock.mockReset()
     flushNowMock.mockResolvedValue(undefined)
+    exportProjectBundleMock.mockReset()
+    exportProjectBundleMock.mockResolvedValue(true)
     routerPush.mockReset()
   })
 
@@ -475,6 +481,34 @@ describe('TreeView row order integration', () => {
     expect(flushNowMock).toHaveBeenCalledOnce()
     expect(ui.showAuxiliaryRelations).toBe(false)
     expect(routerPush).toHaveBeenCalledWith('/')
+  })
+
+  it('flushes pending changes before exporting a project backup', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const project = externalProjectRef('/tmp/test.family')
+    family.setProject(project, {
+      name: '测试',
+      schemaVersion: 4,
+      createdAt: '2026-07-16T00:00:00.000Z',
+      updatedAt: '2026-07-16T00:00:00.000Z',
+    }, family.data)
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
+      },
+    })
+
+    const exportButton = wrapper.findAll('button')
+      .find(button => button.text() === '导出备份')!
+    await exportButton.trigger('click')
+
+    expect(flushNowMock).toHaveBeenCalledOnce()
+    expect(exportProjectBundleMock).toHaveBeenCalledWith(project)
+    expect(flushNowMock.mock.invocationCallOrder[0])
+      .toBeLessThan(exportProjectBundleMock.mock.invocationCallOrder[0]!)
   })
 
   it('keeps the project open when the final save fails', async () => {
