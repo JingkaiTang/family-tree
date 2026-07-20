@@ -6,8 +6,9 @@ use image::imageops::FilterType;
 use image::GenericImageView;
 use image::ImageReader;
 use serde::Serialize;
+use tauri::AppHandle;
 
-use super::project::validate_project_root;
+use super::project::{resolve_project_root, validate_project_root_path, ProjectRef};
 use crate::errors::{CmdError, CmdResult};
 
 const MEDIA_DIR: &str = "media";
@@ -75,13 +76,12 @@ fn encode_and_write_webp(src: &image::DynamicImage, dest: &Path, quality: f32) -
     Ok(())
 }
 
-#[tauri::command]
-pub fn import_photo(
-    project_path: String,
+pub(crate) fn import_photo_at(
+    project_root: &Path,
     bytes: Vec<u8>,
     _mime: String,
 ) -> CmdResult<ImportedPhoto> {
-    let root = validate_project_root(&project_path)?;
+    let root = validate_project_root_path(project_root)?;
     ensure_media_dirs(&root)?;
 
     if bytes.len() > MAX_IMPORT_BYTES {
@@ -130,21 +130,36 @@ pub fn import_photo(
     Ok(ImportedPhoto { photo_id })
 }
 
-/// 立即把指定 photoId 文件移入 .trash/（软删除）
 #[tauri::command]
-pub fn delete_photo(project_path: String, photo_id: String) -> CmdResult<()> {
-    let root = validate_project_root(&project_path)?;
-    validate_photo_id(&photo_id)?;
+pub fn import_photo(
+    app: AppHandle,
+    project: ProjectRef,
+    bytes: Vec<u8>,
+    mime: String,
+) -> CmdResult<ImportedPhoto> {
+    let root = resolve_project_root(&app, &project)?;
+    import_photo_at(&root, bytes, mime)
+}
+
+/// 立即把指定 photoId 文件移入 .trash/（软删除）
+pub(crate) fn delete_photo_at(project_root: &Path, photo_id: &str) -> CmdResult<()> {
+    let root = validate_project_root_path(project_root)?;
+    validate_photo_id(photo_id)?;
     ensure_media_dirs(&root)?;
-    move_to_trash(&root, &photo_id)?;
+    move_to_trash(&root, photo_id)?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn delete_photo(app: AppHandle, project: ProjectRef, photo_id: String) -> CmdResult<()> {
+    let root = resolve_project_root(&app, &project)?;
+    delete_photo_at(&root, &photo_id)
 }
 
 /// 扫描 media/photos 与 media/thumbs 下所有 webp，移除不在 used_ids 里的文件到 .trash/。
 /// 返回被清理的照片数（每个 id 计 1，即使两张文件）。
-#[tauri::command]
-pub fn gc_media(project_path: String, used_ids: Vec<String>) -> CmdResult<u32> {
-    let root = validate_project_root(&project_path)?;
+pub(crate) fn gc_media_at(project_root: &Path, used_ids: Vec<String>) -> CmdResult<u32> {
+    let root = validate_project_root_path(project_root)?;
     ensure_media_dirs(&root)?;
 
     for photo_id in &used_ids {
@@ -166,6 +181,12 @@ pub fn gc_media(project_path: String, used_ids: Vec<String>) -> CmdResult<u32> {
         }
     }
     Ok(trashed)
+}
+
+#[tauri::command]
+pub fn gc_media(app: AppHandle, project: ProjectRef, used_ids: Vec<String>) -> CmdResult<u32> {
+    let root = resolve_project_root(&app, &project)?;
+    gc_media_at(&root, used_ids)
 }
 
 fn move_to_trash(root: &Path, photo_id: &str) -> CmdResult<()> {
@@ -197,16 +218,30 @@ fn move_to_trash(root: &Path, photo_id: &str) -> CmdResult<()> {
 }
 
 /// 只读取已验证项目目录中的照片字节，避免向 WebView 暴露任意本地文件协议。
-#[tauri::command]
-pub fn load_photo(project_path: String, photo_id: String, thumb: bool) -> CmdResult<Vec<u8>> {
-    let root = validate_project_root(&project_path)?;
-    let photo_id = validate_photo_id(&photo_id)?;
+pub(crate) fn load_photo_at(
+    project_root: &Path,
+    photo_id: &str,
+    thumb: bool,
+) -> CmdResult<Vec<u8>> {
+    let root = validate_project_root_path(project_root)?;
+    let photo_id = validate_photo_id(photo_id)?;
     let subdir = if thumb { THUMBS_SUBDIR } else { PHOTOS_SUBDIR };
     let path = root
         .join(MEDIA_DIR)
         .join(subdir)
         .join(format!("{}.webp", photo_id));
     fs::read(&path).map_err(|_| CmdError::InvalidPath(format!("照片不存在：{}", path.display())))
+}
+
+#[tauri::command]
+pub fn load_photo(
+    app: AppHandle,
+    project: ProjectRef,
+    photo_id: String,
+    thumb: bool,
+) -> CmdResult<Vec<u8>> {
+    let root = resolve_project_root(&app, &project)?;
+    load_photo_at(&root, &photo_id, thumb)
 }
 
 #[cfg(test)]
@@ -235,20 +270,19 @@ mod tests {
         buf
     }
 
-    fn create_test_project(name: &str) -> (PathBuf, String) {
+    fn create_test_project(name: &str) -> PathBuf {
         let root = tmp_dir(name);
         fs::create_dir_all(&root).unwrap();
-        let root_s = root.to_string_lossy().to_string();
-        crate::commands::project::create_project(root_s.clone(), "测试".into()).unwrap();
-        (root, root_s)
+        crate::commands::project::initialize_project(&root, "测试").unwrap();
+        root
     }
 
     #[test]
     fn import_creates_photo_and_thumb() {
-        let (root, root_s) = create_test_project("import");
+        let root = create_test_project("import");
         let bytes = tiny_png_bytes();
 
-        let res = import_photo(root_s.clone(), bytes, "image/png".into()).expect("import");
+        let res = import_photo_at(&root, bytes, "image/png".into()).expect("import");
         assert!(!res.photo_id.is_empty());
 
         let photo = root
@@ -262,21 +296,23 @@ mod tests {
         assert!(photo.exists());
         assert!(thumb.exists());
         assert!(photo.metadata().unwrap().len() > 0);
-        assert!(!load_photo(root_s, res.photo_id, true).unwrap().is_empty());
+        assert!(!load_photo_at(&root, &res.photo_id, true)
+            .unwrap()
+            .is_empty());
 
         fs::remove_dir_all(&root).ok();
     }
 
     #[test]
     fn gc_moves_unused_to_trash() {
-        let (root, root_s) = create_test_project("gc");
+        let root = create_test_project("gc");
         let bytes = tiny_png_bytes();
 
-        let a = import_photo(root_s.clone(), bytes.clone(), "image/png".into()).unwrap();
-        let b = import_photo(root_s.clone(), bytes, "image/png".into()).unwrap();
+        let a = import_photo_at(&root, bytes.clone(), "image/png".into()).unwrap();
+        let b = import_photo_at(&root, bytes, "image/png".into()).unwrap();
 
         // 仅 a 被使用，b 应被 GC
-        let n = gc_media(root_s.clone(), vec![a.photo_id.clone()]).unwrap();
+        let n = gc_media_at(&root, vec![a.photo_id.clone()]).unwrap();
         assert_eq!(n, 1);
 
         assert!(root
@@ -303,8 +339,8 @@ mod tests {
 
     #[test]
     fn media_commands_reject_path_traversal_ids() {
-        let (root, root_s) = create_test_project("unsafe-id");
-        let err = delete_photo(root_s, "../escape".into()).unwrap_err();
+        let root = create_test_project("unsafe-id");
+        let err = delete_photo_at(&root, "../escape").unwrap_err();
         assert!(matches!(err, CmdError::InvalidPath(_)));
         fs::remove_dir_all(&root).ok();
     }

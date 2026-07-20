@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { FamilyData, ProjectMeta } from '@/core/schema'
-import type { ExternalProjectRef, ProjectRef } from './projectRef'
+import type { ProjectRef } from './projectRef'
 
 export interface LoadedProject {
   project: ProjectRef
@@ -8,8 +8,14 @@ export interface LoadedProject {
   family: FamilyData
 }
 
+export interface ManagedProjectSummary {
+  project: Extract<ProjectRef, { kind: 'managed' }>
+  meta: ProjectMeta
+}
+
 export interface ProjectRepository {
   create(project: ProjectRef, name: string): Promise<ProjectMeta>
+  listManaged(): Promise<ManagedProjectSummary[]>
   load(project: ProjectRef): Promise<LoadedProject>
   save(project: ProjectRef, family: FamilyData): Promise<void>
   importPhoto(
@@ -22,63 +28,41 @@ export interface ProjectRepository {
   resolvePhotoUrl(project: ProjectRef, photoId: string, thumb?: boolean): Promise<string>
 }
 
-function requireExternalProject(project: ProjectRef): ExternalProjectRef {
-  if (project.kind !== 'external') {
-    throw new Error('当前版本尚未启用托管项目存储')
-  }
-  return project
-}
-
 export const projectRepository: ProjectRepository = {
   async create(project, name) {
-    const { path } = requireExternalProject(project)
-    return invoke<ProjectMeta>('create_project', { path, name })
+    return invoke<ProjectMeta>('create_project', { project, name })
+  },
+
+  async listManaged() {
+    return invoke<ManagedProjectSummary[]>('list_managed_projects')
   },
 
   async load(project) {
-    const external = requireExternalProject(project)
-    const { path } = external
-    const loaded = await invoke<{ path: string; meta: ProjectMeta; family: FamilyData }>(
-      'load_project',
-      { path },
-    )
-    return { project: externalProjectFromLoadedPath(external, loaded.path), ...loaded }
+    return invoke<LoadedProject>('load_project', { project })
   },
 
   async save(project, family) {
-    const { path } = requireExternalProject(project)
-    await invoke('save_project', { path, familyJson: JSON.stringify(family) })
+    await invoke('save_project', { project, familyJson: JSON.stringify(family) })
   },
 
   async importPhoto(project, bytes, mime) {
-    const { path: projectPath } = requireExternalProject(project)
     return invoke<{ photoId: string }>('import_photo', {
-      projectPath,
+      project,
       bytes: Array.from(bytes),
       mime,
     })
   },
 
   async deletePhoto(project, photoId) {
-    const { path: projectPath } = requireExternalProject(project)
-    await invoke('delete_photo', { projectPath, photoId })
+    await invoke('delete_photo', { project, photoId })
   },
 
   async gcMedia(project, usedIds) {
-    const { path: projectPath } = requireExternalProject(project)
-    return invoke<number>('gc_media', { projectPath, usedIds })
+    return invoke<number>('gc_media', { project, usedIds })
   },
 
   async resolvePhotoUrl(project, photoId, thumb = false) {
-    const { path: projectPath } = requireExternalProject(project)
-    const bytes = await invoke<number[]>('load_photo', { projectPath, photoId, thumb })
+    const bytes = await invoke<number[]>('load_photo', { project, photoId, thumb })
     return URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'image/webp' }))
   },
-}
-
-function externalProjectFromLoadedPath(
-  requested: ExternalProjectRef,
-  loadedPath: string,
-): ExternalProjectRef {
-  return loadedPath === requested.path ? requested : { kind: 'external', path: loadedPath }
 }

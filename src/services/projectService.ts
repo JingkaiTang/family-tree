@@ -7,8 +7,9 @@ import {
 } from '@/core/schema'
 import { migrate } from '@/core/migrate'
 import { assertFamilyIntegrity } from '@/core/familyIntegrity'
+import { v4 as uuidv4 } from 'uuid'
 import { projectRepository } from './projectRepository'
-import { projectRefName, type ProjectRef } from './projectRef'
+import { managedProjectRef, projectRefName, type ProjectRef } from './projectRef'
 
 export interface OpenResult {
   project: ProjectRef
@@ -25,6 +26,14 @@ export async function createProject(project: ProjectRef, name: string): Promise<
   // 初始空数据写盘一次
   await projectRepository.save(project, family)
   return { project, meta, family }
+}
+
+export async function createManagedProject(name: string): Promise<OpenResult> {
+  return createProject(managedProjectRef(uuidv4()), name)
+}
+
+export async function listManagedProjects() {
+  return projectRepository.listManaged()
 }
 
 /**

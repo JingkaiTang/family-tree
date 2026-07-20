@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   externalProjectRef,
   isProjectRef,
+  managedProjectRef,
   projectRefLocation,
   projectRefName,
 } from './projectRef'
@@ -15,7 +16,7 @@ describe('projectRef', () => {
   })
 
   it('does not expose a filesystem location for managed projects', () => {
-    const project = { kind: 'managed', id: 'project-id' } as const
+    const project = managedProjectRef('project-id')
 
     expect(isProjectRef(project)).toBe(true)
     expect(projectRefLocation(project)).toBeNull()

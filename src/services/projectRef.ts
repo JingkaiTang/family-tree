@@ -14,6 +14,10 @@ export function externalProjectRef(path: string): ExternalProjectRef {
   return { kind: 'external', path }
 }
 
+export function managedProjectRef(id: string): ManagedProjectRef {
+  return { kind: 'managed', id }
+}
+
 export function isProjectRef(value: unknown): value is ProjectRef {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>

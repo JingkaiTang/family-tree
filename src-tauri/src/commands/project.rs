@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager};
 
 use crate::errors::{CmdError, CmdResult};
 
@@ -20,11 +21,24 @@ pub struct ProjectMeta {
     pub updated_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum ProjectRef {
+    External { path: String },
+    Managed { id: String },
+}
+
 #[derive(Debug, Serialize)]
 pub struct LoadedProject {
-    pub path: String,
+    pub project: ProjectRef,
     pub meta: ProjectMeta,
     pub family: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ManagedProjectSummary {
+    pub project: ProjectRef,
+    pub meta: ProjectMeta,
 }
 
 const FAMILY_FILE: &str = "family.json";
@@ -36,6 +50,8 @@ const TRASH_SUBDIR: &str = ".trash";
 const CURRENT_SCHEMA_VERSION: u32 = 4;
 const MAX_BAK_COUNT: usize = 3;
 const MAX_FAMILY_JSON_BYTES: u64 = 50 * 1024 * 1024;
+const MANAGED_PROJECTS_DIR: &str = "projects";
+const MANAGED_PROJECT_SUFFIX: &str = ".family";
 
 // ============================================================
 // Helpers
@@ -127,8 +143,9 @@ fn validate_absolute_directory(path: &str) -> CmdResult<PathBuf> {
     Ok(canonical)
 }
 
-pub(crate) fn validate_project_root(path: &str) -> CmdResult<PathBuf> {
-    let root = validate_absolute_directory(path)?;
+pub(crate) fn validate_project_root_path(path: &Path) -> CmdResult<PathBuf> {
+    let path_string = path.to_string_lossy();
+    let root = validate_absolute_directory(&path_string)?;
     for marker in [META_FILE, FAMILY_FILE] {
         if !root.join(marker).is_file() {
             return Err(CmdError::CorruptedProject(format!(
@@ -139,6 +156,52 @@ pub(crate) fn validate_project_root(path: &str) -> CmdResult<PathBuf> {
         }
     }
     Ok(root)
+}
+
+fn validate_managed_id(id: &str) -> CmdResult<&str> {
+    uuid::Uuid::parse_str(id)
+        .map_err(|_| CmdError::InvalidPath(format!("非法托管项目 ID：{}", id)))?;
+    Ok(id)
+}
+
+fn app_data_dir(app: &AppHandle) -> CmdResult<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .map_err(|error| CmdError::Other(format!("无法定位 AppData：{}", error)))
+}
+
+pub(crate) fn managed_projects_dir(app: &AppHandle) -> CmdResult<PathBuf> {
+    Ok(app_data_dir(app)?.join(MANAGED_PROJECTS_DIR))
+}
+
+pub(crate) fn managed_project_root(base: &Path, id: &str) -> CmdResult<PathBuf> {
+    let id = validate_managed_id(id)?;
+    Ok(base.join(format!("{}{}", id, MANAGED_PROJECT_SUFFIX)))
+}
+
+pub(crate) fn resolve_project_root(app: &AppHandle, project: &ProjectRef) -> CmdResult<PathBuf> {
+    let managed_base = managed_projects_dir(app)?;
+    resolve_project_root_from_base(project, &managed_base)
+}
+
+pub(crate) fn resolve_project_root_from_base(
+    project: &ProjectRef,
+    managed_base: &Path,
+) -> CmdResult<PathBuf> {
+    match project {
+        ProjectRef::External { path } => validate_project_root_path(Path::new(path)),
+        ProjectRef::Managed { id } => {
+            let root = managed_project_root(managed_base, id)?;
+            let canonical_root = validate_project_root_path(&root)?;
+            let canonical_base = fs::canonicalize(managed_base).map_err(|_| {
+                CmdError::InvalidPath(format!("托管项目目录不存在：{}", managed_base.display()))
+            })?;
+            if !canonical_root.starts_with(&canonical_base) {
+                return Err(CmdError::InvalidPath("托管项目越出 AppData 边界".into()));
+            }
+            Ok(canonical_root)
+        }
+    }
 }
 
 fn ensure_dirs(root: &Path) -> CmdResult<()> {
@@ -204,9 +267,11 @@ fn rotate_backups(root: &Path) -> CmdResult<()> {
 // Commands
 // ============================================================
 
-#[tauri::command]
-pub fn create_project(path: String, name: String) -> CmdResult<ProjectMeta> {
-    let root = validate_absolute_directory(&path)?;
+pub(crate) fn initialize_project(root: &Path, name: &str) -> CmdResult<ProjectMeta> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 100 {
+        return Err(CmdError::Other("项目名称须为 1 到 100 个字符".into()));
+    }
 
     // 任一项目标记已存在都拒绝覆盖，避免把损坏项目当成新项目重建。
     if root.join(FAMILY_FILE).exists() || root.join(META_FILE).exists() {
@@ -214,16 +279,16 @@ pub fn create_project(path: String, name: String) -> CmdResult<ProjectMeta> {
             "该目录已存在家族项目文件，请改用\"打开\"。".into(),
         ));
     }
-    ensure_dirs(&root)?;
+    ensure_dirs(root)?;
 
     let now = now_iso();
     let meta = ProjectMeta {
-        name,
+        name: name.to_string(),
         schema_version: CURRENT_SCHEMA_VERSION,
         created_at: now.clone(),
         updated_at: now,
     };
-    write_meta(&root, &meta)?;
+    write_meta(root, &meta)?;
 
     // 写一份空 family.json 占位（前端会再写一次完整数据，但这里保证目录完整性）
     let empty = serde_json::json!({
@@ -239,9 +304,8 @@ pub fn create_project(path: String, name: String) -> CmdResult<ProjectMeta> {
     Ok(meta)
 }
 
-#[tauri::command]
-pub fn load_project(path: String) -> CmdResult<LoadedProject> {
-    let root = validate_project_root(&path)?;
+fn load_project_from_root(root: &Path, project: ProjectRef) -> CmdResult<LoadedProject> {
+    let root = validate_project_root_path(root)?;
     ensure_dirs(&root)?;
 
     let meta = read_meta(&root)?;
@@ -258,21 +322,25 @@ pub fn load_project(path: String) -> CmdResult<LoadedProject> {
     let family: serde_json::Value = serde_json::from_slice(&family_bytes)?;
 
     Ok(LoadedProject {
-        path: root.to_string_lossy().to_string(),
+        project: match project {
+            ProjectRef::External { .. } => ProjectRef::External {
+                path: root.to_string_lossy().to_string(),
+            },
+            managed @ ProjectRef::Managed { .. } => managed,
+        },
         meta,
         family,
     })
 }
 
-#[tauri::command]
-pub fn save_project(path: String, family_json: String) -> CmdResult<()> {
-    let root = validate_project_root(&path)?;
+pub(crate) fn save_project_at(root: &Path, family_json: &str) -> CmdResult<()> {
+    let root = validate_project_root_path(root)?;
     if family_json.len() as u64 > MAX_FAMILY_JSON_BYTES {
         return Err(CmdError::Other("family.json 超过 50 MiB 限制".into()));
     }
 
     // Rust 层只校验 JSON 和格式版本；完整 schema 与关系图约束由前端校验。
-    let parsed: serde_json::Value = serde_json::from_str(&family_json)?;
+    let parsed: serde_json::Value = serde_json::from_str(family_json)?;
     if parsed.get("schemaVersion").and_then(|value| value.as_u64())
         != Some(u64::from(CURRENT_SCHEMA_VERSION))
     {
@@ -295,6 +363,103 @@ pub fn save_project(path: String, family_json: String) -> CmdResult<()> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn create_project(app: AppHandle, project: ProjectRef, name: String) -> CmdResult<ProjectMeta> {
+    let managed_base = managed_projects_dir(&app)?;
+    create_project_with_base(&project, &name, &managed_base)
+}
+
+fn create_project_with_base(
+    project: &ProjectRef,
+    name: &str,
+    managed_base: &Path,
+) -> CmdResult<ProjectMeta> {
+    let (root, remove_on_error) = match project {
+        ProjectRef::External { path } => (validate_absolute_directory(path)?, false),
+        ProjectRef::Managed { id } => {
+            fs::create_dir_all(managed_base)?;
+            let root = managed_project_root(managed_base, id)?;
+            if root.exists() {
+                return Err(CmdError::Other("该托管项目已存在".into()));
+            }
+            fs::create_dir(&root)?;
+            (fs::canonicalize(root)?, true)
+        }
+    };
+
+    match initialize_project(&root, name) {
+        Ok(meta) => Ok(meta),
+        Err(error) => {
+            if remove_on_error {
+                let _ = fs::remove_dir_all(&root);
+            }
+            Err(error)
+        }
+    }
+}
+
+#[tauri::command]
+pub fn list_managed_projects(app: AppHandle) -> CmdResult<Vec<ManagedProjectSummary>> {
+    let base = managed_projects_dir(&app)?;
+    list_managed_projects_at(&base)
+}
+
+fn list_managed_projects_at(base: &Path) -> CmdResult<Vec<ManagedProjectSummary>> {
+    fs::create_dir_all(base)?;
+    let mut projects = Vec::new();
+
+    for entry in fs::read_dir(base)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+        let Some(id) = file_name.strip_suffix(MANAGED_PROJECT_SUFFIX) else {
+            continue;
+        };
+        if validate_managed_id(id).is_err() {
+            continue;
+        }
+        let Ok(root) = validate_project_root_path(&entry.path()) else {
+            continue;
+        };
+        let Ok(meta) = read_meta(&root) else {
+            continue;
+        };
+        projects.push(ManagedProjectSummary {
+            project: ProjectRef::Managed { id: id.to_string() },
+            meta,
+        });
+    }
+
+    projects.sort_by(|left, right| {
+        right
+            .meta
+            .updated_at
+            .cmp(&left.meta.updated_at)
+            .then_with(|| left.meta.name.cmp(&right.meta.name))
+    });
+    Ok(projects)
+}
+
+#[tauri::command]
+pub fn load_project(app: AppHandle, project: ProjectRef) -> CmdResult<LoadedProject> {
+    let root = resolve_project_root(&app, &project)?;
+    load_project_from_root(&root, project)
+}
+
+#[tauri::command]
+pub fn save_project(app: AppHandle, project: ProjectRef, family_json: String) -> CmdResult<()> {
+    let root = resolve_project_root(&app, &project)?;
+    save_project_at(&root, &family_json)
+}
+
+#[tauri::command]
+pub fn runtime_platform() -> &'static str {
+    std::env::consts::OS
+}
+
 // ============================================================
 // Tests
 // ============================================================
@@ -314,25 +479,30 @@ mod tests {
         p
     }
 
+    fn external_project(root: &Path) -> ProjectRef {
+        ProjectRef::External {
+            path: root.to_string_lossy().to_string(),
+        }
+    }
+
     #[test]
     fn create_load_save_roundtrip() {
         let root = tmp_dir("roundtrip");
         fs::create_dir_all(&root).unwrap();
-        let root_s = root.to_string_lossy().to_string();
 
         // create
-        let meta = create_project(root_s.clone(), "测试家族".into()).expect("create");
+        let meta = initialize_project(&root, "测试家族").expect("create");
         assert_eq!(meta.name, "测试家族");
         assert!(root.join(FAMILY_FILE).exists());
         assert!(root.join(META_FILE).exists());
         assert!(root.join(MEDIA_DIR).join(PHOTOS_SUBDIR).exists());
 
         // create again should fail (dir already has project)
-        let err = create_project(root_s.clone(), "re".into()).unwrap_err();
+        let err = initialize_project(&root, "re").unwrap_err();
         assert!(matches!(err, CmdError::Other(_)));
 
         // load
-        let loaded = load_project(root_s.clone()).expect("load");
+        let loaded = load_project_from_root(&root, external_project(&root)).expect("load");
         assert_eq!(loaded.meta.name, "测试家族");
         assert!(loaded.family.get("members").is_some());
 
@@ -350,8 +520,8 @@ mod tests {
             },
             "nicknameOverrides": {}
         });
-        save_project(root_s.clone(), new_family.to_string()).expect("save");
-        let loaded2 = load_project(root_s.clone()).expect("load2");
+        save_project_at(&root, &new_family.to_string()).expect("save");
+        let loaded2 = load_project_from_root(&root, external_project(&root)).expect("load2");
         assert_eq!(
             loaded2.family["members"]["m1"]["firstName"],
             serde_json::Value::String("三".into())
@@ -359,7 +529,7 @@ mod tests {
         assert_eq!(loaded2.meta.schema_version, CURRENT_SCHEMA_VERSION);
 
         // save again triggers a .bak.1
-        save_project(root_s.clone(), new_family.to_string()).expect("save2");
+        save_project_at(&root, &new_family.to_string()).expect("save2");
         assert!(root.join("family.json.bak.1").exists());
 
         // cleanup
@@ -370,9 +540,8 @@ mod tests {
     fn save_rejects_invalid_json() {
         let root = tmp_dir("badjson");
         fs::create_dir_all(&root).unwrap();
-        let root_s = root.to_string_lossy().to_string();
-        create_project(root_s.clone(), "x".into()).unwrap();
-        let err = save_project(root_s.clone(), "not-json".into()).unwrap_err();
+        initialize_project(&root, "x").unwrap();
+        let err = save_project_at(&root, "not-json").unwrap_err();
         assert!(matches!(err, CmdError::Json(_)));
         let _ = fs::remove_dir_all(&root);
     }
@@ -381,9 +550,8 @@ mod tests {
     fn save_rejects_non_current_schema() {
         let root = tmp_dir("old-schema");
         fs::create_dir_all(&root).unwrap();
-        let root_s = root.to_string_lossy().to_string();
-        create_project(root_s.clone(), "x".into()).unwrap();
-        let err = save_project(root_s, r#"{"schemaVersion":1}"#.into()).unwrap_err();
+        initialize_project(&root, "x").unwrap();
+        let err = save_project_at(&root, r#"{"schemaVersion":1}"#).unwrap_err();
         assert!(matches!(err, CmdError::Other(_)));
         let _ = fs::remove_dir_all(&root);
     }
@@ -392,7 +560,7 @@ mod tests {
     fn save_rejects_directory_without_project_markers() {
         let root = tmp_dir("not-project");
         fs::create_dir_all(&root).unwrap();
-        let err = save_project(root.to_string_lossy().to_string(), "{}".into()).unwrap_err();
+        let err = save_project_at(&root, "{}").unwrap_err();
         assert!(matches!(err, CmdError::CorruptedProject(_)));
         let _ = fs::remove_dir_all(&root);
     }
@@ -403,5 +571,63 @@ mod tests {
         let path = root.join("child").join("..");
         let err = validate_absolute_directory(&path.to_string_lossy()).unwrap_err();
         assert!(matches!(err, CmdError::InvalidPath(_)));
+    }
+
+    #[test]
+    fn managed_project_root_accepts_only_uuid_ids() {
+        let base = tmp_dir("managed-base");
+        let id = uuid::Uuid::new_v4().to_string();
+
+        assert_eq!(
+            managed_project_root(&base, &id).unwrap(),
+            base.join(format!("{}.family", id))
+        );
+        assert!(managed_project_root(&base, "../escape").is_err());
+        assert!(managed_project_root(&base, "not-a-uuid").is_err());
+    }
+
+    #[test]
+    fn managed_project_create_list_load_save_roundtrip() {
+        let base = tmp_dir("managed-roundtrip");
+        let project = ProjectRef::Managed {
+            id: uuid::Uuid::new_v4().to_string(),
+        };
+
+        let meta = create_project_with_base(&project, "移动家族", &base).unwrap();
+        assert_eq!(meta.name, "移动家族");
+
+        let root = resolve_project_root_from_base(&project, &base).unwrap();
+        let family = serde_json::json!({
+            "schemaVersion": CURRENT_SCHEMA_VERSION,
+            "members": {},
+            "nicknameOverrides": {}
+        });
+        save_project_at(&root, &family.to_string()).unwrap();
+
+        let loaded = load_project_from_root(&root, project.clone()).unwrap();
+        assert_eq!(loaded.project, project);
+        assert_eq!(loaded.family["schemaVersion"], CURRENT_SCHEMA_VERSION);
+
+        let projects = list_managed_projects_at(&base).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].project, project);
+        assert_eq!(projects[0].meta.name, "移动家族");
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn project_ref_uses_the_frontend_tagged_shape() {
+        let project = ProjectRef::Managed {
+            id: "00000000-0000-0000-0000-000000000000".into(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(project).unwrap(),
+            serde_json::json!({
+                "kind": "managed",
+                "id": "00000000-0000-0000-0000-000000000000"
+            })
+        );
     }
 }
