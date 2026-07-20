@@ -9,6 +9,7 @@ import TreeView from '@/pages/TreeView.vue'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
+import { externalProjectRef } from '@/services/projectRef'
 
 const { flushNowMock, routerPush } = vi.hoisted(() => ({
   flushNowMock: vi.fn(),
@@ -17,7 +18,9 @@ const { flushNowMock, routerPush } = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
-vi.mock('@/services/tauriApi', () => ({ gcMedia: vi.fn() }))
+vi.mock('@/services/projectRepository', () => ({
+  projectRepository: { gcMedia: vi.fn() },
+}))
 vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
 
 const TreeLayoutHostStub = defineComponent({
@@ -479,7 +482,7 @@ describe('TreeView row order integration', () => {
     setActivePinia(pinia)
     const family = useFamilyStore()
     const ui = useUiStore()
-    family.setProject('/tmp/test.family', {
+    family.setProject(externalProjectRef('/tmp/test.family'), {
       name: '测试',
       schemaVersion: 4,
       createdAt: '2026-07-16T00:00:00.000Z',

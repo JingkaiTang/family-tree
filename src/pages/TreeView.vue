@@ -8,7 +8,7 @@ import { flushNow } from '@/services/autosave'
 import TreeLayoutHost from '@/components/tree/TreeLayoutHost.vue'
 import SearchBar from '@/components/search/SearchBar.vue'
 import { getKinship } from '@/core/kinship'
-import { gcMedia } from '@/services/tauriApi'
+import { projectRepository } from '@/services/projectRepository'
 import { v4 as uuidv4 } from 'uuid'
 import type { LayoutModePreference } from '@/core/layoutMode'
 
@@ -29,7 +29,7 @@ const {
 } = storeToRefs(ui)
 
 const saveStatus = computed(() => {
-  if (!family.projectPath) return ''
+  if (!family.projectRef) return ''
   if (isDirty.value) return '未保存…'
   return '已保存'
 })
@@ -155,10 +155,10 @@ function kinshipResolver(fromId: string, toId: string): string | null {
 }
 
 async function onGcMedia() {
-  if (!family.projectPath) return
+  if (!family.projectRef) return
   try {
     const usedIds = family.membersArray.map((m) => m.photoId).filter((x): x is string => !!x)
-    const trashed = await gcMedia(family.projectPath, usedIds)
+    const trashed = await projectRepository.gcMedia(family.projectRef, usedIds)
     if (trashed > 0) {
       ui.showToast('success', `已清理 ${trashed} 张未使用的照片到 .trash/`)
     } else {

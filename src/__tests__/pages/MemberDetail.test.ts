@@ -9,6 +9,7 @@ import MemberDetail from '@/pages/MemberDetail.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
+import { externalProjectRef } from '@/services/projectRef'
 
 const { deletePhotoMock, flushNowMock, routerBack, routerPush } = vi.hoisted(() => ({
   deletePhotoMock: vi.fn(),
@@ -21,7 +22,9 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ back: routerBack, push: routerPush }),
 }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
-vi.mock('@/services/tauriApi', () => ({ deletePhoto: deletePhotoMock }))
+vi.mock('@/services/projectRepository', () => ({
+  projectRepository: { deletePhoto: deletePhotoMock },
+}))
 
 const MemberFormStub = defineComponent({
   name: 'MemberForm',
@@ -58,8 +61,8 @@ describe('MemberDetail photo transaction', () => {
     await wrapper.get('[data-testid="cancel"]').trigger('click')
     await flushPromises()
 
-    expect(deletePhotoMock).toHaveBeenCalledWith('/tmp/test.family', 'new-photo-1')
-    expect(deletePhotoMock).not.toHaveBeenCalledWith('/tmp/test.family', 'old-photo')
+    expect(deletePhotoMock).toHaveBeenCalledWith(externalProjectRef('/tmp/test.family'), 'new-photo-1')
+    expect(deletePhotoMock).not.toHaveBeenCalledWith(externalProjectRef('/tmp/test.family'), 'old-photo')
     expect(family.data.members.a.photoId).toBe('old-photo')
     expect(routerBack).toHaveBeenCalledOnce()
   })
@@ -75,7 +78,7 @@ describe('MemberDetail photo transaction', () => {
     expect(flushNowMock).toHaveBeenCalledOnce()
     expect(family.data.members.a.photoId).toBe('new-photo-2')
     expect(deletePhotoMock).toHaveBeenCalledTimes(1)
-    expect(deletePhotoMock).toHaveBeenCalledWith('/tmp/test.family', 'new-photo-1')
+    expect(deletePhotoMock).toHaveBeenCalledWith(externalProjectRef('/tmp/test.family'), 'new-photo-1')
   })
 
   it('does not delete a staged photo that remains referenced after a failed save', async () => {
@@ -100,7 +103,7 @@ function mountedMember() {
   const family = useFamilyStore()
   const data = createEmptyFamily()
   data.members.a = { ...mk('a'), photoId: 'old-photo' }
-  family.setProject('/tmp/test.family', createEmptyMeta('测试'), data)
+  family.setProject(externalProjectRef('/tmp/test.family'), createEmptyMeta('测试'), data)
   const wrapper = mount(MemberDetail, {
     props: { id: 'a' },
     global: {

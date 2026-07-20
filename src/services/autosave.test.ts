@@ -4,6 +4,8 @@ import { createEmptyFamily, createEmptyMeta, type FamilyData } from '@/core/sche
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 import { createAutosaveController } from './autosave'
+import { externalProjectRef } from './projectRef'
+import type { ProjectRef } from './projectRef'
 
 describe('autosave coordinator', () => {
   beforeEach(() => {
@@ -17,7 +19,7 @@ describe('autosave coordinator', () => {
   it('debounces every revision instead of only the first dirty transition', async () => {
     vi.useFakeTimers()
     const family = openedFamily()
-    const save = vi.fn(async (_path: string, _data: FamilyData) => {})
+    const save = vi.fn(async (_project: ProjectRef, _data: FamilyData) => {})
     const controller = createAutosaveController(family, { debounceMs: 800, save })
     controller.start()
 
@@ -42,7 +44,7 @@ describe('autosave coordinator', () => {
       data: FamilyData
       resolve: () => void
     }> = []
-    const save = vi.fn((_path: string, data: FamilyData) => new Promise<void>(resolve => {
+    const save = vi.fn((_project: ProjectRef, data: FamilyData) => new Promise<void>(resolve => {
       pending.push({ data, resolve })
     }))
     const controller = createAutosaveController(family, { save })
@@ -84,6 +86,6 @@ describe('autosave coordinator', () => {
 
 function openedFamily() {
   const family = useFamilyStore()
-  family.setProject('/tmp/test.family', createEmptyMeta('测试'), createEmptyFamily())
+  family.setProject(externalProjectRef('/tmp/test.family'), createEmptyMeta('测试'), createEmptyFamily())
   return family
 }

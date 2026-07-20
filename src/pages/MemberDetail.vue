@@ -5,12 +5,13 @@ import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { flushNow } from '@/services/autosave'
-import { deletePhoto } from '@/services/tauriApi'
+import { projectRepository } from '@/services/projectRepository'
 import MemberForm from '@/components/member/MemberForm.vue'
 import RelationEditor from '@/components/member/RelationEditor.vue'
 import SiblingOrderEditor from '@/components/member/SiblingOrderEditor.vue'
 import { getKinship } from '@/core/kinship'
 import type { Member } from '@/core/schema'
+import type { ProjectRef } from '@/services/projectRef'
 
 const props = defineProps<{ id: string }>()
 
@@ -24,7 +25,7 @@ const member = computed(() => family.getMember(props.id))
 
 // 表单本地副本
 const draft = ref<Member | null>(null)
-const stagedPhotos = new Map<string, string>()
+const stagedPhotos = new Map<string, ProjectRef>()
 
 watch(
   member,
@@ -103,8 +104,8 @@ async function onBack() {
 }
 
 function onMediaStaged(photoId: string) {
-  if (!family.projectPath) return
-  stagedPhotos.set(photoId, family.projectPath)
+  if (!family.projectRef) return
+  stagedPhotos.set(photoId, family.projectRef)
 }
 
 async function discardUnreferencedStagedPhotos() {
@@ -114,13 +115,13 @@ async function discardUnreferencedStagedPhotos() {
       .map(value => value.photoId)
       .filter((value): value is string => value !== undefined),
   )
-  for (const [photoId, projectPath] of [...stagedPhotos]) {
+  for (const [photoId, project] of [...stagedPhotos]) {
     if (referencedPhotoIds.has(photoId)) {
       stagedPhotos.delete(photoId)
       continue
     }
     try {
-      await deletePhoto(projectPath, photoId)
+      await projectRepository.deletePhoto(project, photoId)
       stagedPhotos.delete(photoId)
     } catch (e) {
       ui.showToast('error', '暂存照片清理失败：' + (e instanceof Error ? e.message : String(e)))

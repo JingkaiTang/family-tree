@@ -8,15 +8,18 @@ import { defineComponent, h } from 'vue'
 import PhotoPicker from '@/components/member/PhotoPicker.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
+import { externalProjectRef } from '@/services/projectRef'
 
 const { importPhotoMock, resolvePhotoUrlMock } = vi.hoisted(() => ({
   importPhotoMock: vi.fn(),
   resolvePhotoUrlMock: vi.fn(),
 }))
 
-vi.mock('@/services/tauriApi', () => ({
-  importPhoto: importPhotoMock,
-  resolvePhotoUrl: resolvePhotoUrlMock,
+vi.mock('@/services/projectRepository', () => ({
+  projectRepository: {
+    importPhoto: importPhotoMock,
+    resolvePhotoUrl: resolvePhotoUrlMock,
+  },
 }))
 
 const PhotoCropperStub = defineComponent({
@@ -35,7 +38,7 @@ describe('PhotoPicker media staging', () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     useFamilyStore().setProject(
-      '/tmp/test.family',
+      externalProjectRef('/tmp/test.family'),
       createEmptyMeta('测试'),
       createEmptyFamily(),
     )

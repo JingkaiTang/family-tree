@@ -6,7 +6,8 @@ import { useUiStore } from '@/stores/ui'
 import { pickDirectory } from '@/services/tauriApi'
 import { createProject, openProject } from '@/services/projectService'
 import { startAutosave } from '@/services/autosave'
-import { getLastProjectPath, setLastProjectPath } from '@/services/prefs'
+import { getLastProjectRef, setLastProjectRef } from '@/services/prefs'
+import { externalProjectRef, projectRefName, type ProjectRef } from '@/services/projectRef'
 
 const router = useRouter()
 const family = useFamilyStore()
@@ -16,13 +17,13 @@ const busy = ref(false)
 const error = ref<string | null>(null)
 /** 启动时是否正在自动尝试恢复上次项目（让 UI 显示 loading 而不是闪一下按钮） */
 const autoRestoring = ref(false)
-const lastPath = ref<string | null>(null)
+const lastProject = ref<ProjectRef | null>(null)
 
-async function tryOpen(dir: string, silent = false): Promise<boolean> {
+async function tryOpen(project: ProjectRef, silent = false): Promise<boolean> {
   try {
     busy.value = true
-    const result = await openProject(dir)
-    family.setProject(result.path, result.meta, result.family)
+    const result = await openProject(project)
+    family.setProject(result.project, result.meta, result.family)
     startAutosave()
     if (!silent) ui.showToast('success', `已打开家族：${result.meta.name}`)
     router.push('/tree')
@@ -31,8 +32,8 @@ async function tryOpen(dir: string, silent = false): Promise<boolean> {
     const msg = e instanceof Error ? e.message : String(e)
     if (silent) {
       // 自动恢复失败：清掉无效记录，不打扰用户
-      setLastProjectPath(null)
-      lastPath.value = null
+      setLastProjectRef(null)
+      lastProject.value = null
       console.warn('[Welcome] auto-restore failed:', msg)
     } else {
       error.value = msg
@@ -50,8 +51,8 @@ async function onCreate() {
   const name = dir.split('/').filter(Boolean).pop() ?? '未命名家族'
   try {
     busy.value = true
-    const result = await createProject(dir, name)
-    family.setProject(result.path, result.meta, result.family)
+    const result = await createProject(externalProjectRef(dir), name)
+    family.setProject(result.project, result.meta, result.family)
     startAutosave()
     ui.showToast('success', `已新建家族：${name}`)
     router.push('/tree')
@@ -66,22 +67,22 @@ async function onOpen() {
   error.value = null
   const dir = await pickDirectory('选择要打开的家族项目文件夹')
   if (!dir) return
-  await tryOpen(dir)
+  await tryOpen(externalProjectRef(dir))
 }
 
 async function onOpenLast() {
-  if (!lastPath.value) return
-  await tryOpen(lastPath.value)
+  if (!lastProject.value) return
+  await tryOpen(lastProject.value)
 }
 
 function onForgetLast() {
-  setLastProjectPath(null)
-  lastPath.value = null
+  setLastProjectRef(null)
+  lastProject.value = null
 }
 
 onMounted(async () => {
-  const stored = getLastProjectPath()
-  lastPath.value = stored
+  const stored = getLastProjectRef()
+  lastProject.value = stored
   if (!stored) return
   // 启动自动恢复。失败时静默清掉记录，落回欢迎页
   autoRestoring.value = true
@@ -92,9 +93,6 @@ onMounted(async () => {
   }
 })
 
-function lastName(path: string): string {
-  return path.split('/').filter(Boolean).pop() ?? path
-}
 </script>
 
 <template>
@@ -126,17 +124,17 @@ function lastName(path: string): string {
 
       <!-- 最近打开：点击快速恢复；X 清除记录 -->
       <div
-        v-if="lastPath"
+        v-if="lastProject"
         class="mt-2 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 shadow-sm"
       >
         <span class="text-xs text-slate-400">最近：</span>
         <button
           class="hover:text-emerald-700 hover:underline disabled:opacity-50"
           :disabled="busy"
-          :title="lastPath"
+          :title="lastProject.kind === 'external' ? lastProject.path : lastProject.id"
           @click="onOpenLast"
         >
-          {{ lastName(lastPath) }}
+          {{ projectRefName(lastProject) }}
         </button>
         <button
           class="text-xs text-slate-400 hover:text-rose-500"

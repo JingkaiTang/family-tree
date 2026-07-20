@@ -6,7 +6,9 @@ import FocusFlowView from '@/components/tree/focus-flow/FocusFlowView.vue'
 import { createEmptyFamily } from '@/core/schema'
 import { multiUnionFamily, threeGenFamily } from '@/__tests__/fixtures/families'
 
-vi.mock('@/services/tauriApi', () => ({ resolvePhotoUrl: vi.fn() }))
+vi.mock('@/services/projectRepository', () => ({
+  projectRepository: { resolvePhotoUrl: vi.fn() },
+}))
 
 describe('FocusFlowView', () => {
   it('renders normal-flow family sections and mobile-safe member actions', async () => {

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
-import { resolvePhotoUrl } from '@/services/tauriApi'
+import { projectRepository } from '@/services/projectRepository'
 import DefaultAvatar from '@/components/member/DefaultAvatar.vue'
 import { getDefaultAvatarAgeBand } from '@/core/defaultAvatar'
 
@@ -25,15 +25,15 @@ let photoRequest = 0
 const ageBand = computed(() => getDefaultAvatarAgeBand(props.member))
 
 watch(
-  () => [props.member.photoId, family.projectPath] as const,
-  async ([photoId, projectPath]) => {
+  () => [props.member.photoId, family.projectRef] as const,
+  async ([photoId, project]) => {
     const request = ++photoRequest
     const previous = photoUrl.value
     if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
     photoUrl.value = null
-    if (!photoId || !projectPath) return
+    if (!photoId || !project) return
     try {
-      const next = await resolvePhotoUrl(projectPath, photoId, true)
+      const next = await projectRepository.resolvePhotoUrl(project, photoId, true)
       if (request !== photoRequest) {
         if (next.startsWith('blob:')) URL.revokeObjectURL(next)
         return

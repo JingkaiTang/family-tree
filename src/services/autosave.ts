@@ -3,11 +3,12 @@ import type { FamilyData } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { saveProject } from './projectService'
+import type { ProjectRef } from './projectRef'
 
 const DEBOUNCE_MS = 800
 
 type FamilyStore = ReturnType<typeof useFamilyStore>
-type SaveProject = (path: string, family: FamilyData) => Promise<void>
+type SaveProject = (project: ProjectRef, family: FamilyData) => Promise<void>
 
 export interface AutosaveController {
   start: () => void
@@ -47,9 +48,9 @@ export function createAutosaveController(
   }
 
   function snapshot() {
-    if (!family.projectPath || !family.isDirty) return null
+    if (!family.projectRef || !family.isDirty) return null
     return {
-      path: family.projectPath,
+      project: family.projectRef,
       projectToken: family.projectToken,
       revision: family.revision,
       data: JSON.parse(JSON.stringify(family.data)) as FamilyData,
@@ -62,7 +63,7 @@ export function createAutosaveController(
       const current = snapshot()
       if (current === null) continue
 
-      await save(current.path, current.data)
+      await save(current.project, current.data)
       family.markSaved(current.projectToken, current.revision)
 
       if (
@@ -88,7 +89,7 @@ export function createAutosaveController(
     stopWatch = watch(
       () => family.revision,
       () => {
-        if (family.projectPath && family.isDirty) schedule()
+        if (family.projectRef && family.isDirty) schedule()
       },
       { flush: 'sync' },
     )
@@ -106,7 +107,7 @@ export function createAutosaveController(
       await saveLoop
       return
     }
-    if (!family.projectPath || !family.isDirty) return
+    if (!family.projectRef || !family.isDirty) return
     await enqueueSave()
   }
 
@@ -139,7 +140,7 @@ export function startAutosave() {
   if (typeof window !== 'undefined' && !closeGuardStarted) {
     closeGuardStarted = true
     window.addEventListener('beforeunload', event => {
-      if (family.isDirty && family.projectPath) {
+      if (family.isDirty && family.projectRef) {
         void controller?.flushNow()
         event.preventDefault()
       }
@@ -158,7 +159,7 @@ async function installTauriCloseGuard(
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
   const currentWindow = getCurrentWindow()
   await currentWindow.onCloseRequested(async event => {
-    if (!family.isDirty || !family.projectPath) return
+    if (!family.isDirty || !family.projectRef) return
     event.preventDefault()
     try {
       await flushNow()
