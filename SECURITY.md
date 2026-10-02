@@ -33,4 +33,11 @@ CI 会检查 npm 和 RustSec 已知漏洞，Dependabot 每月检查 npm、Cargo 
 
 Tauri 在 Linux 上仍依赖 GTK3/WebKitGTK 生态，其中部分间接 crate 已收到维护状态公告。项目没有静默忽略这些公告；在 Tauri 上游完成迁移前，将通过锁文件、最小 capability、CSP、自动审计和定期升级降低暴露面。
 
+2026-10-02 核查时，锁文件还涉及以下两条 `unsound` 信息性公告：
+
+- [`RUSTSEC-2024-0429`](https://rustsec.org/advisories/RUSTSEC-2024-0429.html)：`glib 0.18.5` 的字符串迭代器存在未定义行为。Tauri 的 GTK 0.18 依赖链限制了 glib 版本；修复需要 glib 0.20 及以上，当前没有兼容的 0.18 补丁。
+- [`RUSTSEC-2026-0097`](https://rustsec.org/advisories/RUSTSEC-2026-0097.html)：`rand 0.7.3` 经 `selectors → phf_codegen → phf_generator` 构建依赖链引入。当前未启用公告触发条件所需的 `log` feature，且 0.7 系列没有兼容补丁；这项核查不等于证明不存在风险。
+
+这些告警继续保留在审计输出中，并跟踪上游修复与迁移；依赖或 feature 变化时需重新评估。
+
 上述边界的实现细节见 [架构文档](docs/architecture.md)。
