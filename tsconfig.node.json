@@ -16,5 +16,5 @@
     },
     "types": ["node"]
   },
-  "include": ["*.config.ts", "e2e/**/*.ts"]
+  "include": ["*.config.ts", "e2e/**/*.ts", "src/vite-env.d.ts"]
 }
