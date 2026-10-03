@@ -1,12 +1,19 @@
 /** @vitest-environment happy-dom */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   detectDefaultLayoutMode,
   resolveLayoutMode,
 } from './layoutMode'
 
 describe('layoutMode', () => {
-  afterEach(() => vi.restoreAllMocks())
+  beforeEach(() => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Desktop browser')
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
 
   it('resolves explicit choices without changing them for the device', () => {
     expect(resolveLayoutMode('family-grid', 'focus-flow')).toBe('family-grid')
@@ -24,5 +31,20 @@ describe('layoutMode', () => {
   it('defaults desktop devices to the family grid', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
     expect(detectDefaultLayoutMode()).toBe('family-grid')
+  })
+
+  it('keeps narrow desktop windows on the original family grid', () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 1023px)',
+    })))
+    expect(detectDefaultLayoutMode()).toBe('family-grid')
+  })
+
+  it('keeps phones on focus flow even in a wide landscape viewport', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Android Mobile')
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(pointer: coarse)',
+    })))
+    expect(detectDefaultLayoutMode()).toBe('focus-flow')
   })
 })

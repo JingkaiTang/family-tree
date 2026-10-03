@@ -6,19 +6,16 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import Welcome from '@/pages/Welcome.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
-import { externalProjectRef, managedProjectRef } from '@/services/projectRef'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 
 const mocks = vi.hoisted(() => ({
-  runtimePlatform: vi.fn(),
   pickProject: vi.fn(),
   authorizeProject: vi.fn(),
   getDirectoryStorageAvailability: vi.fn(),
+  hasProvider: vi.fn(),
   getLastProjectRef: vi.fn(),
   setLastProjectRef: vi.fn(),
-  listManagedProjects: vi.fn(),
-  createManagedProject: vi.fn(),
   createProject: vi.fn(),
   openProject: vi.fn(),
   importProjectBundle: vi.fn(),
@@ -27,13 +24,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.routerPush }) }))
-vi.mock('@/services/runtime', () => ({
-  getRuntimePlatform: mocks.runtimePlatform,
-  isMobilePlatform: (platform: string) => platform === 'ios' || platform === 'android',
-}))
 vi.mock('@/services/projectService', () => ({
-  listManagedProjects: mocks.listManagedProjects,
-  createManagedProject: mocks.createManagedProject,
   createProject: mocks.createProject,
   openProject: mocks.openProject,
 }))
@@ -51,15 +42,16 @@ vi.mock('@/services/storage', () => ({
   pickProject: mocks.pickProject,
   authorizeProject: mocks.authorizeProject,
   getDirectoryStorageAvailability: mocks.getDirectoryStorageAvailability,
+  hasProvider: mocks.hasProvider,
 }))
 
-const selected = { providerId: 'tauri-local', id: 'opaque-location', displayName: '家族显示名' }
+const selected = { providerId: 'browser-directory', id: 'opaque-handle-id', displayName: '家族显示名' }
 
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.resetAllMocks()
-  mocks.runtimePlatform.mockResolvedValue('macos')
   mocks.getDirectoryStorageAvailability.mockReturnValue({ supported: true, reason: null })
+  mocks.hasProvider.mockImplementation((id: string) => ['browser-directory', 'test-cloud'].includes(id))
   mocks.getLastProjectRef.mockReturnValue(null)
   mocks.pickProject.mockResolvedValue(selected)
   mocks.createProject.mockResolvedValue({
@@ -73,82 +65,11 @@ beforeEach(() => {
     family: createEmptyFamily(),
   })
   mocks.routerPush.mockResolvedValue(undefined)
-  mocks.listManagedProjects.mockResolvedValue([])
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
-})
-
-describe('Welcome mobile project library', () => {
-  it('shows managed AppData projects instead of desktop folder actions', async () => {
-    const project = managedProjectRef('00000000-0000-0000-0000-000000000001')
-    mocks.runtimePlatform.mockResolvedValue('ios')
-    mocks.listManagedProjects.mockResolvedValue([{
-      project,
-      meta: createEmptyMeta('移动家族'),
-    }])
-
-    const wrapper = mount(Welcome)
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('移动家族')
-    expect(wrapper.text()).not.toContain('打开已有家族')
-    expect(mocks.listManagedProjects).toHaveBeenCalledOnce()
-    expect(useUiStore().defaultLayoutMode).toBe('focus-flow')
-  })
-
-  it('creates and opens a managed project from the mobile form', async () => {
-    const project = managedProjectRef('00000000-0000-0000-0000-000000000002')
-    const meta = createEmptyMeta('新家族')
-    const familyData = createEmptyFamily()
-    mocks.runtimePlatform.mockResolvedValue('android')
-    mocks.createManagedProject.mockResolvedValue({ project, meta, family: familyData })
-
-    const wrapper = mount(Welcome)
-    await flushPromises()
-    await wrapper.get('input[aria-label="家族名称"]').setValue('新家族')
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(mocks.createManagedProject).toHaveBeenCalledWith('新家族')
-    expect(useFamilyStore().projectRef).toEqual(project)
-    expect(mocks.startAutosave).toHaveBeenCalledOnce()
-    expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
-  })
-
-  it('imports a backup into managed storage and opens it', async () => {
-    const project = managedProjectRef('00000000-0000-0000-0000-000000000003')
-    const meta = createEmptyMeta('导入家族')
-    const familyData = createEmptyFamily()
-    mocks.runtimePlatform.mockResolvedValue('ios')
-    mocks.importProjectBundle.mockResolvedValue({ project, meta })
-    mocks.openProject.mockResolvedValue({ project, meta, family: familyData })
-
-    const wrapper = mount(Welcome)
-    await flushPromises()
-    const importButton = wrapper.findAll('button')
-      .find(button => button.text() === '导入家族备份')!
-    await importButton.trigger('click')
-    await flushPromises()
-
-    expect(mocks.importProjectBundle).toHaveBeenCalledExactlyOnceWith()
-    expect(mocks.listManagedProjects).toHaveBeenCalledTimes(2)
-    expect(mocks.openProject).toHaveBeenCalledWith(project)
-    expect(useFamilyStore().projectRef).toEqual(project)
-    expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
-  })
-
-  it('keeps desktop folder actions on desktop runtimes', async () => {
-    mocks.runtimePlatform.mockResolvedValue('macos')
-
-    const wrapper = mount(Welcome)
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('打开已有家族')
-    expect(mocks.listManagedProjects).not.toHaveBeenCalled()
-    expect(useUiStore().defaultLayoutMode).toBe('family-grid')
-  })
+  vi.restoreAllMocks()
 })
 
 describe('Welcome storage connections', () => {
@@ -157,7 +78,7 @@ describe('Welcome storage connections', () => {
     await wrapper.findAll('button').find(button => button.text() === '新建家族')!.trigger('click')
     await flushPromises()
 
-    expect(mocks.pickProject).toHaveBeenCalledWith('tauri-local', 'create')
+    expect(mocks.pickProject).toHaveBeenCalledWith('browser-directory', 'create')
     expect(mocks.createProject).toHaveBeenCalledWith(selected, selected.displayName)
     expect(family.projectRef).toEqual({ ...selected, id: 'created-project' })
     expect(mocks.startAutosave).toHaveBeenCalledOnce()
@@ -169,7 +90,7 @@ describe('Welcome storage connections', () => {
     await wrapper.findAll('button').find(button => button.text() === '打开已有家族')!.trigger('click')
     await flushPromises()
 
-    expect(mocks.pickProject).toHaveBeenCalledWith('tauri-local', 'open')
+    expect(mocks.pickProject).toHaveBeenCalledWith('browser-directory', 'open')
     expect(mocks.openProject).toHaveBeenCalledWith(selected)
     expect(family.projectRef).toEqual(selected)
   })
@@ -210,7 +131,7 @@ describe('Welcome storage connections', () => {
   })
 
   it('preserves a recent reference after restore fails and allows a retry', async () => {
-    const recent = { providerId: 'other-provider', id: 'opaque-remote-id', displayName: '最近的家族' }
+    const recent = { providerId: 'test-cloud', id: 'opaque-remote-id', displayName: '最近的家族' }
     mocks.getLastProjectRef.mockReturnValue(recent)
     mocks.openProject.mockRejectedValueOnce(new Error('需要重新授权'))
     const { wrapper } = await mountedWelcome()
@@ -241,40 +162,34 @@ describe('Welcome storage connections', () => {
     expect(wrapper.text()).not.toContain('最近：')
   })
 
-  it.each([
-    ['ios', managedProjectRef('managed-project'), true],
-    ['android', externalProjectRef('/tmp/desktop.family'), false],
-    ['macos', externalProjectRef('/tmp/desktop.family'), true],
-    ['web', externalProjectRef('/tmp/desktop.family'), false],
-    ['macos', managedProjectRef('managed-project'), false],
-    ['web', { providerId: 'browser-directory', id: 'stored-handle-id', displayName: '网页目录' }, true],
-    ['macos', { providerId: 'browser-directory', id: 'stored-handle-id', displayName: '网页目录' }, false],
-    ['android', { providerId: 'browser-directory', id: 'stored-handle-id', displayName: '网页目录' }, false],
-    ['ios', { providerId: 'cloud', id: 'remote-id', displayName: '云端家族' }, true],
-    ['macos', { providerId: 'cloud', id: 'remote-id', displayName: '云端家族' }, true],
-  ] as const)('restores only compatible recent storage on %s: %o', async (platform, recent, shouldRestore) => {
-    mocks.runtimePlatform.mockResolvedValue(platform)
+  it('ignores recent storage that no longer has a registered provider', async () => {
+    mocks.getLastProjectRef.mockReturnValue({
+      providerId: 'removed-provider', id: 'old-project', displayName: '旧项目',
+    })
+    const { wrapper } = await mountedWelcome()
+
+    expect(mocks.openProject).not.toHaveBeenCalled()
+    expect(mocks.authorizeProject).not.toHaveBeenCalled()
+    expect(mocks.routerPush).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('最近：')
+    expect(mocks.setLastProjectRef).not.toHaveBeenCalled()
+  })
+
+  it('restores an independently registered provider when directory storage is unavailable', async () => {
+    const recent = { providerId: 'test-cloud', id: 'remote-id', displayName: '云端家族' }
     mocks.getLastProjectRef.mockReturnValue(recent)
+    mocks.getDirectoryStorageAvailability.mockReturnValue({ supported: false, reason: '需要目录 API' })
     mocks.openProject.mockResolvedValue({
       project: recent, meta: createEmptyMeta(recent.displayName), family: createEmptyFamily(),
     })
+    await mountedWelcome()
 
-    const { wrapper } = await mountedWelcome()
-
-    if (shouldRestore) {
-      expect(mocks.openProject).toHaveBeenCalledExactlyOnceWith(recent)
-      expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
-    } else {
-      expect(mocks.openProject).not.toHaveBeenCalled()
-      expect(mocks.routerPush).not.toHaveBeenCalled()
-    }
-    expect(mocks.setLastProjectRef).not.toHaveBeenCalledWith(null)
-    wrapper.unmount()
+    expect(mocks.openProject).toHaveBeenCalledExactlyOnceWith(recent)
+    expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
   })
 
-  it('lets mobile users retry and forget a failed connection from another provider', async () => {
-    const recent = { providerId: 'cloud', id: 'remote-id', displayName: '云端家族' }
-    mocks.runtimePlatform.mockResolvedValue('ios')
+  it('lets users retry and forget a failed connection from another registered provider', async () => {
+    const recent = { providerId: 'test-cloud', id: 'remote-id', displayName: '云端家族' }
     mocks.getLastProjectRef.mockReturnValue(recent)
     mocks.openProject.mockRejectedValue(new Error('需要重新授权'))
     const { wrapper } = await mountedWelcome()
@@ -300,7 +215,6 @@ describe('Welcome browser directory storage', () => {
   }
 
   beforeEach(() => {
-    mocks.runtimePlatform.mockResolvedValue('web')
     mocks.pickProject.mockResolvedValue(browserProject)
     mocks.createProject.mockResolvedValue({
       project: browserProject,
@@ -319,19 +233,15 @@ describe('Welcome browser directory storage', () => {
     ['打开已有家族', 'open'],
   ] as const)('starts the directory picker directly from the click for %s', async (label, mode) => {
     const { wrapper, family } = await mountedWelcome()
-    const runtimeCalls = mocks.runtimePlatform.mock.calls.length
     const button = wrapper.findAll('button').find(value => value.text() === label)!
 
     button.element.click()
-    // 在同一个用户事件中调用选择器，不能先等待异步平台检测而丢失浏览器激活状态。
+    // 在同一个用户事件中调用选择器，不能先等待异步操作而丢失浏览器激活状态。
     expect(mocks.pickProject).toHaveBeenCalledExactlyOnceWith('browser-directory', mode)
-    expect(mocks.runtimePlatform).toHaveBeenCalledTimes(runtimeCalls)
     await flushPromises()
 
     expect(family.projectRef).toEqual(browserProject)
     expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
-    expect(mocks.listManagedProjects).not.toHaveBeenCalled()
-    expect(mocks.createManagedProject).not.toHaveBeenCalled()
     expect(mocks.authorizeProject).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('数据直接保存在你授权的本地目录')
     if (mode === 'create') {
@@ -357,8 +267,6 @@ describe('Welcome browser directory storage', () => {
     }
     expect(mocks.pickProject).not.toHaveBeenCalled()
     expect(mocks.openProject).not.toHaveBeenCalled()
-    expect(mocks.listManagedProjects).not.toHaveBeenCalled()
-    expect(mocks.createManagedProject).not.toHaveBeenCalled()
     expect(wrapper.find('input[type="file"]').exists()).toBe(false)
   })
 
@@ -444,7 +352,6 @@ describe('Welcome browser directory storage', () => {
     expect(mocks.openProject).toHaveBeenCalledWith(browserProject)
     expect(family.projectRef).toEqual(browserProject)
     expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
-    expect(mocks.listManagedProjects).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain(file.name)
     expect(wrapper.text()).not.toContain('选择空文件夹并导入')
   })
@@ -522,9 +429,9 @@ describe('Welcome browser directory storage', () => {
     expect(confirm.attributes('disabled')).toBeUndefined()
   })
 
-  it('uses focus-flow in a narrow browser without substituting native storage', async () => {
+  it('uses the original mobile layout and browser directory storage on a touch phone', async () => {
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
-      matches: query === '(max-width: 1023px)',
+      matches: query === '(pointer: coarse)' || query === '(max-width: 1023px)',
     })))
     const { wrapper } = await mountedWelcome()
 
@@ -534,7 +441,51 @@ describe('Welcome browser directory storage', () => {
     await wrapper.findAll('button').find(value => value.text() === '打开已有家族')!.trigger('click')
     await flushPromises()
     expect(mocks.pickProject).toHaveBeenCalledWith('browser-directory', 'open')
-    expect(mocks.listManagedProjects).not.toHaveBeenCalled()
+  })
+
+  it('keeps the original desktop layout in a narrow desktop browser', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 1023px)',
+    })))
+    await mountedWelcome()
+
+    expect(useUiStore().defaultLayoutMode).toBe('family-grid')
+    expect(useUiStore().resolvedLayoutMode).toBe('family-grid')
+  })
+
+  it('keeps the original mobile layout when a phone opens in landscape', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Android Mobile')
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(pointer: coarse)',
+    })))
+    await mountedWelcome()
+
+    expect(useUiStore().defaultLayoutMode).toBe('focus-flow')
+    expect(useUiStore().resolvedLayoutMode).toBe('focus-flow')
+  })
+
+  it('does not change a session default or explicit choice when reopening Welcome after resizing', async () => {
+    const matchMedia = vi.fn(() => ({ matches: false }))
+    vi.stubGlobal('matchMedia', matchMedia)
+    const pinia = createPinia()
+    const firstWelcome = mount(Welcome, { global: { plugins: [pinia] } })
+    await flushPromises()
+    const ui = useUiStore(pinia)
+    expect(ui.defaultLayoutMode).toBe('family-grid')
+
+    ui.setLayoutModePreference('focus-flow')
+    firstWelcome.unmount()
+    matchMedia.mockImplementation(() => ({ matches: true }))
+    window.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new Event('orientationchange'))
+    const nextWelcome = mount(Welcome, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    expect(ui.defaultLayoutMode).toBe('family-grid')
+    expect(ui.resolvedLayoutMode).toBe('focus-flow')
+    ui.setLayoutModePreference('auto')
+    expect(ui.resolvedLayoutMode).toBe('family-grid')
+    nextWelcome.unmount()
   })
 })
 

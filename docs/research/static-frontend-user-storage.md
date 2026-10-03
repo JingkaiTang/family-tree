@@ -1,10 +1,12 @@
 # 纯前端分发与用户自带存储
 
+> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 尚未实现。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
+
 日期：2026-10-03。当前明确目标：应用可以自行静态部署，不建立应用自己的账号体系，**优先使用用户选择并授权的普通本地目录保存家谱**，已有云盘连接作为后续可选能力。这是后续选型的约束；集中式 Supabase 用户管理不作为默认路线。[浏览器最低版本、发布日期与限制](./local-directory-browser-support.md)
 
 两种主要路线的部署、浏览器覆盖、容量与同步成本，见[普通本地目录与 Google Drive 对比](./local-directory-vs-google-drive.md)。
 
-后续实现进度：已抽出统一项目与媒体存储接口并接入现有 Tauri 适配器，详见[存储接口说明](../storage.md)。浏览器目录及云盘实现仍待接入；以下选型边界继续适用。
+当前实现进度：统一 IO、浏览器普通目录、浏览器照片处理和归档已接入，详见[存储接口说明](../storage.md)。云盘仍待实现；下文保留当时的方案推演，包括最终未采用的浏览器私有存储降级和可选原生宿主。
 
 **建议架构**
 
@@ -21,7 +23,7 @@
        首版优先           后续评估
 ```
 
-此图描述可扩展边界，不表示第一版同时实现所有适配器。用户已选择先实现本地目录读写；不支持目录接口的平台需要另定导入导出或云盘方案。现有领域逻辑可复用；Tauri 项目读写和 Rust 照片处理需要浏览器实现。[现有架构](../architecture.md#L27)、[存储接口](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L1)
+此图描述可扩展边界，不表示第一版同时实现所有适配器。用户已选择先实现本地目录读写；不支持目录接口的平台需要另定导入导出或云盘方案。现有领域逻辑可复用；Tauri 项目读写和 Rust 照片处理需要浏览器实现。[现有架构](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/architecture.md#L27)、[存储接口](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L1)
 
 **静态分发与授权配置**
 
@@ -46,7 +48,7 @@
 
 - 打开应用后选择并授权项目目录，无需注册家族树账号；后续需要同步时再评估“连接云盘”。
 - 本地修改保存到选定目录，显示保存中、已保存、保存失败或需重新授权；恢复目录句柄时检查权限。
-- 云盘功能若实现，应按存储提供商、远端账户与项目隔离缓存，显示待同步、同步完成和冲突状态。当前自动保存只保护同一进程的修订状态，需另外设计并发与跨设备处理。[当前保存逻辑](../../src/services/autosave.ts#L49)
+- 云盘功能若实现，应按存储提供商、远端账户与项目隔离缓存，显示待同步、同步完成和冲突状态。当前自动保存只保护同一进程的修订状态，需另外设计并发与跨设备处理。[当前保存逻辑](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/autosave.ts#L49)
 - 云盘令牌续期和重新授权按各提供商的浏览器流程处理，不承诺页面关闭后持续同步。
 - 保留项目 JSON 和照片的完整归档导出。跨域名、跨 OAuth 应用配置后应实际验证旧项目是否仍可发现和访问；不能只凭使用同一个云盘账户就跳过这项验证。
 - 桌面和手机可共用网页界面，但不能假定具有相同的目录访问能力；若继续维护 Tauri 原生包，单独验证其平台存储适配和可选云盘授权回流。
@@ -57,7 +59,7 @@
 
 2026-10-03 读取的 MDN 兼容数据将 `showDirectoryPicker`、`showOpenFilePicker` 和 `showSaveFilePicker` 标为桌面 Chrome 86 起、Android Chrome 132 起支持，Edge 跟随 Chromium；Firefox、Safari 和 iOS Safari 列为不支持。实现时仍需能力检测与目标设备验证，不应再笼统称手机浏览器都不支持。[MDN 兼容数据](https://github.com/mdn/browser-compat-data/blob/main/api/Window.json)
 
-用户已将网页直接读写现有 `.family` 目录选为优先路线，保留 `meta.json`、`family.json` 和媒体结构。仍需实现浏览器存储和图片处理，并重新设计备份与中断恢复；不能直接调用当前 Rust 命令或继承其临时文件加 rename 的保存保证。[项目格式](../project-format.md#L5)、[现有 Rust 保存](../../src-tauri/src/commands/project.rs#L268)
+用户已将网页直接读写现有 `.family` 目录选为优先路线，保留 `meta.json`、`family.json` 和媒体结构。仍需实现浏览器存储和图片处理，并重新设计备份与中断恢复；不能直接调用当前 Rust 命令或继承其临时文件加 rename 的保存保证。[项目格式](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L5)、[现有 Rust 保存](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src-tauri/src/commands/project.rs#L268)
 
 不支持目录读写时，可评估 IndexedDB 或 OPFS 保存本地数据，再提供包含照片的完整归档导入导出。OPFS 是按网站来源隔离、通常不直接向用户展示的浏览器私有存储，受容量管理影响，清除站点数据会删除它；它与用户主动选择的普通文件夹不同。[MDN OPFS](https://github.com/mdn/content/blob/main/files/en-us/web/api/file_system_api/origin_private_file_system/index.md)
 
@@ -73,6 +75,6 @@
 
 缓存管理属于拟议实现：图片使用二进制 Blob，按需加载，分别控制磁盘缓存和解码内存；应用自己的缓存淘汰不得删除未同步编辑、待上传照片或冲突副本。尽快将这些唯一修改保存到选定主存储，不能假定它们能抵御浏览器整站清理。
 
-现有 `.family` 已分开 JSON、照片和缩略图；主图最长边会缩至 1600px，缩略图为 256px，因此当前主图不一定是用户导入的原始分辨率文件。如果后续需要家庭原始影像归档，应另外明确原始文件保留策略，不将缩略图或处理后的主图当作原始照片备份。[媒体格式](../project-format.md#L85)
+现有 `.family` 已分开 JSON、照片和缩略图；主图最长边会缩至 1600px，缩略图为 256px，因此当前主图不一定是用户导入的原始分辨率文件。如果后续需要家庭原始影像归档，应另外明确原始文件保留策略，不将缩略图或处理后的主图当作原始照片备份。[媒体格式](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L85)
 
 本次确立了本地目录优先的目标并核实部署、浏览器能力边界，尚未实现浏览器存储或同步协议，也未操作用户账号或部署站点。各云盘服务的审核、额度和浏览器令牌行为仍需在选定具体提供商后验证。

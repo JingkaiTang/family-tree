@@ -125,7 +125,7 @@ async function encodeWebp(bitmap: ImageBitmap, maxDimension: number, quality: nu
   }
 }
 
-/** Validate before decoding, then create the same WebP media sizes as native storage. */
+/** Validate before decoding, then create full-size and thumbnail WebP media. */
 export async function prepareBrowserPhoto(bytes: Uint8Array, _mime: string): Promise<{ photo: Blob; thumbnail: Blob }> {
   if (bytes.length === 0) throw new Error('图片内容为空')
   if (bytes.length > MAX_IMPORT_BYTES) throw new Error('图片超过 25 MiB 限制')

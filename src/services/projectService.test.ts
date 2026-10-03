@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyFamily, createEmptyMeta, SCHEMA_VERSION, type Member } from '@/core/schema'
-import { createManagedProject, createProject, openProject, saveProject } from './projectService'
+import { createProject, openProject, saveProject } from './projectService'
 import type { ProjectRef } from './storage'
 
 const api = vi.hoisted(() => ({
@@ -106,18 +106,4 @@ describe('projectService format boundary', () => {
     await expect(createProject(project, '新家族')).rejects.toThrow('storage unavailable')
   })
 
-  it('移动端创建独立托管项目并保存到适配器返回的引用', async () => {
-    const managed = { providerId: 'tauri-managed', id: 'new-managed-id', displayName: '手机家族' }
-    api.createProject.mockResolvedValue({ ref: managed, meta: createEmptyMeta('手机家族') })
-
-    const created = await createManagedProject('手机家族')
-
-    expect(api.createProject).toHaveBeenCalledWith({
-      providerId: 'tauri-managed',
-      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      displayName: '手机家族',
-    }, '手机家族')
-    expect(api.saveProject).toHaveBeenCalledWith(managed, createEmptyFamily())
-    expect(created.project).toEqual(managed)
-  })
 })

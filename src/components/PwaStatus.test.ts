@@ -3,12 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import PwaStatus from './PwaStatus.vue'
 
-const runtime = vi.hoisted(() => ({ native: false }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => runtime.native }))
-
 describe('PWA shell lifecycle', () => {
   beforeEach(() => {
-    runtime.native = false
     vi.stubEnv('PROD', true)
     vi.stubEnv('BASE_URL', './')
   })
@@ -48,8 +44,8 @@ describe('PWA shell lifecycle', () => {
     wrapper.unmount()
   })
 
-  it('does not register a service worker inside a native client', async () => {
-    runtime.native = true
+  it('does not register a service worker during development', async () => {
+    vi.stubEnv('PROD', false)
     const { serviceWorker } = serviceWorkerFixture()
     const wrapper = mount(PwaStatus)
     await flushPromises()

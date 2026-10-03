@@ -1,5 +1,7 @@
 # 用户授权本地目录：浏览器版本与限制
 
+> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 尚未实现。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
+
 调研日期：2026-10-03。用户已选择普通本地目录作为优先主存储；应用继续按纯前端静态分发设计，不建立应用账号体系。本文记录资料核查与代码检查结果，未实现或实测浏览器目录读写。
 
 ## 支持范围与发布时间
@@ -40,13 +42,13 @@
 
 ## 对当前项目的影响
 
-项目已有 `.family` 目录结构，包含 `meta.json`、`family.json`、备份、照片和缩略图，可以作为浏览器版的同一存储格式。需新增浏览器目录存储实现，用句柄代替当前 Tauri 路径调用；图片处理也需浏览器实现。[目录格式](../project-format.md#L5)、[当前存储接口](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L1)
+项目已有 `.family` 目录结构，包含 `meta.json`、`family.json`、备份、照片和缩略图，可以作为浏览器版的同一存储格式。需新增浏览器目录存储实现，用句柄代替当前 Tauri 路径调用；图片处理也需浏览器实现。[目录格式](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L5)、[当前存储接口](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L1)
 
-当前安装 Vite 8.1.5，[配置](../../vite.config.ts#L9) 未设置 `build.target`；其默认目标包括 Chrome 111 / Edge 111。[版本固定的 Vite 常量][12]与本地安装内容一致。这只是构建目标，不包含所有运行时 API 和 CSS 兼容保证。项目还使用 [structuredClone](../../src/core/migrate.ts#L37)、`Array.at()`、[color-mix()](../../src/components/tree/FamilyUnit.vue#L129) 和 Tailwind 4 的颜色能力，因此不能把 Chrome / Edge 86 作为项目最低版本，也不能未经测试承诺 111 全部可用。
+当前安装 Vite 8.1.5，[配置](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/vite.config.ts#L9) 未设置 `build.target`；其默认目标包括 Chrome 111 / Edge 111。[版本固定的 Vite 常量][12]与本地安装内容一致。这只是构建目标，不包含所有运行时 API 和 CSS 兼容保证。项目还使用 [structuredClone](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/core/migrate.ts#L37)、`Array.at()`、[color-mix()](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/components/tree/FamilyUnit.vue#L129) 和 Tailwind 4 的颜色能力，因此不能把 Chrome / Edge 86 作为项目最低版本，也不能未经测试承诺 111 全部可用。
 
 建议首版以**近期稳定版桌面 Chrome / Edge**为正式验证目标，**Android Chrome 132 及以上**作为移动端候选并进行真机验证。iPhone / iPad 的 Safari 需要另一种存储体验，例如完整归档导入导出或后续云盘适配；如果要求同样的普通目录持续读写能力，需要评估原生客户端。
 
-浏览器保存仍需单独设计备份、写入中断恢复和并发修改检测，不能直接继承 Rust 临时文件加 rename 的保存保证。现有自动保存的进程内修订号也不等于跨标签页或跨设备冲突保护。[Rust 保存逻辑](../../src-tauri/src/commands/project.rs#L268)、[自动保存](../../src/services/autosave.ts#L49)
+浏览器保存仍需单独设计备份、写入中断恢复和并发修改检测，不能直接继承 Rust 临时文件加 rename 的保存保证。现有自动保存的进程内修订号也不等于跨标签页或跨设备冲突保护。[Rust 保存逻辑](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src-tauri/src/commands/project.rs#L268)、[自动保存](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/autosave.ts#L49)
 
 后续实现的验收应覆盖：首次选目录并写入、重启浏览器后重开项目、权限撤销后恢复、磁盘满或中断时恢复、多个页面同时编辑，以及大量照片的按需读取。当前未执行这些功能测试；正式最低版本应在实现后根据目标设备结果确定。
 

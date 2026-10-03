@@ -1,5 +1,7 @@
 # 普通本地目录与 Google Drive 对比
 
+> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 尚未实现。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
+
 日期：2026-10-03。范围：纯前端静态分发、不运营应用账号系统、大量家谱图片与数据、桌面和手机访问。本轮只核查资料、审查项目并整理方案，没有实现、部署或操作用户 Google 账号。
 
 ## 决策建议
@@ -38,13 +40,13 @@ External + Testing 下 refresh token 七天失效有官方 SDK 依据，但该�
 
 ## 对家谱项目的具体影响
 
-项目当前已经是普通 `.family` 目录，包含 JSON、照片、缩略图和备份。[项目格式](../project-format.md#L5) 本地目录方案可保留该格式，以浏览器句柄替换 [Tauri 路径接口](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L13)。Drive 可以保留逻辑结构，但应使用稳定项目标识与 Drive 文件 ID，并维护 `photoId → fileId` 映射，不能依靠可重名的文件名定位。[5]
+项目当前已经是普通 `.family` 目录，包含 JSON、照片、缩略图和备份。[项目格式](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L5) 本地目录方案可保留该格式，以浏览器句柄替换 [Tauri 路径接口](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L13)。Drive 可以保留逻辑结构，但应使用稳定项目标识与 Drive 文件 ID，并维护 `photoId → fileId` 映射，不能依靠可重名的文件名定位。[5]
 
-两种路线都需要浏览器照片处理。当前主图最长边缩至 1600px、缩略图为 256px，主图不一定保留导入文件的原始分辨率；更换存储不会自动变成原件归档功能。[照片规则](../project-format.md#L85)
+两种路线都需要浏览器照片处理。当前主图最长边缩至 1600px、缩略图为 256px，主图不一定保留导入文件的原始分辨率；更换存储不会自动变成原件归档功能。[照片规则](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L85)
 
-当前保存的是整份 `family.json`，[自动保存的修订号](../../src/services/autosave.ts#L49)只保护同一进程中的保存状态。例如电脑和手机从同一旧版本开始编辑，先后上传整份 JSON，直接覆盖会丢失另一端修改。Drive 的文件版本号可用于发现变化，但“读取版本再上传”本身不是无竞争的原子锁。[5] 同一个本地目录同时被网页和桌面应用修改，也需要并发保护。
+当前保存的是整份 `family.json`，[自动保存的修订号](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/autosave.ts#L49)只保护同一进程中的保存状态。例如电脑和手机从同一旧版本开始编辑，先后上传整份 JSON，直接覆盖会丢失另一端修改。Drive 的文件版本号可用于发现变化，但“读取版本再上传”本身不是无竞争的原子锁。[5] 同一个本地目录同时被网页和桌面应用修改，也需要并发保护。
 
-拟议保存策略：本地目录单独设计浏览器备份与中断恢复；Drive 则先保证媒体上传成功，再提交引用媒体的家谱版本，并保留冲突副本。多文件上传不能直接当作整项目事务，不能照搬 Rust 保存与本地照片 GC 的保证。[当前恢复机制](../project-format.md#L77)、[当前媒体清理](../../src-tauri/src/commands/media.rs#L143)
+拟议保存策略：本地目录单独设计浏览器备份与中断恢复；Drive 则先保证媒体上传成功，再提交引用媒体的家谱版本，并保留冲突副本。多文件上传不能直接当作整项目事务，不能照搬 Rust 保存与本地照片 GC 的保证。[当前恢复机制](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L77)、[当前媒体清理](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src-tauri/src/commands/media.rs#L143)
 
 建议先抽出统一的项目与媒体存储接口，完成本地目录模式；日后增加可选 Drive 项目并支持完整导入导出。将“本地项目迁移到 Drive”与“同一项目长期双向同步”分开评估，后者需要额外同步协议。仅做云端备份也可分阶段实现，但不能据此声称已经支持手机持续编辑同一项目。
 

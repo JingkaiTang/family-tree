@@ -80,13 +80,6 @@ export function threeGenFamily(): Record<string, Member> {
 }
 
 /**
- * 核心成员数组版（供 relativesAdapter 测试使用）
- */
-export function threeGenMemberArray(): Member[] {
-  return Object.values(threeGenFamily())
-}
-
-/**
  * 带兄弟姐妹的四代结构 (15+人)
  * 覆盖：兄弟、姐妹、堂亲、表亲、叔伯、姑姑、舅舅、姨
  */

@@ -1,30 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import {
-  externalProjectRef,
-  isProjectRef,
-  managedProjectRef,
-  projectRefLocation,
-  projectRefName,
-} from './projectRef'
+import { isProjectRef } from './projectRef'
 
 describe('projectRef', () => {
-  it('preserves an external project path for desktop projects', () => {
-    const project = externalProjectRef('/tmp/测试.family')
-
-    expect(projectRefLocation(project)).toBe('/tmp/测试.family')
-    expect(projectRefName(project)).toBe('测试.family')
-  })
-
-  it('does not expose a filesystem location for managed projects', () => {
-    const project = managedProjectRef('project-id')
+  it.each(['browser-directory', 'drive-connection'])('accepts an opaque project reference for %s', providerId => {
+    const project = { providerId, id: 'opaque-project-id', displayName: '家族' }
 
     expect(isProjectRef(project)).toBe(true)
-    expect(projectRefLocation(project)).toBeNull()
   })
 
-  it('rejects malformed persisted references', () => {
-    expect(isProjectRef({ kind: 'external', path: '' })).toBe(false)
-    expect(isProjectRef({ kind: 'managed', id: 42 })).toBe(false)
-    expect(isProjectRef(null)).toBe(false)
+  it.each([
+    null,
+    [],
+    '/old/path',
+    { providerId: '', id: 'project', displayName: '家族' },
+    { providerId: 'browser-directory', id: '', displayName: '家族' },
+    { providerId: 'browser-directory', id: 42, displayName: '家族' },
+    { providerId: 'browser-directory', id: 'project', displayName: '   ' },
+  ])('rejects malformed persisted reference %j', value => {
+    expect(isProjectRef(value)).toBe(false)
   })
 })

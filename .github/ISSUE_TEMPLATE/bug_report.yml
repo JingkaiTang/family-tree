@@ -38,7 +38,14 @@ body:
     id: os
     attributes:
       label: 操作系统
-      options: [macOS, Windows, Linux]
+      options: [macOS, Windows, Linux, Android, iOS, 其他]
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器及版本
+      placeholder: 例如 Chrome 132；是否以 PWA 方式运行
     validations:
       required: true
   - type: textarea

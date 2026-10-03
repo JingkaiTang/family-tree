@@ -66,7 +66,7 @@ describe('project route restoration', () => {
     expect(family.projectRef).toEqual(project)
   })
 
-  it.each(['tauri-local', 'tauri-managed', 'browser-directory', 'google-drive'])(
+  it.each(['browser-directory', 'test-remote-provider'])(
     'allows an active %s project without assuming its storage location',
     async (providerId) => {
       const family = useFamilyStore()

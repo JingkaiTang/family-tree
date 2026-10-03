@@ -5,7 +5,6 @@ import { createEmptyFamily, createEmptyMeta, type FamilyData } from '@/core/sche
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 import { createAutosaveController, installPageLifecycleFlush } from './autosave'
-import { externalProjectRef, managedProjectRef } from './projectRef'
 import type { ProjectRef } from '@/services/storage/types'
 
 describe('autosave coordinator', () => {
@@ -135,9 +134,8 @@ describe('autosave coordinator', () => {
   })
 
   it.each([
-    { providerId: 'tauri-local', id: '/tmp/other.family', displayName: '另一个本地项目' },
-    { providerId: 'test-cloud', id: '/tmp/test.family', displayName: '不同提供商的同名 ID' },
-    managedProjectRef('managed-project', '移动端项目'),
+    { providerId: 'browser-directory', id: 'other-handle-id', displayName: '另一个本地项目' },
+    { providerId: 'test-cloud', id: 'test-handle-id', displayName: '不同提供商的同名 ID' },
   ])('isolates queued saves when switching to $providerId / $id', async nextProject => {
     const family = openedFamily()
     const firstProject = { ...family.projectRef! }
@@ -176,6 +174,10 @@ describe('autosave coordinator', () => {
 
 function openedFamily() {
   const family = useFamilyStore()
-  family.setProject(externalProjectRef('/tmp/test.family'), createEmptyMeta('测试'), createEmptyFamily())
+  family.setProject(
+    { providerId: 'browser-directory', id: 'test-handle-id', displayName: '测试' },
+    createEmptyMeta('测试'),
+    createEmptyFamily(),
+  )
   return family
 }

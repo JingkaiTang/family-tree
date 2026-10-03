@@ -228,7 +228,7 @@ describe('browser directory selection and permissions', () => {
 })
 
 describe('browser directory project persistence', () => {
-  it('creates native-compatible JSON and loads it without rewriting files', async () => {
+  it('creates compatible project JSON and loads it without rewriting files', async () => {
     const test = await created()
     const before = await test.root.text('family.json')
     const metaWrites = test.root.files.get('meta.json')?.writes

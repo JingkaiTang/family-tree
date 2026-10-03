@@ -92,7 +92,7 @@ function jsonBlob(value: unknown): Blob {
 }
 
 /**
- * 输出与原生端相同的 archiveVersion=1 ZIP。顺序压缩，始终遵守输出背压，
+ * 输出兼容现有备份的 archiveVersion=1 ZIP。顺序压缩，始终遵守输出背压，
  * 不构造整包 Blob；只包含家族数据引用的原图和缩略图。
  * 成功时关闭 destination 并等待其提交；任意失败时 abort，调用方不应再 close。
  * 使用 FileSystemFileHandle.createWritable() 可在失败时保留原有目标文件。

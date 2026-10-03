@@ -1,6 +1,6 @@
 # 架构说明
 
-本文描述 Family Tree 当前 alpha 架构、关键边界和贡献时必须保持的约束。Web/PWA 是共享应用入口；桌面和手机复用同一套 Vue UI、领域逻辑和 IO 契约，Tauri 保留为提供平台能力的可选宿主，尤其用于 iOS 与已有原生项目。
+本文描述 Family Tree 当前 alpha 架构、关键边界和贡献时必须保持的约束。Web/PWA 是唯一应用入口；桌面和手机复用同一套 Vue UI、领域逻辑和 IO 契约，通过浏览器直接读写用户授权的普通目录。
 
 ## 总体分层
 
@@ -20,34 +20,43 @@ autosave / projectService
 services/storage / projectTransfer
         │ 按提供商路由 ProjectRef
         ▼
-browser-directory        tauri-local / tauri-managed
-        │                         │ 最小 IPC
-浏览器目录句柄              受控 Rust commands
-        │                         │
-用户普通 .family 目录        外部目录 / AppData 托管项目
+browser-directory
+        │
+浏览器目录句柄
+        │
+用户普通 .family 目录
 ```
 
 ## 前端职责
 
 - `src/pages` 负责页面级流程，例如创建/打开项目、选择成员和路由。
 - `src/stores` 是当前项目会话的单一状态源。每次受控变更递增 `revision`；切换项目递增 `projectToken`。
-- `src/services/autosave.ts` 对不可变快照串行保存。只有保存结果仍匹配同一 `projectToken` 和 `revision` 时才清除脏状态；应用内关闭项目与原生关窗等待保存，浏览器关闭页面仅能提示和尽力刷新，不能保证页面销毁后继续写入。
-- `src/services/storage` 是项目和媒体 IO 入口，使用 `{ providerId, id, displayName }` 路由到 `browser-directory`、`tauri-local` 或 `tauri-managed`。上层不解释目录路径、浏览器句柄或未来云盘文件 ID；接口与扩展契约见 [storage.md](storage.md)。
-- `src/services/projectRepository.ts` 保留原生托管目录列表能力，媒体与普通项目读写统一经过存储接口。
-- `src/services/projectTransfer.ts` 编排所选提供商的备份传输。浏览器选择文件/空目录，通过 ZIP 流处理共享归档；原生由 Rust 完成系统选择器、有界传输与 AppCache 清理，WebView 不执行通用文件 IO。
+- `src/services/autosave.ts` 对不可变快照串行保存。只有保存结果仍匹配同一 `projectToken` 和 `revision` 时才清除脏状态；应用内关闭项目等待保存，浏览器关闭页面仅能提示和尽力刷新，不能保证页面销毁后继续写入。
+- `src/services/storage` 是项目和媒体 IO 入口，使用 `{ providerId, id, displayName }` 路由到存储提供商，当前实现为 `browser-directory`。上层不解释目录路径、浏览器句柄或未来云盘文件 ID；接口与扩展契约见 [storage.md](storage.md)。
+- `src/services/projectTransfer.ts` 编排浏览器目录的备份传输。浏览器选择文件/空目录，通过 ZIP 流导入导出兼容既有格式的归档。
 - `src/services/projectService.ts` 是项目格式边界：打开时迁移并验证，保存前再次进行 Zod 和跨成员图校验。
-- `src/core` 不依赖 Vue 或 Tauri，承载 schema、迁移、关系完整性、称谓与布局算法。
-- PWA 的 Service Worker 仅缓存构建静态资源，不存储项目或媒体，不在 Tauri 中注册；新版本等待旧窗口自然关闭，不强制刷新编辑页面。
+- `src/core` 不依赖 Vue 或具体存储实现，承载 schema、迁移、关系完整性、称谓与布局算法。
+- `npm run build` 是唯一生产构建入口，输出 `dist/` 静态网页与 PWA 资源；不包含原生宿主、桥接层或平台工具链。
+- PWA 的 Service Worker 仅缓存构建静态资源，不存储项目或媒体；新版本等待旧窗口自然关闭，不强制刷新编辑页面。
 
 ## 家族布局
 
-`TreeLayoutHost.vue` 是两套布局的 UI 边界：原生桌面端默认使用家族网格，iOS/Android 默认使用聚焦纵流，浏览器环境使用触控设备启发式判断；用户可在“自动 / 聚焦纵流 / 家族网格”之间切换。选择保存在设备本地，不写入 `.family` 项目，也不会产生自动保存脏状态。网格的 pan/zoom 与纵流的聚焦点、展开分支和滚动位置分别保存，切换时互不转换。
+`TreeLayoutHost.vue` 是两套布局的 UI 边界，直接复用原有组件：
+
+| 运行形式 | 自动布局 | 共享实现 |
+| --- | --- | --- |
+| Web PC | 家族网格 | `FamilyCanvas.vue` |
+| 移动 Web | 聚焦纵流 | `FocusFlowView.vue` |
+
+浏览器在 UI store 创建时，依据移动设备 UA 或“粗指针且紧凑视口”检测一次默认布局。普通 PC 窗口变窄仍使用家族网格，手机横屏仍使用聚焦纵流。响应式工具栏和表单继续随视口调整，但欢迎页加载、窗口缩放和旋转不会覆盖已确定的浏览器布局。
+
+用户可在“自动 / 聚焦纵流 / 家族网格”之间切换，显式选择优先于默认值。选择保存在设备本地，不写入 `.family` 项目，也不会产生自动保存脏状态。网格的 pan/zoom 与纵流的聚焦点、展开分支和滚动位置分别保存，切换时互不转换。
 
 两套布局只共享 `src/core/family-graph` 产出的规范化家庭事实。`selectedId`（选中成员）、`viewpointId`（称谓视角）和 `layoutFocusId`（纵流锚点）是三个独立状态。
 
 ### 家族网格
 
-`src/core/treeLayout.ts` 是网格布局的异步门面。在浏览器中，它通过原生 Web Worker 调用 `treeLayoutCore.ts`；Worker 不可用或崩溃时退回同步纯函数，保证功能可用。每个请求由 ID 匹配，`FamilyCanvas` 还使用自己的请求序号丢弃过期结果。
+`src/core/treeLayout.ts` 是网格布局的异步门面。在浏览器中，它通过浏览器 Web Worker 调用 `treeLayoutCore.ts`；Worker 不可用或崩溃时退回同步纯函数，保证功能可用。每个请求由 ID 匹配，`FamilyCanvas` 还使用自己的请求序号丢弃过期结果。
 
 核心流水线位于 `src/core/family-layout`：
 
@@ -80,26 +89,24 @@ browser-directory        tauri-local / tauri-managed
 2. Autosave 捕获完整项目引用、当前项目令牌、修订号和数据快照。
 3. `projectService` 校验 schema 与关系图不变量。
 4. 存储接口按完整项目引用选择提供商，适配器检查目录权限、项目标记和文件大小。
-5. 两种实现均保留三份 `family.json.bak.N`。原生由 Rust 同目录临时文件加 rename 写入；浏览器使用 `createWritable()`，成功 `close()` 后才确认提交，写前比较磁盘内容以发现外部修改。
+5. 浏览器提供商保留三份 `family.json.bak.N`，使用 `createWritable()` 写入，成功 `close()` 后才确认提交，写前比较磁盘内容以发现外部修改。
 6. 成功结果仍属于当前修订时，Store 才标记为已保存。
 
-浏览器页面隐藏或进入 `pagehide` 时会立即刷新同一个串行保存队列，以降低系统冻结前的数据窗口；这不保证页面被杀死后完成写入。Web 目录句柄存于 IndexedDB，项目文件仍在用户目录；原生 iOS/Android 的项目根固定在 AppData 的 `projects/<uuid>.family`。
+浏览器页面隐藏或进入 `pagehide` 时会立即刷新同一个串行保存队列，以降低系统冻结前的数据窗口；这不保证页面被杀死后完成写入。Web 目录句柄存于 IndexedDB，项目文件仍在用户目录。
 
-浏览器同来源窗口使用 Web Locks 串行目录操作，但不同来源、原生应用与外部编辑器不共享这把锁。磁盘内容比较也不是跨进程原子 CAS；应避免多个写入者同时编辑一个项目。统一 IO 不提供跨设备同步、多文件事务或自动冲突合并。
+浏览器同来源窗口使用 Web Locks 串行目录操作，但不同来源与外部编辑器不共享这把锁。磁盘内容比较也不是跨进程原子 CAS；应避免多个写入者同时编辑一个项目。统一 IO 不提供跨设备同步、多文件事务或自动冲突合并。
 
-照片先写入独立媒体文件并作为暂存 ID 传递。成员保存成功后该 ID 才成为项目引用；取消或组件卸载会回收未引用的暂存媒体。原生删除/GC 移入 `.trash`；浏览器删除先复制回收副本再删除原文件，暂不提供 GC。浏览器只处理 PNG/JPEG/WebP，沿用主图和缩略图尺寸。
+照片先写入独立媒体文件并作为暂存 ID 传递。成员保存成功后该 ID 才成为项目引用；取消或组件卸载会回收未引用的暂存媒体。浏览器删除先复制回收副本再删除原文件，暂不提供 GC。浏览器只处理 PNG/JPEG/WebP，沿用主图和缩略图尺寸。
 
 项目格式详见 [project-format.md](project-format.md)。
 
 ## 本地文件安全边界
 
 - 浏览器只有用户点击选择的目录句柄，后台 IO 不主动请求授权；不支持普通目录 API 时明确停止，不降级保存项目到 OPFS。新建/导入只接受空目录，归档条目和媒体标识必须通过校验。
-- Tauri capability 仅保留必要窗口和对话框权限，没有 WebView 通用 fs 权限，也没有 `assetProtocol: ["**"]`。Rust 选择器直接返回项目引用，备份传输仅使用原生选择器返回的文件句柄/URI。
-- 所有项目命令拒绝相对路径、`.`/`..` 路径片段、非目录和缺少项目标记的目录，并使用 canonical path。
-- AppData 托管项目 ID 必须是 UUID；备份包限制压缩包大小、条目数、解压总量和单文件大小，拒绝路径穿越、符号链接、重复或未知条目。
-- 照片 ID 只允许 ASCII 字母、数字、`_`、`-`；WebView 只接收照片字节并创建临时 Blob URL。
-- CSP 限制脚本、图片和 IPC 来源；Blob 只用于应用生成的图片 URL。
-- 本地项目当前不加密。PWA 有静态资源更新流程；原生自动更新与签名发布链仍属于独立发布工作。
+- 项目引用使用不透明 ID 关联保存的浏览器目录句柄，不接收来自页面的任意绝对文件路径。打开和保存时校验项目标记与文件大小。
+- 备份包限制压缩包大小、条目数、解压总量和单文件大小，拒绝路径穿越、符号链接、重复或未知条目。
+- 照片 ID 只允许 ASCII 字母、数字、`_`、`-`；图片组件接收 Blob 并创建临时 URL，用后释放。
+- 本地项目当前不加密。PWA 按静态资源更新流程发布；静态主机不存储用户项目，部署凭据不进入网页产物。
 
 ## 测试层次
 
@@ -107,8 +114,7 @@ browser-directory        tauri-local / tauri-managed
 - 组件测试：Vue 交互、拖拽、视口和保存失败路径。
 - 浏览器存储/归档测试：权限、备份、外部修改冲突、媒体处理、流大小限制与失败清理。
 - Playwright：真实 Chromium 验证 Web 流程，使用 OPFS 句柄替代无法操作的系统选择器；生产不运行 OPFS，系统权限和 Android 文档提供程序需真机验收。
-- Rust 单元测试：项目目录、版本、媒体导入/GC 和路径穿越。
 - 性能门禁：确定性的 500 人家谱，CI p95 预算 1000ms。
-- 构建门禁：TypeScript + Vite 生产构建、Cargo fmt/test/clippy、npm audit 和 RustSec audit。
+- 构建门禁：TypeScript + Vite 生产构建、npm audit。
 
-CI 配置位于 `.github/workflows/ci.yml`。任何跨边界变更都应在对应层添加回归测试。
+CI 配置位于 `.github/workflows/ci.yml`，依赖用途与兼容决策见 [依赖管理](dependencies.md)。任何跨边界变更都应在对应层添加回归测试。

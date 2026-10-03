@@ -35,6 +35,9 @@ export function createStorage(
 
   return {
     registerProvider,
+    hasProvider(providerId: string): boolean {
+      return providers.has(providerId)
+    },
     registerPicker,
     async authorizeProject(ref: ProjectRef): Promise<void> {
       getProvider(ref.providerId)

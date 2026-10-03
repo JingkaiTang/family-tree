@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { isTauri } from '@tauri-apps/api/core'
 
 const updateReady = ref(false)
 const dismissed = ref(false)
@@ -9,7 +8,7 @@ let disposed = false
 let cleanup: (() => void) | undefined
 
 onMounted(async () => {
-  if (!import.meta.env.PROD || isTauri() || !('serviceWorker' in navigator)) return
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
 
   try {
     const base = new URL(import.meta.env.BASE_URL, document.baseURI)

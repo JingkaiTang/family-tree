@@ -9,7 +9,7 @@ dist-ssr
 !test-data/synthetic-family-200-6.family/
 !test-data/synthetic-family-200-6.family/**
 
-# local secrets and signing credentials
+# local secrets
 .env
 .env.*
 !.env.example
@@ -26,10 +26,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# tauri
-src-tauri/target
-src-tauri/gen
 
 # workbuddy
 .workbuddy

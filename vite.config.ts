@@ -2,19 +2,18 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-// Tauri expects a fixed port, fail if that port is not available
-const host = process.env.TAURI_DEV_HOST
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   // Relative URLs let the same build run at a static host's root or subdirectory.
-  base: loadEnv(mode, process.cwd(), 'VITE_').VITE_BASE_PATH || './',
+  base: loadEnv(mode, projectRoot, 'VITE_').VITE_BASE_PATH || './',
   plugins: [vue(), VitePWA({
-    // Registration is guarded by runtime detection in PwaStatus.vue.
+    // PwaStatus.vue registers updates after the application is ready.
     injectRegister: false,
     registerType: 'prompt',
-    disable: Boolean(process.env.TAURI_ENV_PLATFORM),
     includeAssets: ['icons/*.png'],
     manifest: {
       id: './',
@@ -45,30 +44,10 @@ export default defineConfig(({ mode }) => ({
     },
   })],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: { '@': path.join(projectRoot, 'src') },
   },
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 5173,
     strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: 'ws',
-          host,
-          port: 5174,
-        }
-      : undefined,
-    watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ['**/src-tauri/**'],
-    },
   },
 }))

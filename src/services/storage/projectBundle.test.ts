@@ -131,7 +131,7 @@ async function oversizedIndexFixture(zip64: boolean): Promise<Blob> {
 }
 
 describe('portable project bundles', () => {
-  it('exports a native-compatible ZIP and roundtrips shared photos exactly once', async () => {
+  it('exports a compatible ZIP and roundtrips shared photos exactly once', async () => {
     const output = transaction()
     const family = familyWithPhotos('photo-1', 'photo-1')
     const meta = createEmptyMeta('示例家族')
@@ -162,7 +162,7 @@ describe('portable project bundles', () => {
     }
   })
 
-  it('opens native-shaped archives, including allowed directories and unreferenced media', async () => {
+  it('opens legacy archives, including allowed directories and unreferenced media', async () => {
     const entries = projectEntries(createEmptyFamily())
     entries.unshift({ path: 'project/', content: '', options: { directory: true, unixMode: 0o040700 } })
     const reader = await openProjectBundle(await fixture(entries))

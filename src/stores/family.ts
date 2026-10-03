@@ -26,7 +26,6 @@ import {
   reconcileSiblingOrders,
 } from '@/core/siblingOrder'
 import { setLastProjectRef } from '@/services/prefs'
-import { projectRefLocation } from '@/services/projectRef'
 import type { ProjectRef } from '@/services/storage/types'
 
 /**
@@ -39,7 +38,6 @@ import type { ProjectRef } from '@/services/storage/types'
  */
 export const useFamilyStore = defineStore('family', () => {
   const projectRef = ref<ProjectRef | null>(null)
-  const projectPath = computed(() => projectRef.value ? projectRefLocation(projectRef.value) : null)
   const projectMeta = ref<ProjectMeta | null>(null)
   const data = ref<FamilyData>(createEmptyFamily())
   const isDirty = ref(false)
@@ -424,7 +422,6 @@ export const useFamilyStore = defineStore('family', () => {
   return {
     // state
     projectRef,
-    projectPath,
     projectMeta,
     data,
     isDirty,

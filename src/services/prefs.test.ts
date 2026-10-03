@@ -5,16 +5,21 @@ import {
   setLastProjectRef,
   setLayoutModePreference,
 } from './prefs'
-import { externalProjectRef, managedProjectRef } from './projectRef'
+
+const providers = vi.hoisted(() => new Set<string>())
+vi.mock('./storage', () => ({ hasProvider: (id: string) => providers.has(id) }))
 
 const LAST_PROJECT_REF_KEY = 'family-tree:lastProjectRef'
 const PREVIOUS_PROJECT_KEY = 'family-tree:lastProject'
 const LEGACY_PROJECT_PATH_KEY = 'family-tree:lastProjectPath'
 const LAYOUT_MODE_KEY = 'family-tree:layoutModePreference'
+const project = { providerId: 'browser-directory', id: 'opaque-project-id', displayName: '家族' }
 
 let entries: Map<string, string>
 
 beforeEach(() => {
+  providers.clear()
+  providers.add('browser-directory')
   entries = new Map()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => entries.get(key) ?? null,
@@ -29,57 +34,54 @@ afterEach(() => {
 
 describe('recent project preferences', () => {
   it('stores and restores only the public project reference fields', () => {
-    const project = {
-      providerId: 'drive-connection',
-      id: 'opaque-project-id',
-      displayName: '家族',
-      accessToken: 'must-not-be-persisted',
-    }
+    const withCredentials = { ...project, accessToken: 'must-not-be-persisted' }
+    setLastProjectRef(withCredentials)
 
-    setLastProjectRef(project)
-
-    const expected = {
-      providerId: 'drive-connection',
-      id: 'opaque-project-id',
-      displayName: '家族',
-    }
-    expect(JSON.parse(entries.get(LAST_PROJECT_REF_KEY)!)).toEqual(expected)
-    expect(getLastProjectRef()).toEqual(expected)
-  })
-
-  it.each([
-    ['/home/user/家谱.family/', '家谱.family'],
-    ['C:\\Users\\user\\家谱.family\\', '家谱.family'],
-  ])('migrates the legacy local path %s', (path, displayName) => {
-    entries.set(LEGACY_PROJECT_PATH_KEY, path)
-
-    const project = getLastProjectRef()
-
-    expect(project).toEqual({ providerId: 'tauri-local', id: path, displayName })
     expect(JSON.parse(entries.get(LAST_PROJECT_REF_KEY)!)).toEqual(project)
-    expect(entries.has(LEGACY_PROJECT_PATH_KEY)).toBe(false)
+    expect(getLastProjectRef()).toEqual(project)
+  })
+
+  it('restores a future provider only once it has been registered', () => {
+    const remote = { providerId: 'drive-connection', id: 'opaque-remote-id', displayName: '远端家族' }
+    setLastProjectRef(remote)
+
+    expect(getLastProjectRef()).toBeNull()
+    expect(JSON.parse(entries.get(LAST_PROJECT_REF_KEY)!)).toEqual(remote)
+    providers.add(remote.providerId)
+    expect(getLastProjectRef()).toEqual(remote)
+  })
+
+  it.each(['tauri-local', 'tauri-managed'])('ignores references to the removed %s provider without deleting them', providerId => {
+    const removed = { providerId, id: '/old-project', displayName: '旧项目' }
+    entries.set(LAST_PROJECT_REF_KEY, JSON.stringify(removed))
+    entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify(project))
+
+    expect(getLastProjectRef()).toBeNull()
+    expect(entries.get(LAST_PROJECT_REF_KEY)).toBe(JSON.stringify(removed))
+    expect(entries.get(PREVIOUS_PROJECT_KEY)).toBe(JSON.stringify(project))
   })
 
   it.each([
-    {
-      stored: { kind: 'external', path: '/tmp/legacy.family', accessToken: 'discard' },
-      expected: externalProjectRef('/tmp/legacy.family'),
-    },
-    {
-      stored: { kind: 'managed', id: 'local-id', accessToken: 'discard' },
-      expected: managedProjectRef('local-id'),
-    },
-  ])('migrates the previous $stored.kind project reference', ({ stored, expected }) => {
+    { kind: 'external', path: '/tmp/legacy.family' },
+    { kind: 'managed', id: 'old-managed-id' },
+  ])('ignores a legacy $kind reference instead of treating it as a browser directory', stored => {
     entries.set(LAST_PROJECT_REF_KEY, JSON.stringify(stored))
     entries.set(LEGACY_PROJECT_PATH_KEY, '/stale/project')
 
-    expect(getLastProjectRef()).toEqual(expected)
-    expect(JSON.parse(entries.get(LAST_PROJECT_REF_KEY)!)).toEqual(expected)
-    expect(entries.has(LEGACY_PROJECT_PATH_KEY)).toBe(false)
+    expect(getLastProjectRef()).toBeNull()
+    expect(entries.get(LAST_PROJECT_REF_KEY)).toBe(JSON.stringify(stored))
+    expect(entries.get(LEGACY_PROJECT_PATH_KEY)).toBe('/stale/project')
   })
 
-  it('migrates the previous canonical project key', () => {
-    const project = { providerId: 'other-connection', id: 'opaque-id', displayName: '云端项目' }
+  it('ignores a legacy path without altering its record', () => {
+    entries.set(LEGACY_PROJECT_PATH_KEY, '/home/user/家谱.family')
+
+    expect(getLastProjectRef()).toBeNull()
+    expect(entries.get(LEGACY_PROJECT_PATH_KEY)).toBe('/home/user/家谱.family')
+    expect(entries.has(LAST_PROJECT_REF_KEY)).toBe(false)
+  })
+
+  it('migrates the previous canonical project key for a connected provider', () => {
     entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify(project))
 
     expect(getLastProjectRef()).toEqual(project)
@@ -87,30 +89,18 @@ describe('recent project preferences', () => {
     expect(entries.has(PREVIOUS_PROJECT_KEY)).toBe(false)
   })
 
-  it('persists a named managed project without a physical path', () => {
-    const project = managedProjectRef('local-id', '移动端家谱')
-
-    setLastProjectRef(project)
-
-    expect(getLastProjectRef()).toEqual(project)
-    expect(getLastProjectRef()?.providerId).toBe('tauri-managed')
-    expect(entries.has(LEGACY_PROJECT_PATH_KEY)).toBe(false)
-  })
-
   it.each([
     'not-json',
     'null',
     '[]',
     '"/old/path"',
-    '{"providerId":"drive","id":"123"}',
+    '{"providerId":"browser-directory","id":"123"}',
     '{"providerId":"","id":"123","displayName":"家族"}',
-    '{"providerId":"drive","id":12,"displayName":"家族"}',
-    '{"providerId":"drive","id":"123","displayName":null}',
-    '{"kind":"managed","id":""}',
-    '{"kind":"external","path":42}',
-  ])('rejects invalid structured preferences without restoring a stale path: %s', value => {
+    '{"providerId":"browser-directory","id":12,"displayName":"家族"}',
+    '{"providerId":"browser-directory","id":"123","displayName":null}',
+  ])('rejects invalid preferences without restoring a stale project: %s', value => {
     entries.set(LAST_PROJECT_REF_KEY, value)
-    entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify(externalProjectRef('/another/stale/project')))
+    entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify(project))
     entries.set(LEGACY_PROJECT_PATH_KEY, '/stale/project')
 
     expect(getLastProjectRef()).toBeNull()
@@ -124,9 +114,8 @@ describe('recent project preferences', () => {
   })
 
   it('prefers the current key and discards unknown fields when reading', () => {
-    const project = { providerId: 'another-provider', id: 'project', displayName: '另一个项目' }
     entries.set(LAST_PROJECT_REF_KEY, JSON.stringify({ ...project, refreshToken: 'ignore' }))
-    entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify(externalProjectRef('/another/stale/project')))
+    entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify({ ...project, id: 'stale-project' }))
     entries.set(LEGACY_PROJECT_PATH_KEY, '/stale/project')
 
     expect(getLastProjectRef()).toEqual(project)
@@ -148,20 +137,7 @@ describe('recent project preferences', () => {
     expect(getLayoutModePreference()).toBe('focus-flow')
   })
 
-  it('keeps legacy recovery available when writing the migration is denied', () => {
-    entries.set(LEGACY_PROJECT_PATH_KEY, '/home/user/project.family')
-    localStorage.setItem = () => { throw new Error('quota exceeded') }
-
-    expect(getLastProjectRef()).toEqual({
-      providerId: 'tauri-local',
-      id: '/home/user/project.family',
-      displayName: 'project.family',
-    })
-    expect(entries.get(LEGACY_PROJECT_PATH_KEY)).toBe('/home/user/project.family')
-  })
-
   it('keeps the previous canonical key if migration cannot be persisted', () => {
-    const project = managedProjectRef('local-id', '家谱')
     entries.set(PREVIOUS_PROJECT_KEY, JSON.stringify(project))
     localStorage.setItem = () => { throw new Error('quota exceeded') }
 

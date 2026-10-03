@@ -9,9 +9,6 @@ import { migrate } from '@/core/migrate'
 import { assertFamilyIntegrity } from '@/core/familyIntegrity'
 import * as api from './storage'
 import type { ProjectRef } from './storage'
-import { v4 as uuidv4 } from 'uuid'
-import { managedProjectRef } from './projectRef'
-import { projectRepository } from './projectRepository'
 
 export interface OpenResult {
   project: ProjectRef
@@ -64,12 +61,4 @@ export async function saveProject(ref: ProjectRef, family: FamilyData): Promise<
   }
   assertFamilyIntegrity(parsed.data)
   await api.saveProject(ref, parsed.data)
-}
-
-export async function createManagedProject(name: string): Promise<OpenResult> {
-  return createProject(managedProjectRef(uuidv4(), name), name)
-}
-
-export async function listManagedProjects() {
-  return projectRepository.listManaged()
 }

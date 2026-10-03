@@ -529,7 +529,7 @@ export function createBrowserDirectoryStorage(options: BrowserDirectoryOptions):
   }
 }
 
-// Keep IndexedDB lazy so native builds and unsupported browsers can import the
+// Keep IndexedDB lazy so unsupported browsers can import the
 // shared storage entry point without opening a browser database.
 let directoryStore: ReturnType<typeof createStore> | undefined
 function registryStore() {

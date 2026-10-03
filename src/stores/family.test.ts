@@ -3,7 +3,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useFamilyStore } from './family'
 import { mk } from '@/__tests__/fixtures/families'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
-import { externalProjectRef, managedProjectRef } from '@/services/projectRef'
 
 describe('family store relation invariants', () => {
   beforeEach(() => {
@@ -83,25 +82,6 @@ describe('family store relation invariants', () => {
     expect(family.projectRef).toBeNull()
     expect(family.projectMeta).toBeNull()
     expect(family.lastSavedAt).toBeNull()
-  })
-
-  it('exposes a physical path only for external directory projects', () => {
-    const family = useFamilyStore()
-    family.setProject(
-      externalProjectRef('/tmp/test.family'),
-      createEmptyMeta('目录家谱'),
-      createEmptyFamily(),
-    )
-    expect(family.projectPath).toBe('/tmp/test.family')
-
-    family.setProject(
-      managedProjectRef('local-id', '移动端家谱'),
-      createEmptyMeta('移动端家谱'),
-      createEmptyFamily(),
-    )
-    expect(family.projectPath).toBeNull()
-    expect(family.projectRef?.providerId).toBe('tauri-managed')
-    expect(family.projectRef?.id).toBe('local-id')
   })
 
   it('does not replace a conflicting current spouse without explicit replacement', () => {

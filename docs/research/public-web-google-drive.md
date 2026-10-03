@@ -1,5 +1,7 @@
 # 家族树对外开放与 Google Drive 存储调研
 
+> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 尚未实现。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
+
 调研日期：2026-10-03。代码基线：`c33861279d48b93c33b00d2ea92e8d66407e8c23`。本次检查代码、项目文档及公开的一方资料；未改动业务代码，未部署服务，未读取真实家谱或照片，未操作 Google 账户。
 
 后续已明确纯前端分发、无应用账号、普通本地目录优先的目标，当前方向见[纯前端与用户自带存储方案](static-frontend-user-storage.md)和[本地目录与 Drive 对比](local-directory-vs-google-drive.md)。下文是前期以 Drive 为重点的调研，涉及认证后端或业务数据库的内容保留作方案比较，不代表当前默认架构。
@@ -16,25 +18,25 @@
 | 一人维护，亲人只读查看 | 上述方案 + 明确的分享与读取权限 | 增加邀请或文件授权、撤回访问、只读交互；分享文件不自动完成应用内权限设计 |
 | 家人共同编辑 | 网页/PWA + 服务端账户、家谱权限、写入协调；优先评估数据库作为主存储 | 需保证关系图一致性、权限检查和冲突处理；Drive 可作为附件、导出或备份层 |
 
-第三条并非技术上禁止使用 Drive，而是当前全量 JSON 写入方式与多人协作不匹配。关系修改涉及反向引用、配偶约束和祖先环检查，不能把不同人的成员字段直接合并后视为正确。[项目格式](../project-format.md#L54)、[保存代码](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L23)
+第三条并非技术上禁止使用 Drive，而是当前全量 JSON 写入方式与多人协作不匹配。关系修改涉及反向引用、配偶约束和祖先环检查，不能把不同人的成员字段直接合并后视为正确。[项目格式](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L54)、[保存代码](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L23)
 
 **已从项目核实的现状**
 
 | 现状与依据 | 对公开网页版的影响 |
 | --- | --- |
-| Vue、Pinia、亲属称谓和布局已有清晰分层；领域核心不依赖 Tauri，布局已有浏览器 Web Worker。[架构](../architecture.md#L27) | 可以复用家谱领域模型、关系校验、称谓计算和布局；无需重写整套应用 |
+| Vue、Pinia、亲属称谓和布局已有清晰分层；领域核心不依赖 Tauri，布局已有浏览器 Web Worker。[架构](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/architecture.md#L27) | 可以复用家谱领域模型、关系校验、称谓计算和布局；无需重写整套应用 |
 | 新建、打开、保存、照片读取与目录选择都通过 Tauri IPC 或 dialog。[tauriApi](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/tauriApi.ts#L1) | 直接把当前 `dist` 放上云，不能使这些功能在普通浏览器中工作 |
-| `projectService` 负责迁移、Zod 和关系图校验，但直接导入 `tauriApi`。[projectService](../../src/services/projectService.ts#L10) | 是适合抽出存储边界的入口；照片组件和页面的直接依赖也要一起改 |
-| 项目由 `meta.json`、`family.json`、照片和缩略图组成，目前格式版本为 4。[项目格式](../project-format.md#L5) | 与文件型云存储相容，可保留领域 JSON，将远端文件映射和同步信息单独设计 |
-| 项目标识是本机 `projectPath`；最近打开项目是单个 localStorage 路径。[store](../../src/stores/family.ts#L38)、[prefs](../../src/services/prefs.ts#L9) | 云版需要稳定项目 ID、Drive 文件 ID，以及按登录账号隔离的缓存和最近项目 |
-| 自动保存捕获整份家谱，依靠当前进程的 `revision` 与 `projectToken` 清除脏状态；打开项目时 revision 归零。[autosave](../../src/services/autosave.ts#L49)、[store](../../src/stores/family.ts#L53) | 当前机制防止旧保存结果清除新修订或新项目会话的脏状态，但不提供跨设备版本协调 |
-| Rust 保存轮转三份备份，并原子写入整份 JSON。[Rust 保存](../../src-tauri/src/commands/project.rs#L268) | 云端必须重新实现保存和恢复语义；不能认为 Drive 上传天然继承本地原子写入与备份保证 |
-| 图片解码、尺寸限制、缩放和两份 WebP 生成在 Rust。[媒体代码](../../src-tauri/src/commands/media.rs#L79) | 网页版需补浏览器图片处理或服务端图片处理，现有上传和裁剪 UI 可以继续使用 |
-| 关闭浏览器时调用异步 `flushNow`，未等待其完成。[autosave](../../src/services/autosave.ts#L139) | 需要尽早落入本地持久化队列，不能把关页时上传当作可靠保存方案 |
-| 成员页面固定左右两栏，右侧使用 `w-96`；工具栏较长，已有 Pointer Events 不等于完成手机适配。[成员页](../../src/pages/MemberDetail.vue#L153)、[树页面](../../src/pages/TreeView.vue#L197)、[节点](../../src/components/tree/MemberNode.vue#L134) | 手机需要折叠菜单、纵向表单/页签，以及明确区分查看、平移和编辑拖动 |
-| 当前视角 `defaultViewpointId` 会写入项目的 `family.json`。[store](../../src/stores/family.ts#L328) | 若引入共享，应将个人视角与家谱事实分开，避免亲人相互覆盖自己的浏览偏好 |
+| `projectService` 负责迁移、Zod 和关系图校验，但直接导入 `tauriApi`。[projectService](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/projectService.ts#L10) | 是适合抽出存储边界的入口；照片组件和页面的直接依赖也要一起改 |
+| 项目由 `meta.json`、`family.json`、照片和缩略图组成，目前格式版本为 4。[项目格式](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L5) | 与文件型云存储相容，可保留领域 JSON，将远端文件映射和同步信息单独设计 |
+| 项目标识是本机 `projectPath`；最近打开项目是单个 localStorage 路径。[store](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/stores/family.ts#L38)、[prefs](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/prefs.ts#L9) | 云版需要稳定项目 ID、Drive 文件 ID，以及按登录账号隔离的缓存和最近项目 |
+| 自动保存捕获整份家谱，依靠当前进程的 `revision` 与 `projectToken` 清除脏状态；打开项目时 revision 归零。[autosave](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/autosave.ts#L49)、[store](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/stores/family.ts#L53) | 当前机制防止旧保存结果清除新修订或新项目会话的脏状态，但不提供跨设备版本协调 |
+| Rust 保存轮转三份备份，并原子写入整份 JSON。[Rust 保存](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src-tauri/src/commands/project.rs#L268) | 云端必须重新实现保存和恢复语义；不能认为 Drive 上传天然继承本地原子写入与备份保证 |
+| 图片解码、尺寸限制、缩放和两份 WebP 生成在 Rust。[媒体代码](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src-tauri/src/commands/media.rs#L79) | 网页版需补浏览器图片处理或服务端图片处理，现有上传和裁剪 UI 可以继续使用 |
+| 关闭浏览器时调用异步 `flushNow`，未等待其完成。[autosave](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/services/autosave.ts#L139) | 需要尽早落入本地持久化队列，不能把关页时上传当作可靠保存方案 |
+| 成员页面固定左右两栏，右侧使用 `w-96`；工具栏较长，已有 Pointer Events 不等于完成手机适配。[成员页](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/pages/MemberDetail.vue#L153)、[树页面](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/pages/TreeView.vue#L197)、[节点](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/components/tree/MemberNode.vue#L134) | 手机需要折叠菜单、纵向表单/页签，以及明确区分查看、平移和编辑拖动 |
+| 当前视角 `defaultViewpointId` 会写入项目的 `family.json`。[store](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/stores/family.ts#L328) | 若引入共享，应将个人视角与家谱事实分开，避免亲人相互覆盖自己的浏览偏好 |
 
-检查 `package.json`、路由、服务和平台配置，未发现 Google OAuth、Drive 客户端、服务端账户系统、IndexedDB 同步队列或 PWA manifest/service worker 的现有实现；这些属于新增工作。[依赖](../../package.json#L1)、[路由](../../src/router/index.ts#L1)、[构建配置](../../vite.config.ts#L1)
+检查 `package.json`、路由、服务和平台配置，未发现 Google OAuth、Drive 客户端、服务端账户系统、IndexedDB 同步队列或 PWA manifest/service worker 的现有实现；这些属于新增工作。[依赖](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/package.json#L1)、[路由](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/router/index.ts#L1)、[构建配置](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/vite.config.ts#L1)
 
 **Google 技术接入的已核实事实**
 
@@ -76,11 +78,11 @@ Google Workspace 官方组织的一份示例 README 把 `drive.file` 标为 “R
 建议的项目存储设计如下。这些是拟议设计，尚未实现或进行多设备验证。
 
 - 用户 Drive 中由应用创建项目目录，以稳定 ID 识别，不依赖可重名、可改名的目录名称；保存家谱 JSON、照片及缩略图，维护 `photoId → Drive fileId` 映射。Drive 的文件 ID、父目录和私有 `appProperties` 字段可作为实现基础。[接口定义](https://github.com/googleapis/google-api-nodejs-client/blob/main/discovery/drive-v3.json)
-- 同步元数据应与现有 schema v4 领域事实分开；云端协议版本、账号、项目、基准版本及媒体状态由存储层管理。`memberId` 代表家谱人物，不等于 Google 登录用户。[现有模型](../../src/core/schema.ts#L28)
+- 同步元数据应与现有 schema v4 领域事实分开；云端协议版本、账号、项目、基准版本及媒体状态由存储层管理。`memberId` 代表家谱人物，不等于 Google 登录用户。[现有模型](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/core/schema.ts#L28)
 - 本地先保存，随后上传；分别显示“本机已保存”“同步中”“已同步”“需要处理冲突”。本地缓存、待上传队列和账号身份绑定，切换账号时不能把上一账号的队列传到新账号。
 - 媒体成功上传后再提交引用它的家谱版本；上传失败、重复重试或中途断网时保持可恢复。家谱快照与关联媒体应能一起导出，手机端不能只依赖选择文件夹。
 - 第一版发生冲突时保留两个版本，由用户选择或恢复；暂不自动合并关系图。可以验证不可变快照、服务端串行提交或经文档证实的条件写入方案，具体协议需在实现前选定并做双设备实验。
-- 首版暂停云端自动媒体清理。现有 GC 按当前本地快照判断引用，不能直接用于云端；后续应依据已提交远端版本并设置恢复宽限期。[当前 GC](../../src/pages/TreeView.vue#L118)、[Rust GC](../../src-tauri/src/commands/media.rs#L143)
+- 首版暂停云端自动媒体清理。现有 GC 按当前本地快照判断引用，不能直接用于云端；后续应依据已提交远端版本并设置恢复宽限期。[当前 GC](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/pages/TreeView.vue#L118)、[Rust GC](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src-tauri/src/commands/media.rs#L143)
 
 **是否需要自己的后端**
 
@@ -100,7 +102,7 @@ PWA 能减少单独维护原生移动 App 的需求，但安装能力、离线�
 
 MDN 明确指出 `beforeunload` 在移动端可能完全不触发；浏览器的 IndexedDB/Cache 默认也可能被回收。因此建议编辑后及时写本地队列，成功同步到 Drive 后再显示已同步，并提供导出和恢复；申请持久存储也不替代云端同步和用户备份。[beforeunload](https://github.com/mdn/content/blob/main/files/en-us/web/api/window/beforeunload_event/index.md)、[存储回收](https://github.com/mdn/content/blob/main/files/en-us/web/api/storage_api/storage_quotas_and_eviction_criteria/index.md)
 
-手机适配建议先覆盖成员表单、关系编辑、树形浏览、照片导入与冲突处理；验收需包含 Android Chrome、iOS Safari 和桌面浏览器。现有 500 人性能检查可作为算法基线，但不能替代手机实机体验验证。[项目测试边界](../architecture.md#L80)
+手机适配建议先覆盖成员表单、关系编辑、树形浏览、照片导入与冲突处理；验收需包含 Android Chrome、iOS Safari 和桌面浏览器。现有 500 人性能检查可作为算法基线，但不能替代手机实机体验验证。[项目测试边界](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/architecture.md#L80)
 
 **对公众发布的准备路径**
 
@@ -113,7 +115,7 @@ MDN 明确指出 `beforeunload` 在移动端可能完全不触发；浏览器的
 5. 明确用户可执行的操作：导出家谱、删除应用数据、断开 Drive、退出与清理本地缓存。断开授权不应被当成已经删除文件，未同步修改也不应在退出时被静默丢弃。这是本产品的设计建议。
 6. 通过下列验收后再开启小规模公开测试；稳定后扩大访问。生产发布状态与 Google 验证状态分别检查，不将其中一个替代另一个。
 
-本项目保存照片、生日、居住地及家庭关系，当前 README 和格式文档承诺本地存储、不主动上传。云版必须准确说明上传时机、存储位置、服务器是否接触数据，以及删除/导出的实际行为；不能继续照搬桌面版的本地存储文案。这是现有功能直接带来的产品要求。[成员字段](../../src/core/schema.ts#L28)、[当前隐私说明](../project-format.md#L92)
+本项目保存照片、生日、居住地及家庭关系，当前 README 和格式文档承诺本地存储、不主动上传。云版必须准确说明上传时机、存储位置、服务器是否接触数据，以及删除/导出的实际行为；不能继续照搬桌面版的本地存储文案。这是现有功能直接带来的产品要求。[成员字段](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/src/core/schema.ts#L28)、[当前隐私说明](https://github.com/JingkaiTang/family-tree/blob/c33861279d48b93c33b00d2ea92e8d66407e8c23/docs/project-format.md#L92)
 
 上线前需重新打开并核对的官方入口如下，**本轮未成功读取这些页面**，不得视为已完成政策核验：
 

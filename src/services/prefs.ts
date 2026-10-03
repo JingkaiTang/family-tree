@@ -1,6 +1,7 @@
 import type { LayoutModePreference } from '@/core/layoutMode'
 import type { ProjectRef } from '@/services/storage/types'
-import { externalProjectRef, managedProjectRef } from './projectRef'
+import { hasProvider } from './storage'
+import { isProjectRef } from './projectRef'
 
 /**
  * 用户偏好只保存在本机；项目引用仅保存定位字段，不包含连接凭证。
@@ -11,27 +12,8 @@ const LEGACY_PROJECT_PATH_KEY = 'family-tree:lastProjectPath'
 const LAYOUT_MODE_KEY = 'family-tree:layoutModePreference'
 
 function parseProjectRef(value: unknown): ProjectRef | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
-
-  if ('providerId' in value) {
-    if (
-      typeof value.providerId !== 'string' || !value.providerId.trim()
-      || !('id' in value) || typeof value.id !== 'string' || !value.id.trim()
-      || !('displayName' in value) || typeof value.displayName !== 'string' || !value.displayName.trim()
-    ) return null
-    return { providerId: value.providerId, id: value.id, displayName: value.displayName }
-  }
-
-  // 移动端支持最初以 kind 区分外部目录和应用托管项目。
-  if (
-    'kind' in value && value.kind === 'external'
-    && 'path' in value && typeof value.path === 'string' && value.path.trim()
-  ) return externalProjectRef(value.path)
-  if (
-    'kind' in value && value.kind === 'managed'
-    && 'id' in value && typeof value.id === 'string' && value.id.trim()
-  ) return managedProjectRef(value.id)
-  return null
+  if (!isProjectRef(value)) return null
+  return { providerId: value.providerId, id: value.id, displayName: value.displayName }
 }
 
 export function getLastProjectRef(): ProjectRef | null {
@@ -41,16 +23,13 @@ export function getLastProjectRef(): ProjectRef | null {
       const stored = localStorage.getItem(key)
       if (stored === null) continue
       const project = parseProjectRef(JSON.parse(stored))
-      if (!project) return null
+      // 不恢复已移除或尚未连接的提供商，也不把旧目录路径解释为浏览器句柄。
+      if (!project || !hasProvider(project.providerId)) return null
       setLastProjectRef(project)
       return project
     }
 
-    const path = localStorage.getItem(LEGACY_PROJECT_PATH_KEY)
-    if (!path?.trim()) return null
-    const project = externalProjectRef(path)
-    setLastProjectRef(project)
-    return project
+    return null
   } catch {
     return null
   }

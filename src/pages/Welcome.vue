@@ -6,24 +6,14 @@ import { useUiStore } from '@/stores/ui'
 import {
   authorizeProject,
   getDirectoryStorageAvailability,
+  hasProvider,
   pickProject,
   type ProjectRef,
 } from '@/services/storage'
-import {
-  createManagedProject,
-  createProject,
-  listManagedProjects,
-  openProject,
-} from '@/services/projectService'
+import { createProject, openProject } from '@/services/projectService'
 import { startAutosave } from '@/services/autosave'
 import { getLastProjectRef, setLastProjectRef } from '@/services/prefs'
-import type { ManagedProjectSummary } from '@/services/projectRepository'
 import { importProjectBundle } from '@/services/projectTransfer'
-import {
-  getRuntimePlatform,
-  isMobilePlatform,
-  type RuntimePlatform,
-} from '@/services/runtime'
 
 const router = useRouter()
 const family = useFamilyStore()
@@ -31,21 +21,12 @@ const ui = useUiStore()
 
 const busy = ref(false)
 const error = ref<string | null>(null)
-const platformReady = ref(false)
-const runtimePlatform = ref<RuntimePlatform>('web')
-const mobileProjects = ref<ManagedProjectSummary[]>([])
-const managedProjectName = ref('我的家族')
 const bundleFileInput = ref<HTMLInputElement | null>(null)
 const pendingBundleFile = ref<File | null>(null)
 /** 启动时是否正在自动尝试恢复上次项目（让 UI 显示 loading 而不是闪一下按钮） */
 const autoRestoring = ref(false)
 const lastProject = ref<ProjectRef | null>(null)
-const isMobile = computed(() => isMobilePlatform(runtimePlatform.value))
-const isWeb = computed(() => runtimePlatform.value === 'web')
-const directoryProviderId = computed(() => isWeb.value ? 'browser-directory' : 'tauri-local')
-const directoryAvailability = computed(() => isWeb.value
-  ? getDirectoryStorageAvailability()
-  : { supported: true, reason: null })
+const directoryAvailability = computed(() => getDirectoryStorageAvailability())
 const canOpenRecent = computed(() => lastProject.value?.providerId !== 'browser-directory'
   || directoryAvailability.value.supported)
 
@@ -74,7 +55,7 @@ async function onCreateExternal() {
   error.value = null
   try {
     busy.value = true
-    const project = await pickProject(directoryProviderId.value, 'create')
+    const project = await pickProject('browser-directory', 'create')
     if (!project) return
     const name = project.displayName || '未命名家族'
     const result = await createProject(project, name)
@@ -91,54 +72,17 @@ async function onCreateExternal() {
   }
 }
 
-async function onCreateManaged() {
-  const name = managedProjectName.value.trim()
-  if (!name) {
-    error.value = '请输入家族名称'
-    return
-  }
-  error.value = null
-  try {
-    busy.value = true
-    const result = await createManagedProject(name)
-    family.setProject(result.project, result.meta, result.family)
-    startAutosave()
-    ui.showToast('success', `已新建家族：${name}`)
-    await router.push('/tree')
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    busy.value = false
-  }
-}
-
 async function onOpenExternal() {
   if (busy.value || !directoryAvailability.value.supported) return
   error.value = null
   try {
     busy.value = true
-    const project = await pickProject(directoryProviderId.value, 'open')
+    const project = await pickProject('browser-directory', 'open')
     if (project) await tryOpen(project)
   } catch (e) {
     if (!(e instanceof Error && e.name === 'AbortError')) {
       error.value = e instanceof Error ? e.message : String(e)
     }
-  } finally {
-    busy.value = false
-  }
-}
-
-async function onImportManaged() {
-  if (busy.value) return
-  error.value = null
-  try {
-    busy.value = true
-    const imported = await importProjectBundle()
-    if (!imported) return
-    mobileProjects.value = await listManagedProjects()
-    await tryOpen(imported.project)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     busy.value = false
   }
@@ -208,40 +152,16 @@ function onForgetLast() {
   lastProject.value = null
 }
 
-function formatUpdatedAt(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
-}
-
 onMounted(async () => {
-  try {
-    runtimePlatform.value = await getRuntimePlatform()
-    const compactWeb = isWeb.value
-      && window.matchMedia?.('(max-width: 1023px)').matches === true
-    ui.setDefaultLayoutMode(isMobile.value || compactWeb ? 'focus-flow' : 'family-grid')
-    if (isMobile.value) {
-      mobileProjects.value = await listManagedProjects()
-    }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    platformReady.value = true
-  }
-
+  // 布局默认值由 UI store 在会话开始时检测一次，返回首页不改变用户的选择。
   const stored = getLastProjectRef()
-  const matchesRuntime = stored && (
-    stored.providerId === 'tauri-managed' ? isMobile.value
-      : stored.providerId === 'tauri-local' ? !isWeb.value && !isMobile.value
-        : stored.providerId === 'browser-directory' ? isWeb.value
-          : true
-  )
-  lastProject.value = matchesRuntime ? stored : null
-  if (!matchesRuntime || !canOpenRecent.value) return
+  lastProject.value = stored && hasProvider(stored.providerId) ? stored : null
+  if (!lastProject.value || !canOpenRecent.value) return
 
   // 启动自动恢复。失败时保留记录供用户重试。
   autoRestoring.value = true
   try {
-    await tryOpen(stored, true)
+    await tryOpen(lastProject.value, true)
   } finally {
     autoRestoring.value = false
   }
@@ -255,57 +175,9 @@ onMounted(async () => {
       <p class="mt-3 text-slate-500">记录家族成员、关系与故事</p>
     </div>
 
-    <p v-if="!platformReady" class="text-sm text-slate-400">正在准备本地项目…</p>
-    <p v-else-if="autoRestoring" class="text-sm text-slate-400">正在恢复上次打开的家族…</p>
+    <p v-if="autoRestoring" class="text-sm text-slate-400">正在恢复上次打开的家族…</p>
 
-    <div v-else-if="isMobile" class="flex w-full max-w-md flex-col gap-5">
-      <form class="flex gap-2" @submit.prevent="onCreateManaged">
-        <input
-          v-model="managedProjectName"
-          aria-label="家族名称"
-          maxlength="100"
-          class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base"
-          placeholder="家族名称"
-          :disabled="busy"
-        >
-        <button
-          class="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-white shadow active:bg-slate-700 disabled:opacity-50"
-          :disabled="busy"
-          type="submit"
-        >
-          新建
-        </button>
-      </form>
-
-      <button
-        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm active:bg-slate-50 disabled:opacity-50"
-        :disabled="busy"
-        @click="onImportManaged"
-      >
-        导入家族备份
-      </button>
-
-      <section class="flex flex-col gap-2" aria-label="本机家族项目">
-        <h2 class="text-sm font-medium text-slate-500">本机家族</h2>
-        <button
-          v-for="item in mobileProjects"
-          :key="item.project.id"
-          class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm active:bg-slate-50 disabled:opacity-50"
-          :disabled="busy"
-          @click="tryOpen(item.project)"
-        >
-          <span class="block font-medium text-slate-900">{{ item.meta.name }}</span>
-          <span class="mt-1 block text-xs text-slate-400">
-            最近更新：{{ formatUpdatedAt(item.meta.updatedAt) }}
-          </span>
-        </button>
-        <p v-if="mobileProjects.length === 0" class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-          暂无本机家族，输入名称即可新建。
-        </p>
-      </section>
-    </div>
-
-    <div v-else-if="platformReady" class="flex w-full max-w-md flex-col items-center gap-4">
+    <div v-else class="flex w-full max-w-md flex-col items-center gap-4">
       <p class="text-center text-sm text-slate-500">
         选择本地目录，保存家族资料和照片。
       </p>
@@ -333,7 +205,7 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div v-if="isWeb && directoryAvailability.supported" class="flex w-full flex-col gap-3">
+      <div v-if="directoryAvailability.supported" class="flex w-full flex-col gap-3">
         <input
           ref="bundleFileInput"
           type="file"
@@ -374,7 +246,7 @@ onMounted(async () => {
     </div>
 
     <div
-      v-if="platformReady && !autoRestoring && lastProject"
+      v-if="!autoRestoring && lastProject"
       class="mt-2 flex max-w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 shadow-sm"
     >
       <span class="text-xs text-slate-400">最近：</span>
@@ -405,15 +277,7 @@ onMounted(async () => {
     </p>
 
     <p class="text-center text-xs text-slate-400">
-      <template v-if="isMobile">
-        数据保存在本机应用空间，卸载应用前请先导出备份。
-      </template>
-      <template v-else-if="isWeb">
-        数据直接保存在你授权的本地目录，不上传服务器。权限失效时需要重新授权，请定期复制目录备份。
-      </template>
-      <template v-else>
-        数据以普通文件夹形式保存在你选择的位置，可直接复制/备份。
-      </template>
+      数据直接保存在你授权的本地目录，不上传服务器。权限失效时需要重新授权，请定期复制目录备份。
     </p>
   </div>
 </template>

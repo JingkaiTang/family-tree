@@ -29,7 +29,7 @@ type LifecycleDocument = Pick<
 type LifecycleWindow = Pick<Window, 'addEventListener' | 'removeEventListener'>
 
 /**
- * 移动端 WebView 进入后台后可能很快被冻结，因此在 pagehide 和页面隐藏时立即发起保存。
+ * 浏览器页面进入后台后可能很快被冻结，因此在 pagehide 和页面隐藏时立即发起保存。
  */
 export function installPageLifecycleFlush(
   flush: () => Promise<void>,
@@ -153,7 +153,7 @@ let closeGuardStarted = false
  * 启动自动保存：
  * - family store 每个 revision 变化都重新防抖 800ms
  * - 保存串行执行，只有精确 revision 成功落盘后才标记 clean
- * - 路由离开与 Tauri 关窗会等待队列；浏览器卸载时提示未保存状态
+ * - 路由离开会等待队列；浏览器卸载时提示未保存状态
  */
 export function startAutosave() {
   if (controller !== null) return
@@ -183,30 +183,7 @@ export function startAutosave() {
       () => Boolean(family.isDirty && family.projectRef),
       reportSaveError,
     )
-
-    if ('__TAURI_INTERNALS__' in window) {
-      void installTauriCloseGuard(family, ui)
-    }
   }
-}
-
-async function installTauriCloseGuard(
-  family: FamilyStore,
-  ui: ReturnType<typeof useUiStore>,
-) {
-  const { getCurrentWindow } = await import('@tauri-apps/api/window')
-  const currentWindow = getCurrentWindow()
-  await currentWindow.onCloseRequested(async event => {
-    if (!family.isDirty || !family.projectRef) return
-    event.preventDefault()
-    try {
-      await flushNow()
-      await currentWindow.destroy()
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      ui.showToast('error', '保存失败，窗口保持打开：' + msg)
-    }
-  })
 }
 
 /** 手动强制保存（返回 Promise） */

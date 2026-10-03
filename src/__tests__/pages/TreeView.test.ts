@@ -9,7 +9,6 @@ import TreeView from '@/pages/TreeView.vue'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
-import { externalProjectRef } from '@/services/projectRef'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 
 const { exportProjectBundleMock, prepareExportMock, authorizeProjectMock, flushNowMock, routerPush, gcMediaMock, supportsMediaGcMock } = vi.hoisted(() => ({
@@ -504,7 +503,7 @@ describe('TreeView row order integration', () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const family = useFamilyStore()
-    const project = externalProjectRef('/tmp/test.family')
+    const project = { providerId: 'browser-directory', id: 'test-project', displayName: 'test.family' }
     family.setProject(project, {
       name: '测试',
       schemaVersion: 4,
@@ -560,7 +559,7 @@ describe('TreeView row order integration', () => {
     setActivePinia(pinia)
     const family = useFamilyStore()
     const ui = useUiStore()
-    family.setProject(externalProjectRef('/tmp/test.family'), {
+    family.setProject({ providerId: 'browser-directory', id: 'test-project', displayName: 'test.family' }, {
       name: '测试',
       schemaVersion: 4,
       createdAt: '2026-07-16T00:00:00.000Z',
@@ -578,7 +577,7 @@ describe('TreeView row order integration', () => {
     const back = wrapper.findAll('button').find(button => button.text() === '返回')!
     await back.trigger('click')
 
-    expect(family.projectRef).toEqual(externalProjectRef('/tmp/test.family'))
+    expect(family.projectRef).toEqual({ providerId: 'browser-directory', id: 'test-project', displayName: 'test.family' })
     expect(routerPush).not.toHaveBeenCalled()
     expect(ui.toast?.text).toContain('项目保持打开')
   })

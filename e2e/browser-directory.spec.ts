@@ -14,7 +14,7 @@ test.afterEach(async ({ page }, testInfo) => {
   if (errors.length) {
     await testInfo.attach('browser-errors.txt', { body: errors.join('\n\n'), contentType: 'text/plain' })
   }
-  expect(errors, 'The Web app must work without a native Tauri IPC host').toEqual([])
+  expect(errors, 'The Web app must run without page errors').toEqual([])
 })
 
 /**
@@ -85,6 +85,9 @@ async function createAndSaveMember(page: Page, withPhoto = false) {
 
 test('desktop Web saves family and WebP media in a real directory, then restores its IndexedDB handle after reload', async ({ page }) => {
   await createAndSaveMember(page, true)
+  await expect(page.getByTestId('layout-mode-select').locator('option:checked')).toHaveText('自动（网格）')
+  await expect(page.locator('.pz-stage')).toBeVisible()
+  await expect(page.getByTestId('focus-flow-view')).toHaveCount(0)
   const saved = await readFamily(page)
   const member = Object.values(saved.members)[0]
   expect(member).toMatchObject({ lastName: '林', firstName: '测试', notes: '仅用于自动化验证的虚构成员\n浏览器目录持久化' })
@@ -122,7 +125,6 @@ test('desktop Web saves family and WebP media in a real directory, then restores
   await expect(page.getByText('林测试', { exact: true })).toBeVisible()
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('e2e:picker-count'))).toBe('1')
   expect(await readFamily(page)).toEqual(saved)
-  expect(await page.evaluate(() => '__TAURI_INTERNALS__' in window)).toBe(false)
   const project = await page.evaluate(() => JSON.parse(localStorage.getItem('family-tree:lastProjectRef')!))
   expect(project.providerId).toBe('browser-directory')
 })
@@ -217,18 +219,56 @@ test('browser Back flushes pending changes before leaving the project and reopen
 test.describe('narrow touch Web', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
-  test('uses directory storage and the compact layout without a native host or user-agent gate', async ({ page }) => {
+  test('uses directory storage and the compact layout in the browser or user-agent gate', async ({ page }) => {
     await createAndSaveMember(page)
     await expect(page.getByTestId('layout-mode-select')).toHaveValue('auto')
     await expect(page.getByTestId('layout-mode-select').locator('option:checked')).toHaveText('自动（纵流）')
+    await expect(page.getByTestId('focus-flow-view')).toBeVisible()
+    await expect(page.locator('.pz-stage')).toHaveCount(0)
     await expect(page.getByText('林测试', { exact: true })).toBeVisible()
     const width = await page.evaluate(() => ({ viewport: window.innerWidth, content: document.documentElement.scrollWidth }))
     expect(width.content).toBeLessThanOrEqual(width.viewport)
+    await page.getByRole('button', { name: '详情', exact: true }).click()
+    await expect(page.locator('main')).toHaveCSS('flex-direction', 'column')
+    await expect(page.getByRole('heading', { name: '家庭关系', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '返回', exact: true }).click()
+
+    await page.setViewportSize({ width: 1180, height: 600 })
+    await expect(page.getByTestId('layout-mode-select').locator('option:checked')).toHaveText('自动（纵流）')
+    await expect(page.getByTestId('focus-flow-view')).toBeVisible()
+    await page.getByRole('button', { name: '返回', exact: true }).click()
+    await page.getByRole('button', { name: '打开已有家族', exact: true }).click()
+    await expect(page.getByTestId('layout-mode-select').locator('option:checked')).toHaveText('自动（纵流）')
+    await page.setViewportSize({ width: 390, height: 844 })
     await page.reload()
     await expect(page.getByRole('heading', { name: directoryName })).toBeVisible()
     await expect(page.getByText('林测试', { exact: true })).toBeVisible()
     expect(Object.values((await readFamily(page)).members)[0].lastName).toBe('林')
   })
+})
+
+test('a narrow desktop window reuses the client grid and preserves an explicit layout choice across reloads', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 700 })
+  await createAndSaveMember(page)
+  const layout = page.getByTestId('layout-mode-select')
+  await expect(layout.locator('option:checked')).toHaveText('自动（网格）')
+  await expect(page.locator('.pz-stage')).toBeVisible()
+  await expect(page.getByTestId('focus-flow-view')).toHaveCount(0)
+
+  await layout.selectOption('focus-flow')
+  await expect(page.getByTestId('focus-flow-view')).toBeVisible()
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await expect(layout).toHaveValue('focus-flow')
+  await page.reload()
+  await expect(layout).toHaveValue('focus-flow')
+  await expect(page.getByTestId('focus-flow-view')).toBeVisible()
+
+  await page.getByRole('button', { name: '详情', exact: true }).click()
+  await expect(page.locator('main')).toHaveCSS('flex-direction', 'row')
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await layout.selectOption('auto')
+  await expect(layout.locator('option:checked')).toHaveText('自动（网格）')
+  await expect(page.locator('.pz-stage')).toBeVisible()
 })
 
 test('cancelling the directory picker keeps Welcome usable without creating a project', async ({ page }) => {
