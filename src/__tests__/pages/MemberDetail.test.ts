@@ -9,7 +9,7 @@ import MemberDetail from '@/pages/MemberDetail.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
-import { externalProjectRef } from '@/services/projectRef'
+import type { ProjectRef } from '@/services/storage'
 
 const { deletePhotoMock, flushNowMock, routerBack, routerPush } = vi.hoisted(() => ({
   deletePhotoMock: vi.fn(),
@@ -22,9 +22,9 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ back: routerBack, push: routerPush }),
 }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
-vi.mock('@/services/projectRepository', () => ({
-  projectRepository: { deletePhoto: deletePhotoMock },
-}))
+vi.mock('@/services/storage', () => ({ deletePhoto: deletePhotoMock }))
+
+const project: ProjectRef = { providerId: 'test-storage', id: 'opaque-project', displayName: '测试家族' }
 
 const MemberFormStub = defineComponent({
   name: 'MemberForm',
@@ -61,8 +61,8 @@ describe('MemberDetail photo transaction', () => {
     await wrapper.get('[data-testid="cancel"]').trigger('click')
     await flushPromises()
 
-    expect(deletePhotoMock).toHaveBeenCalledWith(externalProjectRef('/tmp/test.family'), 'new-photo-1')
-    expect(deletePhotoMock).not.toHaveBeenCalledWith(externalProjectRef('/tmp/test.family'), 'old-photo')
+    expect(deletePhotoMock).toHaveBeenCalledWith(project, 'new-photo-1')
+    expect(deletePhotoMock).not.toHaveBeenCalledWith(project, 'old-photo')
     expect(family.data.members.a.photoId).toBe('old-photo')
     expect(routerBack).toHaveBeenCalledOnce()
   })
@@ -78,7 +78,7 @@ describe('MemberDetail photo transaction', () => {
     expect(flushNowMock).toHaveBeenCalledOnce()
     expect(family.data.members.a.photoId).toBe('new-photo-2')
     expect(deletePhotoMock).toHaveBeenCalledTimes(1)
-    expect(deletePhotoMock).toHaveBeenCalledWith(externalProjectRef('/tmp/test.family'), 'new-photo-1')
+    expect(deletePhotoMock).toHaveBeenCalledWith(project, 'new-photo-1')
   })
 
   it('does not delete a staged photo that remains referenced after a failed save', async () => {
@@ -95,6 +95,36 @@ describe('MemberDetail photo transaction', () => {
     expect(family.isDirty).toBe(true)
     expect(deletePhotoMock).not.toHaveBeenCalled()
   })
+
+  it('cleans uncommitted media in the original project after the active project changes', async () => {
+    const { family, wrapper } = mountedMember()
+    await wrapper.get('[data-testid="stage-one"]').trigger('click')
+    const nextData = createEmptyFamily()
+    nextData.members.a = { ...mk('a'), photoId: 'new-photo-1' }
+    family.setProject({ ...project, id: 'next-project' }, createEmptyMeta('另一个家族'), nextData)
+    wrapper.unmount()
+    await flushPromises()
+
+    expect(deletePhotoMock).toHaveBeenCalledWith(project, 'new-photo-1')
+    expect(deletePhotoMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps an original project photo referenced by a save that finishes after switching projects', async () => {
+    const { family, wrapper } = mountedMember()
+    let finishSave!: () => void
+    flushNowMock.mockImplementationOnce(() => new Promise<void>(resolve => { finishSave = resolve }))
+    await wrapper.get('[data-testid="stage-one"]').trigger('click')
+    await wrapper.get('[data-testid="save"]').trigger('click')
+    const previousData = family.data
+    family.setProject({ ...project, id: 'next-project' }, createEmptyMeta('另一个家族'), createEmptyFamily())
+    finishSave()
+    await flushPromises()
+    wrapper.unmount()
+    await flushPromises()
+
+    expect(previousData.members.a.photoId).toBe('new-photo-1')
+    expect(deletePhotoMock).not.toHaveBeenCalled()
+  })
 })
 
 function mountedMember() {
@@ -103,7 +133,7 @@ function mountedMember() {
   const family = useFamilyStore()
   const data = createEmptyFamily()
   data.members.a = { ...mk('a'), photoId: 'old-photo' }
-  family.setProject(externalProjectRef('/tmp/test.family'), createEmptyMeta('测试'), data)
+  family.setProject(project, createEmptyMeta('测试'), data)
   const wrapper = mount(MemberDetail, {
     props: { id: 'a' },
     global: {

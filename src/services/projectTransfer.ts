@@ -1,103 +1,83 @@
-import { open, save } from '@tauri-apps/plugin-dialog'
-import { BaseDirectory, open as openFile, mkdir, remove, type FileHandle } from '@tauri-apps/plugin-fs'
-import { v4 as uuidv4 } from 'uuid'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import type { ProjectRef } from './projectRef'
-import { projectRepository, type ManagedProjectSummary } from './projectRepository'
+import type { FamilyData, ProjectMeta } from '@/core/schema'
+import type { ManagedProjectSummary } from './projectRepository'
+import { fromNativeProject, requireNativeStorage, toNativeProject, type NativeProjectRef } from './storage/tauri'
+import { pickProject, readPhoto } from './storage'
 
-const TRANSFERS_DIR = 'transfers'
-const BUNDLE_EXTENSION = 'familybundle'
-const TRANSFER_BUFFER_BYTES = 64 * 1024
-
-function cachePath(transferName: string): string {
-  return `${TRANSFERS_DIR}/${transferName}`
+export interface ProjectExportSnapshot {
+  meta: ProjectMeta
+  family: FamilyData
 }
 
-async function ensureTransferDirectory() {
-  await mkdir(TRANSFERS_DIR, { baseDir: BaseDirectory.AppCache, recursive: true })
-}
-
-async function cleanupTransfer(transferName: string) {
-  try {
-    await remove(cachePath(transferName), { baseDir: BaseDirectory.AppCache })
-  } catch {
-    // 临时文件可能尚未创建，或已经由平台清理。
+/** 原生层完成选择、有界流传输和缓存清理，WebView 不获得通用文件 IO 权限。 */
+export async function importProjectBundle(file?: File): Promise<ManagedProjectSummary | null> {
+  if (!isTauri()) {
+    if (!file) throw new Error('请先选择家族备份，再选择用于导入的空目录。')
+    // Pick before loading codecs or reading the archive: this call owns the click.
+    const target = await pickProject('browser-directory', 'create')
+    if (!target) return null
+    const { importBrowserProjectBundle } = await import('./storage/browserDirectory')
+    const created = await importBrowserProjectBundle(target.id, file)
+    return { project: { ...target, id: created.id, displayName: created.displayName }, meta: created.meta }
   }
+  requireNativeStorage()
+  const imported = await invoke<{ project: NativeProjectRef; meta: ProjectMeta } | null>(
+    'import_project_bundle_from_picker',
+  )
+  return imported
+    ? { project: fromNativeProject(imported.project, imported.meta.name), meta: imported.meta }
+    : null
 }
 
-async function streamBundle(
-  sourcePath: string,
-  destinationPath: string,
-  options: { fromPathBaseDir?: BaseDirectory; toPathBaseDir?: BaseDirectory },
-) {
-  // File handles support Android content URIs; copyFile only resolves filesystem paths.
-  const source = await openFile(sourcePath, { read: true, baseDir: options.fromPathBaseDir })
-  let destination: FileHandle | undefined
-  let transferFailed = false
+export async function exportProjectBundle(project: ProjectRef, snapshot?: ProjectExportSnapshot): Promise<boolean> {
+  const prepared = await prepareProjectBundleExport(project)
+  return prepared ? prepared(snapshot) : false
+}
+
+type SavePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName: string
+    types: Array<{ description: string; accept: Record<string, string[]> }>
+    excludeAcceptAllOption: boolean
+  }) => Promise<FileSystemFileHandle>
+}
+
+/** Select a destination in the click handler; the returned operation runs after saving. */
+export async function prepareProjectBundleExport(project: ProjectRef): Promise<((snapshot?: ProjectExportSnapshot) => Promise<boolean>) | null> {
+  if (project.providerId === 'tauri-local' || project.providerId === 'tauri-managed') {
+    requireNativeStorage()
+    const nativeProject = toNativeProject(project)
+    return () => invoke<boolean>('export_project_bundle_to_picker', { project: nativeProject })
+  }
+  if (project.providerId !== 'browser-directory') throw new Error('此存储不支持原生项目传输或浏览器备份导出')
+  const picker = typeof window !== 'undefined' && (window as SavePickerWindow).showSaveFilePicker
+  if (!picker) throw new Error('此浏览器不支持保存备份文件；可以直接复制项目目录进行备份。')
+  const name = project.displayName.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 80) || '家族备份'
+  let destination: FileSystemFileHandle
   try {
-    destination = await openFile(destinationPath, {
-      write: true,
-      create: true,
-      truncate: true,
-      baseDir: options.toPathBaseDir,
+    destination = await picker.call(window, {
+      suggestedName: `${name}.familybundle`,
+      types: [{ description: '家族备份', accept: { 'application/zip': ['.familybundle'] } }],
+      excludeAcceptAllOption: true,
     })
-    const buffer = new Uint8Array(TRANSFER_BUFFER_BYTES)
-    for (;;) {
-      const count = await source.read(buffer)
-      if (count === null) break
-      let offset = 0
-      while (offset < count) {
-        const written = await destination.write(buffer.subarray(offset, count))
-        if (written === 0) throw new Error('备份文件写入未取得进展')
-        offset += written
-      }
-    }
   } catch (error) {
-    transferFailed = true
+    if (error instanceof Error && error.name === 'AbortError') return null
     throw error
-  } finally {
-    const results = await Promise.allSettled([source.close(), destination?.close()])
-    const closeFailure = results.find(result => result.status === 'rejected')
-    if (!transferFailed && closeFailure?.status === 'rejected') throw closeFailure.reason
   }
-}
-
-export async function importProjectBundle(): Promise<ManagedProjectSummary | null> {
-  const selected = await open({
-    directory: false,
-    multiple: false,
-    pickerMode: 'document',
-    fileAccessMode: 'copy',
-    filters: [{ name: '家族备份', extensions: [BUNDLE_EXTENSION] }],
-  })
-  if (!selected || Array.isArray(selected)) return null
-
-  const transferName = `${uuidv4()}.${BUNDLE_EXTENSION}`
-  await ensureTransferDirectory()
-  try {
-    await streamBundle(selected, cachePath(transferName), {
-      toPathBaseDir: BaseDirectory.AppCache,
-    })
-    return await projectRepository.importBundle(transferName)
-  } finally {
-    await cleanupTransfer(transferName)
-  }
-}
-
-export async function exportProjectBundle(
-  project: ProjectRef,
-): Promise<boolean> {
-  const generated = await projectRepository.exportBundle(project)
-  try {
-    const destination = await save({
-      defaultPath: generated.suggestedName,
-      filters: [{ name: '家族备份', extensions: [BUNDLE_EXTENSION] }],
-    })
-    if (!destination) return false
-    await streamBundle(cachePath(generated.transferName), destination, {
-      fromPathBaseDir: BaseDirectory.AppCache,
-    })
+  if (!destination.name.endsWith('.familybundle')) throw new Error('备份文件名必须以 .familybundle 结尾')
+  let started = false
+  return async (snapshot) => {
+    if (started) throw new Error('请重新选择备份保存位置')
+    started = true
+    if (!snapshot) throw new Error('导出前需要已保存的项目快照')
+    const { exportProjectBundleToStream } = await import('./storage/projectBundle')
+    const output = await destination.createWritable()
+    await exportProjectBundleToStream({
+      meta: snapshot.meta,
+      family: snapshot.family,
+      readPhoto: (id, thumb) => readPhoto(project, id, thumb),
+    }, output)
     return true
-  } finally {
-    await cleanupTransfer(generated.transferName)
   }
 }

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useFamilyStore } from './family'
 import { mk } from '@/__tests__/fixtures/families'
+import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
+import { externalProjectRef, managedProjectRef } from '@/services/projectRef'
 
 describe('family store relation invariants', () => {
   beforeEach(() => {
@@ -34,6 +36,72 @@ describe('family store relation invariants', () => {
     expect(family.isDirty).toBe(true)
     expect(family.markSaved(token, family.revision)).toBe(true)
     expect(family.isDirty).toBe(false)
+  })
+
+  it('owns a copy of the selected project reference', () => {
+    const family = useFamilyStore()
+    const project = {
+      providerId: 'test-provider',
+      id: 'project-a',
+      displayName: '项目 A',
+    }
+
+    family.setProject(project, createEmptyMeta('项目 A'), createEmptyFamily())
+    project.providerId = 'another-provider'
+    project.id = 'project-b'
+    project.displayName = '项目 B'
+
+    expect(family.projectRef).toEqual({
+      providerId: 'test-provider',
+      id: 'project-a',
+      displayName: '项目 A',
+    })
+  })
+
+  it('does not mark a newly opened project clean from a previous session save', () => {
+    const family = useFamilyStore()
+    family.setProject(
+      { providerId: 'provider-a', id: 'same-id', displayName: '项目 A' },
+      createEmptyMeta('项目 A'),
+      createEmptyFamily(),
+    )
+    family.upsertMember(mk('a'))
+    const savedToken = family.projectToken
+    const savedRevision = family.revision
+    family.setProject(
+      { providerId: 'provider-b', id: 'same-id', displayName: '项目 B' },
+      createEmptyMeta('项目 B'),
+      createEmptyFamily(),
+    )
+    family.upsertMember(mk('b'))
+
+    expect(family.revision).toBe(savedRevision)
+    expect(family.markSaved(savedToken, savedRevision)).toBe(false)
+    expect(family.isDirty).toBe(true)
+
+    family.closeProject()
+    expect(family.projectRef).toBeNull()
+    expect(family.projectMeta).toBeNull()
+    expect(family.lastSavedAt).toBeNull()
+  })
+
+  it('exposes a physical path only for external directory projects', () => {
+    const family = useFamilyStore()
+    family.setProject(
+      externalProjectRef('/tmp/test.family'),
+      createEmptyMeta('目录家谱'),
+      createEmptyFamily(),
+    )
+    expect(family.projectPath).toBe('/tmp/test.family')
+
+    family.setProject(
+      managedProjectRef('local-id', '移动端家谱'),
+      createEmptyMeta('移动端家谱'),
+      createEmptyFamily(),
+    )
+    expect(family.projectPath).toBeNull()
+    expect(family.projectRef?.providerId).toBe('tauri-managed')
+    expect(family.projectRef?.id).toBe('local-id')
   })
 
   it('does not replace a conflicting current spouse without explicit replacement', () => {

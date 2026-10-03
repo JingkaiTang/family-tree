@@ -5,8 +5,8 @@ import { createEmptyFamily, createEmptyMeta, type FamilyData } from '@/core/sche
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 import { createAutosaveController, installPageLifecycleFlush } from './autosave'
-import { externalProjectRef } from './projectRef'
-import type { ProjectRef } from './projectRef'
+import { externalProjectRef, managedProjectRef } from './projectRef'
+import type { ProjectRef } from '@/services/storage/types'
 
 describe('autosave coordinator', () => {
   beforeEach(() => {
@@ -16,6 +16,22 @@ describe('autosave coordinator', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('automatically saves the first edit after opening a project', async () => {
+    vi.useFakeTimers()
+    const family = openedFamily()
+    const save = vi.fn(async (_project: ProjectRef, _data: FamilyData) => {})
+    const controller = createAutosaveController(family, { debounceMs: 800, save })
+    controller.start()
+
+    family.upsertMember(mk('first'))
+    await vi.advanceTimersByTimeAsync(800)
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(save.mock.calls[0][1].members.first.id).toBe('first')
+    expect(family.isDirty).toBe(false)
+    controller.stop()
   })
 
   it('debounces every revision instead of only the first dirty transition', async () => {
@@ -116,6 +132,45 @@ describe('autosave coordinator', () => {
 
     await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(error))
     cleanup()
+  })
+
+  it.each([
+    { providerId: 'tauri-local', id: '/tmp/other.family', displayName: '另一个本地项目' },
+    { providerId: 'test-cloud', id: '/tmp/test.family', displayName: '不同提供商的同名 ID' },
+    managedProjectRef('managed-project', '移动端项目'),
+  ])('isolates queued saves when switching to $providerId / $id', async nextProject => {
+    const family = openedFamily()
+    const firstProject = { ...family.projectRef! }
+    const pending: Array<{
+      project: ProjectRef
+      data: FamilyData
+      resolve: () => void
+    }> = []
+    const save = vi.fn((project: ProjectRef, data: FamilyData) => new Promise<void>(resolve => {
+      pending.push({ project, data, resolve })
+    }))
+    const controller = createAutosaveController(family, { save })
+
+    family.upsertMember(mk('old', { firstName: '旧项目' }))
+    const firstFlush = controller.flushNow()
+    family.setProject(nextProject, createEmptyMeta('新项目'), createEmptyFamily())
+    family.upsertMember(mk('new', { firstName: '新项目' }))
+    const secondFlush = controller.flushNow()
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(pending[0].project).toEqual(firstProject)
+    pending[0].resolve()
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+
+    expect(family.isDirty).toBe(true)
+    expect(pending[1].project).toEqual(nextProject)
+    expect(Object.keys(pending[0].data.members)).toEqual(['old'])
+    expect(Object.keys(pending[1].data.members)).toEqual(['new'])
+
+    pending[1].resolve()
+    await Promise.all([firstFlush, secondFlush])
+    expect(family.isDirty).toBe(false)
+    expect(family.projectRef).toEqual(nextProject)
   })
 })
 

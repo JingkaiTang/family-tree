@@ -21,7 +21,7 @@ const MANIFEST_FILE: &str = "archive.json";
 const PROJECT_PREFIX: &str = "project";
 const FAMILY_FILE: &str = "family.json";
 const META_FILE: &str = "meta.json";
-const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
+pub(crate) const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_ENTRY_COUNT: usize = 5_000;
 const MAX_JSON_BYTES: u64 = 50 * 1024 * 1024;
@@ -99,7 +99,7 @@ fn validate_transfer_name(name: &str) -> CmdResult<&str> {
     Ok(name)
 }
 
-fn transfer_path(app: &AppHandle, name: &str) -> CmdResult<PathBuf> {
+pub(crate) fn transfer_path(app: &AppHandle, name: &str) -> CmdResult<PathBuf> {
     validate_transfer_name(name)?;
     let cache = app
         .path()

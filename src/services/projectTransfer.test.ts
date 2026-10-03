@@ -1,239 +1,124 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { externalProjectRef } from './projectRef'
+import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
+import { externalProjectRef, managedProjectRef } from './projectRef'
 
-const mocks = vi.hoisted(() => ({
-  open: vi.fn(),
-  openFile: vi.fn(),
-  save: vi.fn(),
-  mkdir: vi.fn(),
-  copyFile: vi.fn(),
-  remove: vi.fn(),
-  importBundle: vi.fn(),
-  exportBundle: vi.fn(),
-  uuid: vi.fn(() => '00000000-0000-0000-0000-000000000001'),
+const { invoke, isTauri } = vi.hoisted(() => ({ invoke: vi.fn(), isTauri: vi.fn(() => true) }))
+const { pickProject, readPhoto, importBrowserProjectBundle, exportProjectBundleToStream } = vi.hoisted(() => ({
+  pickProject: vi.fn(), readPhoto: vi.fn(), importBrowserProjectBundle: vi.fn(), exportProjectBundleToStream: vi.fn(),
 }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke, isTauri }))
+vi.mock('./storage', () => ({ pickProject, readPhoto }))
+vi.mock('./storage/browserDirectory', () => ({ importBrowserProjectBundle }))
+vi.mock('./storage/projectBundle', () => ({ exportProjectBundleToStream }))
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open, save: mocks.save }))
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  BaseDirectory: { AppCache: 16 },
-  mkdir: mocks.mkdir,
-  open: mocks.openFile,
-  copyFile: mocks.copyFile,
-  remove: mocks.remove,
-}))
-vi.mock('uuid', () => ({ v4: mocks.uuid }))
-vi.mock('./projectRepository', () => ({
-  projectRepository: {
-    importBundle: mocks.importBundle,
-    exportBundle: mocks.exportBundle,
-  },
-}))
+import { exportProjectBundle, importProjectBundle, prepareProjectBundleExport } from './projectTransfer'
 
-import { exportProjectBundle, importProjectBundle } from './projectTransfer'
-
-const transferName = '00000000-0000-0000-0000-000000000001.familybundle'
-const imported = {
-  project: { kind: 'managed', id: 'managed-id' },
-  meta: { name: '测试', schemaVersion: 4, createdAt: 'now', updatedAt: 'now' },
-}
-
-function readableFile(bytes: Uint8Array, maxRead = bytes.length) {
-  let offset = 0
-  return {
-    read: vi.fn(async (buffer: Uint8Array) => {
-      if (offset === bytes.length) return null
-      const count = Math.min(buffer.length, maxRead, bytes.length - offset)
-      buffer.set(bytes.subarray(offset, offset + count))
-      offset += count
-      return count
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-  }
-}
-
-function writableFile(maxWrite = Infinity) {
-  const received: number[] = []
-  return {
-    received,
-    write: vi.fn(async (bytes: Uint8Array) => {
-      const count = Math.min(maxWrite, bytes.length)
-      received.push(...bytes.subarray(0, count))
-      return count
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-  }
-}
-
-describe('project bundle transfers', () => {
+describe('native project bundle transfers', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    mocks.uuid.mockReturnValue('00000000-0000-0000-0000-000000000001')
-    mocks.mkdir.mockResolvedValue(undefined)
-    // Native copyFile resolves filesystem paths and rejects Android content URIs.
-    mocks.copyFile.mockRejectedValue(new Error('invalid path URL'))
-    mocks.remove.mockResolvedValue(undefined)
-    mocks.open.mockResolvedValue('content://picked-bundle')
-    mocks.save.mockResolvedValue('content://export-target')
-    mocks.importBundle.mockResolvedValue(imported)
-    mocks.exportBundle.mockResolvedValue({
-      transferName: 'generated.familybundle',
-      suggestedName: '测试.familybundle',
-    })
+    isTauri.mockReturnValue(true)
   })
 
-  it('streams a picked content URI to AppCache with bounded reads and complete short writes', async () => {
-    const bytes = Uint8Array.from({ length: 150_003 }, (_, index) => index % 251)
-    const source = readableFile(bytes, 20_003)
-    const destination = writableFile(4_097)
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-    mocks.importBundle.mockImplementation(async () => {
-      expect(source.close).toHaveBeenCalledOnce()
-      expect(destination.close).toHaveBeenCalledOnce()
-      expect(Uint8Array.from(destination.received)).toEqual(bytes)
-      return imported
-    })
-
-    await expect(importProjectBundle()).resolves.toEqual(imported)
-
-    expect(mocks.openFile).toHaveBeenNthCalledWith(1, 'content://picked-bundle', { read: true })
-    expect(mocks.openFile).toHaveBeenNthCalledWith(2, `transfers/${transferName}`, {
-      write: true, create: true, truncate: true, baseDir: 16,
-    })
-    expect(source.read.mock.calls.length).toBeGreaterThan(2)
-    const buffers = source.read.mock.calls.map(([buffer]) => buffer)
-    expect(new Set(buffers).size).toBe(1)
-    expect(buffers[0].byteLength).toBe(64 * 1024)
-    expect(mocks.copyFile).not.toHaveBeenCalled()
-    expect(mocks.importBundle).toHaveBeenCalledWith(transferName)
-    expect(mocks.remove).toHaveBeenCalledWith(
-      `transfers/${transferName}`, { baseDir: 16 },
-    )
+  it('imports the selected bundle through native IO and maps the managed project', async () => {
+    const meta = createEmptyMeta('手机家族')
+    invoke.mockResolvedValue({ project: { kind: 'managed', id: 'managed-id' }, meta })
+    await expect(importProjectBundle()).resolves.toEqual({ project: managedProjectRef('managed-id', '手机家族'), meta })
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('import_project_bundle_from_picker')
   })
 
-  it('streams an exported cache file into the selected content URI', async () => {
-    const project = externalProjectRef('/tmp/test.family')
-    const bytes = new Uint8Array([0, 255, 17, 42, 128])
-    const source = readableFile(bytes)
-    const destination = writableFile(2)
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-
-    await expect(exportProjectBundle(project)).resolves.toBe(true)
-
-    expect(mocks.openFile).toHaveBeenNthCalledWith(1, 'transfers/generated.familybundle', {
-      read: true, baseDir: 16,
-    })
-    expect(mocks.openFile).toHaveBeenNthCalledWith(2, 'content://export-target', {
-      write: true, create: true, truncate: true,
-    })
-    expect(Uint8Array.from(destination.received)).toEqual(bytes)
-    expect(source.close).toHaveBeenCalledOnce()
-    expect(destination.close).toHaveBeenCalledOnce()
-    expect(mocks.copyFile).not.toHaveBeenCalled()
-    expect(mocks.remove).toHaveBeenCalledWith(
-      'transfers/generated.familybundle', { baseDir: 16 },
-    )
-  })
-
-  it('closes the source and cleans staging if opening the destination fails', async () => {
-    const source = readableFile(new Uint8Array([1]))
-    const error = new Error('destination unavailable')
-    mocks.openFile.mockResolvedValueOnce(source).mockRejectedValueOnce(error)
-
-    await expect(importProjectBundle()).rejects.toBe(error)
-
-    expect(source.close).toHaveBeenCalledOnce()
-    expect(mocks.importBundle).not.toHaveBeenCalled()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('closes both handles and removes the exported cache when reading fails', async () => {
-    const source = readableFile(new Uint8Array([1]))
-    const destination = writableFile()
-    const error = new Error('read failed')
-    source.read.mockRejectedValueOnce(error)
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-
-    await expect(exportProjectBundle(externalProjectRef('/tmp/test.family'))).rejects.toBe(error)
-
-    expect(source.close).toHaveBeenCalledOnce()
-    expect(destination.close).toHaveBeenCalledOnce()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('preserves a write failure while attempting both closes and cleaning staging', async () => {
-    const source = readableFile(new Uint8Array([1]))
-    const destination = writableFile()
-    const error = new Error('write failed')
-    destination.write.mockRejectedValueOnce(error)
-    source.close.mockRejectedValueOnce(new Error('close failed'))
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-
-    await expect(importProjectBundle()).rejects.toBe(error)
-
-    expect(source.close).toHaveBeenCalledOnce()
-    expect(destination.close).toHaveBeenCalledOnce()
-    expect(mocks.importBundle).not.toHaveBeenCalled()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('rejects a zero-byte write instead of retrying indefinitely', async () => {
-    const source = readableFile(new Uint8Array([1]))
-    const destination = writableFile(0)
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-
-    await expect(importProjectBundle()).rejects.toThrow('备份文件写入未取得进展')
-
-    expect(destination.write).toHaveBeenCalledOnce()
-    expect(source.close).toHaveBeenCalledOnce()
-    expect(destination.close).toHaveBeenCalledOnce()
-    expect(mocks.importBundle).not.toHaveBeenCalled()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('reports a close failure, still closes the other handle, and removes staging', async () => {
-    const source = readableFile(new Uint8Array([1]))
-    const destination = writableFile()
-    const error = new Error('close failed')
-    source.close.mockRejectedValueOnce(error)
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-
-    await expect(importProjectBundle()).rejects.toBe(error)
-
-    expect(destination.close).toHaveBeenCalledOnce()
-    expect(mocks.importBundle).not.toHaveBeenCalled()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('cleans staging when the completed bundle is rejected by the repository', async () => {
-    const source = readableFile(new Uint8Array([1]))
-    const destination = writableFile()
-    const error = new Error('invalid bundle')
-    mocks.openFile.mockResolvedValueOnce(source).mockResolvedValueOnce(destination)
-    mocks.importBundle.mockRejectedValueOnce(error)
-
-    await expect(importProjectBundle()).rejects.toBe(error)
-
-    expect(source.close).toHaveBeenCalledOnce()
-    expect(destination.close).toHaveBeenCalledOnce()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('cleans the generated cache file when export is cancelled', async () => {
-    mocks.save.mockResolvedValue(null)
-
-    await expect(exportProjectBundle(externalProjectRef('/tmp/test.family'))).resolves.toBe(false)
-
-    expect(mocks.openFile).not.toHaveBeenCalled()
-    expect(mocks.remove).toHaveBeenCalledOnce()
-  })
-
-  it('does not stage anything when import is cancelled', async () => {
-    mocks.open.mockResolvedValue(null)
-
+  it('does not open a project when the native picker is cancelled', async () => {
+    invoke.mockResolvedValue(null)
     await expect(importProjectBundle()).resolves.toBeNull()
+  })
 
-    expect(mocks.openFile).not.toHaveBeenCalled()
-    expect(mocks.mkdir).not.toHaveBeenCalled()
-    expect(mocks.remove).not.toHaveBeenCalled()
+  it.each([
+    { project: externalProjectRef('/tmp/test.family'), wire: { kind: 'external', path: '/tmp/test.family' } },
+    { project: managedProjectRef('managed-id'), wire: { kind: 'managed', id: 'managed-id' } },
+  ])('exports $wire.kind through the bounded native transfer', async ({ project, wire }) => {
+    invoke.mockResolvedValue(true)
+    await expect(exportProjectBundle(project)).resolves.toBe(true)
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('export_project_bundle_to_picker', { project: wire })
+  })
+
+  it('preserves native cancellation, IO failures and archive limits', async () => {
+    invoke.mockResolvedValueOnce(false)
+    await expect(exportProjectBundle(externalProjectRef('/tmp/test.family'))).resolves.toBe(false)
+    for (const message of ['备份包超过 512 MiB 限制', 'read failed', 'write failed', 'flush failed', 'invalid bundle']) {
+      const error = new Error(message)
+      invoke.mockRejectedValueOnce(error)
+      await expect(importProjectBundle()).rejects.toBe(error)
+    }
+  })
+
+  it('rejects other providers without granting a native file operation', async () => {
+    await expect(exportProjectBundle({ providerId: 'drive', id: 'id', displayName: '远端家族' }))
+      .rejects.toThrow('不支持原生项目传输')
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('does not call native IO from a browser', async () => {
+    isTauri.mockReturnValue(false)
+    await expect(importProjectBundle()).rejects.toThrow('先选择家族备份')
+    expect(invoke).not.toHaveBeenCalled()
+  })
+})
+
+describe('browser project bundle transfers', () => {
+  const project = { providerId: 'browser-directory', id: 'opaque-id', displayName: '家族' }
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.unstubAllGlobals()
+    isTauri.mockReturnValue(false)
+  })
+
+  it('selects the export destination immediately but writes only the supplied saved snapshot', async () => {
+    const output = new WritableStream<Uint8Array>()
+    const createWritable = vi.fn(async () => output)
+    const picker = vi.fn(async () => ({ name: '家族.familybundle', createWritable }))
+    vi.stubGlobal('window', { showSaveFilePicker: picker })
+    const pending = prepareProjectBundleExport(project)
+    expect(picker).toHaveBeenCalledOnce()
+    const runExport = await pending
+    expect(createWritable).not.toHaveBeenCalled()
+    const snapshot = { meta: createEmptyMeta('家族'), family: createEmptyFamily() }
+    await expect(runExport!(snapshot)).resolves.toBe(true)
+    expect(exportProjectBundleToStream).toHaveBeenCalledWith(expect.objectContaining(snapshot), output)
+    expect(invoke).not.toHaveBeenCalled()
+    await expect(runExport!(snapshot)).rejects.toThrow('重新选择')
+  })
+
+  it('keeps export cancellation and invalid extensions from opening a writer', async () => {
+    const picker = vi.fn().mockRejectedValueOnce(new DOMException('cancel', 'AbortError'))
+    vi.stubGlobal('window', { showSaveFilePicker: picker })
+    await expect(prepareProjectBundleExport(project)).resolves.toBeNull()
+    const createWritable = vi.fn()
+    picker.mockResolvedValueOnce({ name: 'family.json', createWritable })
+    await expect(prepareProjectBundleExport(project)).rejects.toThrow('.familybundle')
+    expect(createWritable).not.toHaveBeenCalled()
+  })
+
+  it('requires an explicit snapshot without reopening the project or resetting its conflict baseline', async () => {
+    const createWritable = vi.fn()
+    vi.stubGlobal('window', { showSaveFilePicker: vi.fn(async () => ({ name: 'x.familybundle', createWritable })) })
+    await expect(exportProjectBundle(project)).rejects.toThrow('已保存的项目快照')
+    expect(createWritable).not.toHaveBeenCalled()
+  })
+
+  it('selects an empty import directory in the click chain and preserves its opaque reference', async () => {
+    const file = new File(['zip'], '迁移.familybundle')
+    const meta = createEmptyMeta('迁移')
+    pickProject.mockResolvedValue(project)
+    importBrowserProjectBundle.mockResolvedValue({ id: project.id, displayName: project.displayName, meta })
+    const pending = importProjectBundle(file)
+    expect(pickProject).toHaveBeenCalledWith('browser-directory', 'create')
+    await expect(pending).resolves.toEqual({ project, meta })
+    expect(importBrowserProjectBundle).toHaveBeenCalledWith(project.id, file)
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('does not read or extract an archive after directory selection cancellation', async () => {
+    pickProject.mockResolvedValue(null)
+    await expect(importProjectBundle(new File([], 'x.familybundle'))).resolves.toBeNull()
+    expect(importBrowserProjectBundle).not.toHaveBeenCalled()
   })
 })

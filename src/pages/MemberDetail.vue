@@ -5,13 +5,12 @@ import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { flushNow } from '@/services/autosave'
-import { projectRepository } from '@/services/projectRepository'
+import { deletePhoto, type ProjectRef } from '@/services/storage'
 import MemberForm from '@/components/member/MemberForm.vue'
 import RelationEditor from '@/components/member/RelationEditor.vue'
 import SiblingOrderEditor from '@/components/member/SiblingOrderEditor.vue'
 import { getKinship } from '@/core/kinship'
-import type { Member } from '@/core/schema'
-import type { ProjectRef } from '@/services/projectRef'
+import type { FamilyData, Member } from '@/core/schema'
 
 const props = defineProps<{ id: string }>()
 
@@ -25,7 +24,11 @@ const member = computed(() => family.getMember(props.id))
 
 // 表单本地副本
 const draft = ref<Member | null>(null)
-const stagedPhotos = new Map<string, ProjectRef>()
+const stagedPhotos = new Map<string, {
+  photoId: string
+  project: ProjectRef
+  data: FamilyData
+}>()
 
 watch(
   member,
@@ -104,25 +107,24 @@ async function onBack() {
 }
 
 function onMediaStaged(photoId: string) {
-  if (!family.projectRef) return
-  stagedPhotos.set(photoId, family.projectRef)
+  const project = family.projectRef
+  if (!project) return
+  const key = JSON.stringify([project.providerId, project.id, photoId])
+  stagedPhotos.set(key, { photoId, project, data: family.data })
 }
 
 async function discardUnreferencedStagedPhotos() {
   if (stagedPhotos.size === 0) return
-  const referencedPhotoIds = new Set(
-    family.membersArray
-      .map(value => value.photoId)
-      .filter((value): value is string => value !== undefined),
-  )
-  for (const [photoId, project] of [...stagedPhotos]) {
-    if (referencedPhotoIds.has(photoId)) {
-      stagedPhotos.delete(photoId)
+  for (const [key, staged] of [...stagedPhotos]) {
+    const { photoId, project, data } = staged
+    // 使用照片所属项目的数据判断引用，不能拿切换后的项目决定是否删除。
+    if (Object.values(data.members).some(value => value.photoId === photoId)) {
+      stagedPhotos.delete(key)
       continue
     }
     try {
-      await projectRepository.deletePhoto(project, photoId)
-      stagedPhotos.delete(photoId)
+      await deletePhoto(project, photoId)
+      stagedPhotos.delete(key)
     } catch (e) {
       ui.showToast('error', '暂存照片清理失败：' + (e instanceof Error ? e.message : String(e)))
     }
@@ -157,6 +159,7 @@ onBeforeUnmount(() => {
         <div v-if="!draft" class="text-slate-400">找不到该成员。</div>
         <MemberForm
           v-else
+          :key="`${family.projectToken}:${id}`"
           v-model="draft"
           @save="onSave"
           @cancel="onCancel"

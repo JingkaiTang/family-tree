@@ -8,15 +8,15 @@ import { flushNow } from '@/services/autosave'
 import TreeLayoutHost from '@/components/tree/TreeLayoutHost.vue'
 import SearchBar from '@/components/search/SearchBar.vue'
 import { getKinship } from '@/core/kinship'
-import { projectRepository } from '@/services/projectRepository'
+import { authorizeProject, gcMedia, supportsMediaGc } from '@/services/storage'
 import { v4 as uuidv4 } from 'uuid'
 import type { LayoutModePreference } from '@/core/layoutMode'
-import { exportProjectBundle } from '@/services/projectTransfer'
+import { prepareProjectBundleExport } from '@/services/projectTransfer'
 
 const router = useRouter()
 const family = useFamilyStore()
 const ui = useUiStore()
-const { projectMeta, projectPath, memberCount, isDirty, membersArray, data } = storeToRefs(family)
+const { projectMeta, projectRef, memberCount, isDirty, membersArray, data } = storeToRefs(family)
 const {
   viewpointId,
   selectedId,
@@ -36,6 +36,7 @@ const saveStatus = computed(() => {
 })
 
 const rootId = computed(() => data.value.rootMemberId)
+const canGcMedia = computed(() => !!projectRef.value && supportsMediaGc(projectRef.value))
 const layoutResetVersion = ref(0)
 const exporting = ref(false)
 const canRestoreDefaultLayout = computed(() => {
@@ -89,22 +90,40 @@ async function onBack() {
 }
 
 async function onSaveNow() {
+  const project = family.projectRef
+  const projectToken = family.projectToken
+  if (!project) return
   try {
+    await authorizeProject(project)
+    if (family.projectToken !== projectToken) return
     await flushNow()
+    if (family.projectToken !== projectToken) return
     ui.showToast('success', '已保存')
   } catch (e) {
+    if (family.projectToken !== projectToken) return
     ui.showToast('error', '保存失败：' + (e instanceof Error ? e.message : String(e)))
   }
 }
 
 async function onExportBundle() {
-  if (!family.projectRef || exporting.value) return
+  const project = family.projectRef
+  if (!project || exporting.value) return
+  const projectToken = family.projectToken
   try {
     exporting.value = true
+    const runExport = await prepareProjectBundleExport(project)
+    if (!runExport || family.projectToken !== projectToken) return
     await flushNow()
-    const exported = await exportProjectBundle(family.projectRef)
+    if (family.projectToken !== projectToken) return
+    if (!family.projectMeta) return
+    const exported = await runExport({
+      meta: { ...family.projectMeta },
+      family: JSON.parse(JSON.stringify(family.data)),
+    })
+    if (family.projectToken !== projectToken) return
     if (exported) ui.showToast('success', '家族备份已导出')
   } catch (e) {
+    if (family.projectToken !== projectToken) return
     ui.showToast('error', '导出失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     exporting.value = false
@@ -171,16 +190,20 @@ function kinshipResolver(fromId: string, toId: string): string | null {
 }
 
 async function onGcMedia() {
-  if (!family.projectRef) return
+  const project = family.projectRef
+  if (!project || !supportsMediaGc(project)) return
+  const projectToken = family.projectToken
   try {
     const usedIds = family.membersArray.map((m) => m.photoId).filter((x): x is string => !!x)
-    const trashed = await projectRepository.gcMedia(family.projectRef, usedIds)
+    const trashed = await gcMedia(project, usedIds)
+    if (family.projectToken !== projectToken) return
     if (trashed > 0) {
-      ui.showToast('success', `已清理 ${trashed} 张未使用的照片到 .trash/`)
+      ui.showToast('success', `已清理 ${trashed} 张未使用的照片`)
     } else {
       ui.showToast('info', '没有需要清理的照片')
     }
   } catch (e) {
+    if (family.projectToken !== projectToken) return
     ui.showToast('error', '清理失败：' + (e instanceof Error ? e.message : String(e)))
   }
 }
@@ -253,7 +276,7 @@ function seedFixture() {
       <div class="flex min-w-0 items-center justify-between gap-3">
         <div class="min-w-0">
           <h2 class="truncate text-lg font-semibold">{{ projectMeta?.name ?? '（未打开项目）' }}</h2>
-          <p class="hidden truncate text-xs text-slate-400 md:block">{{ projectPath }}</p>
+          <p class="hidden truncate text-xs text-slate-400 md:block">{{ projectRef?.displayName }}</p>
         </div>
         <button class="shrink-0 text-sm text-slate-500 hover:text-slate-900 sm:hidden" @click="onBack">返回</button>
       </div>
@@ -343,8 +366,9 @@ function seedFixture() {
           {{ exporting ? '导出中…' : '导出备份' }}
         </button>
         <button
+          v-if="canGcMedia"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"
-          title="把未被任何成员引用的照片移入 .trash/"
+          title="清理未被任何成员引用的照片"
           @click="onGcMedia"
         >
           清理未用照片

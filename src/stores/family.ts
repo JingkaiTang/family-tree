@@ -26,7 +26,8 @@ import {
   reconcileSiblingOrders,
 } from '@/core/siblingOrder'
 import { setLastProjectRef } from '@/services/prefs'
-import { projectRefLocation, type ProjectRef } from '@/services/projectRef'
+import { projectRefLocation } from '@/services/projectRef'
+import type { ProjectRef } from '@/services/storage/types'
 
 /**
  * family store 的职责：
@@ -56,11 +57,15 @@ export const useFamilyStore = defineStore('family', () => {
     projectToken.value += 1
     isDirty.value = false
     revision.value = 0
-    projectRef.value = project
+    projectRef.value = {
+      providerId: project.providerId,
+      id: project.id,
+      displayName: project.displayName,
+    }
     projectMeta.value = meta
     data.value = family
     lastSavedAt.value = Date.now()
-    setLastProjectRef(project)
+    setLastProjectRef(projectRef.value)
   }
 
   function closeProject() {
@@ -89,8 +94,9 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function markDirty() {
-    revision.value += 1
     isDirty.value = true
+    // autosave 同步订阅 revision；首个变更也必须先处于 dirty 状态。
+    revision.value += 1
   }
 
   // ---------------- Member CRUD ----------------

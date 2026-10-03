@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
-import { externalProjectRef } from './projectRef'
+import { externalProjectRef, managedProjectRef } from './projectRef'
 
 const invoke = vi.hoisted(() => vi.fn())
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke, isTauri: () => true }))
 
 import { projectRepository } from './projectRepository'
+import { loadProject } from './storage'
 
 describe('Tauri project repository', () => {
   beforeEach(() => invoke.mockReset())
@@ -14,48 +15,37 @@ describe('Tauri project repository', () => {
   it('passes external references through the unified command contract', async () => {
     const project = externalProjectRef('/tmp/test.family')
     invoke.mockResolvedValue({
-      project,
+      project: { kind: 'external', path: project.id },
       meta: createEmptyMeta('测试'),
       family: createEmptyFamily(),
     })
 
-    const loaded = await projectRepository.load(project)
+    const loaded = await loadProject(project)
 
-    expect(invoke).toHaveBeenCalledWith('load_project', { project })
-    expect(loaded.project).toBe(project)
+    expect(invoke).toHaveBeenCalledWith('load_project', { project: { kind: 'external', path: project.id } })
+    expect(loaded.ref).toEqual(project)
   })
 
   it('passes managed references without exposing an AppData path', async () => {
-    const project = { kind: 'managed', id: 'local-id' } as const
+    const project = managedProjectRef('local-id', '测试')
     invoke.mockResolvedValue({
-      project,
+      project: { kind: 'managed', id: project.id },
       meta: createEmptyMeta('测试'),
       family: createEmptyFamily(),
     })
 
-    await expect(projectRepository.load(project)).resolves.toMatchObject({ project })
-    expect(invoke).toHaveBeenCalledWith('load_project', { project })
+    await expect(loadProject(project)).resolves.toMatchObject({ ref: project })
+    expect(invoke).toHaveBeenCalledWith('load_project', { project: { kind: 'managed', id: project.id } })
   })
 
   it('lists managed projects through the AppData catalog command', async () => {
-    invoke.mockResolvedValue([])
+    const meta = createEmptyMeta('手机项目')
+    invoke.mockResolvedValue([{ project: { kind: 'managed', id: 'local-id' }, meta }])
 
-    await expect(projectRepository.listManaged()).resolves.toEqual([])
+    await expect(projectRepository.listManaged()).resolves.toEqual([
+      { project: managedProjectRef('local-id', '手机项目'), meta },
+    ])
     expect(invoke).toHaveBeenCalledWith('list_managed_projects')
   })
 
-  it('uses cache transfer tokens for bundle import and export', async () => {
-    const project = externalProjectRef('/tmp/test.family')
-    invoke
-      .mockResolvedValueOnce({ transferName: 'token.familybundle', suggestedName: '测试.familybundle' })
-      .mockResolvedValueOnce({ project: { kind: 'managed', id: 'managed-id' }, meta: createEmptyMeta('测试') })
-
-    await projectRepository.exportBundle(project)
-    await projectRepository.importBundle('token.familybundle')
-
-    expect(invoke).toHaveBeenNthCalledWith(1, 'export_project_bundle', { project })
-    expect(invoke).toHaveBeenNthCalledWith(2, 'import_project_bundle', {
-      transferName: 'token.familybundle',
-    })
-  })
 })

@@ -1,9 +1,9 @@
 import { watch, type WatchStopHandle } from 'vue'
 import type { FamilyData } from '@/core/schema'
+import type { ProjectRef } from '@/services/storage/types'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { saveProject } from './projectService'
-import type { ProjectRef } from './projectRef'
 
 const DEBOUNCE_MS = 800
 
@@ -82,7 +82,7 @@ export function createAutosaveController(
   function snapshot() {
     if (!family.projectRef || !family.isDirty) return null
     return {
-      project: family.projectRef,
+      project: { ...family.projectRef },
       projectToken: family.projectToken,
       revision: family.revision,
       data: JSON.parse(JSON.stringify(family.data)) as FamilyData,

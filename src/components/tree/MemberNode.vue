@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
-import { projectRepository } from '@/services/projectRepository'
+import { resolvePhotoUrl } from '@/services/storage'
 import DefaultAvatar from '@/components/member/DefaultAvatar.vue'
 import { getDefaultAvatarAgeBand } from '@/core/defaultAvatar'
 
@@ -48,22 +48,22 @@ function replacePhotoUrl(next: string | null) {
 }
 
 watch(
-  () => [props.member.photoId, family.projectRef] as const,
-  async ([photoId, project]) => {
+  () => [props.member.photoId, family.projectToken] as const,
+  async ([photoId]) => {
+    const project = family.projectRef
+    const projectToken = family.projectToken
     const request = ++photoRequest
-    if (!photoId || !project) {
-      replacePhotoUrl(null)
-      return
-    }
+    replacePhotoUrl(null)
+    if (!photoId || !project) return
     try {
-      const next = await projectRepository.resolvePhotoUrl(project, photoId, true)
-      if (request !== photoRequest) {
+      const next = await resolvePhotoUrl(project, photoId, true)
+      if (request !== photoRequest || projectToken !== family.projectToken) {
         if (next.startsWith('blob:')) URL.revokeObjectURL(next)
         return
       }
       replacePhotoUrl(next)
     } catch {
-      if (request === photoRequest) replacePhotoUrl(null)
+      if (request === photoRequest && projectToken === family.projectToken) replacePhotoUrl(null)
     }
   },
   { immediate: true },

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
-import { projectRepository } from '@/services/projectRepository'
+import { resolvePhotoUrl } from '@/services/storage'
 import DefaultAvatar from '@/components/member/DefaultAvatar.vue'
 import { getDefaultAvatarAgeBand } from '@/core/defaultAvatar'
 
@@ -24,21 +24,27 @@ const photoUrl = ref<string | null>(null)
 let photoRequest = 0
 const ageBand = computed(() => getDefaultAvatarAgeBand(props.member))
 
+function replacePhotoUrl(next: string | null) {
+  const previous = photoUrl.value
+  if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
+  photoUrl.value = next
+}
+
 watch(
-  () => [props.member.photoId, family.projectRef] as const,
-  async ([photoId, project]) => {
+  () => [props.member.photoId, family.projectToken] as const,
+  async ([photoId]) => {
+    const project = family.projectRef
+    const projectToken = family.projectToken
     const request = ++photoRequest
-    const previous = photoUrl.value
-    if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous)
-    photoUrl.value = null
+    replacePhotoUrl(null)
     if (!photoId || !project) return
     try {
-      const next = await projectRepository.resolvePhotoUrl(project, photoId, true)
-      if (request !== photoRequest) {
+      const next = await resolvePhotoUrl(project, photoId, true)
+      if (request !== photoRequest || projectToken !== family.projectToken) {
         if (next.startsWith('blob:')) URL.revokeObjectURL(next)
         return
       }
-      photoUrl.value = next
+      replacePhotoUrl(next)
     } catch {
       // 照片读取失败时使用确定性的默认头像。
     }
@@ -48,7 +54,7 @@ watch(
 
 onBeforeUnmount(() => {
   photoRequest += 1
-  if (photoUrl.value?.startsWith('blob:')) URL.revokeObjectURL(photoUrl.value)
+  replacePhotoUrl(null)
 })
 
 const fullName = computed(() => (

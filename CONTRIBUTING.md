@@ -11,14 +11,19 @@
 
 ## 本地开发
 
-需要 Node.js 20+、Rust stable，以及当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)。
+Web 开发需要 Node.js 20.19+（20.x）或 22.12+；直接 `npm run dev` 即可使用普通目录存储。只有原生宿主开发和 Rust 验证需要 Rust stable 及当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)。部署说明见 [Web/PWA](docs/web-deployment.md)。
 
 ```bash
 npm ci
 npm test
 npm run build
+npm run test:e2e
 npm run test:layout-perf
+```
 
+原生改动继续执行：
+
+```bash
 cd src-tauri
 cargo fmt --all -- --check
 cargo test --locked
@@ -27,6 +32,8 @@ cargo audit
 ```
 
 `cargo audit` 需要先安装 [cargo-audit](https://github.com/rustsec/rustsec/tree/main/cargo-audit)；CI 会通过 RustSec 官方 Action 执行同类检查。
+
+`test:e2e` 使用 Playwright：可通过 `npx playwright install chromium` 安装浏览器；配置会优先使用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`，否则尝试 `/usr/bin/chromium` 或 Playwright 自带版本。无头测试用真实 OPFS 句柄替代系统目录选择器，覆盖浏览器 IO 和句柄持久化；生产不使用 OPFS，系统授权和手机文档提供程序仍需真机验收。生产 PWA 的离线启动与等待更新应使用构建产物另行验证，开发服务器 E2E 不覆盖 Service Worker。
 
 ### 平台构建提示
 
@@ -42,7 +49,9 @@ cargo audit
 - 项目格式变更必须递增 `SCHEMA_VERSION`、添加迁移和回归测试，并同步 `docs/project-format.md`。
 - 布局核心必须保持确定性的纯函数；浏览器入口通过 Web Worker 调用，Node 测试保留同步入口。
 - Vue 组件负责交互编排，领域计算应进入 `src/core` 或可单测的纯模型。
-- 文件系统访问只能经过受校验的 Tauri 命令；不要重新开放宽泛的 fs 或 asset protocol 权限。
+- 所有项目/媒体 IO 经过统一 `ProjectStorageProvider`，UI 和领域逻辑不解释具体路径或调用平台读写。浏览器仅使用用户授权的普通目录；原生文件系统访问只能经过受校验的 Tauri 命令，不重新开放宽泛的 fs 或 asset protocol 权限。
+- 平台差异留在适配器与宿主交互中，桌面、Web/PWA 和移动端共享界面及领域代码。Web 不支持目录 API 时明确提示，不静默改存浏览器私有空间。
+- 保存成功必须表示已完成当前提供商的持久化；多文件事务、跨来源/原生并发和未来云盘版本冲突不可用进程内修订号代替。
 - 只修改当前任务需要的代码，不在同一 PR 中夹带无关格式化或重构。
 
 更完整的边界说明见 [架构文档](docs/architecture.md)。

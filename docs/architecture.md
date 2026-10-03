@@ -1,6 +1,6 @@
 # 架构说明
 
-本文描述 Family Tree 当前 alpha 架构、关键边界和贡献时必须保持的约束。
+本文描述 Family Tree 当前 alpha 架构、关键边界和贡献时必须保持的约束。Web/PWA 是共享应用入口；桌面和手机复用同一套 Vue UI、领域逻辑和 IO 契约，Tauri 保留为提供平台能力的可选宿主，尤其用于 iOS 与已有原生项目。
 
 ## 总体分层
 
@@ -17,24 +17,27 @@ Pinia stores ───────────────► core/* 领域纯�
 autosave / projectService
         │ schema + 图完整性校验
         ▼
-projectRepository / projectTransfer
-        │ 统一 ProjectRef + 最小 IPC 命令
+services/storage / projectTransfer
+        │ 按提供商路由 ProjectRef
         ▼
-Rust commands
-        │ 路径/大小/媒体 ID 校验、原子写入
-        ▼
-外部 .family 目录 / AppData 托管项目
+browser-directory        tauri-local / tauri-managed
+        │                         │ 最小 IPC
+浏览器目录句柄              受控 Rust commands
+        │                         │
+用户普通 .family 目录        外部目录 / AppData 托管项目
 ```
 
 ## 前端职责
 
 - `src/pages` 负责页面级流程，例如创建/打开项目、选择成员和路由。
 - `src/stores` 是当前项目会话的单一状态源。每次受控变更递增 `revision`；切换项目递增 `projectToken`。
-- `src/services/autosave.ts` 对不可变快照串行保存。只有保存结果仍匹配同一 `projectToken` 和 `revision` 时才清除脏状态；关闭窗口必须等待当前保存结束。
-- `src/services/projectRepository.ts` 用 `ProjectRef` 统一桌面外部目录与移动端 AppData 托管项目；上层 Store 和媒体流程不持有裸路径。
-- `src/services/projectTransfer.ts` 只通过受限 AppCache 暂存文件，在系统文档选择器与 Rust 备份命令之间传递 `.familybundle`。
+- `src/services/autosave.ts` 对不可变快照串行保存。只有保存结果仍匹配同一 `projectToken` 和 `revision` 时才清除脏状态；应用内关闭项目与原生关窗等待保存，浏览器关闭页面仅能提示和尽力刷新，不能保证页面销毁后继续写入。
+- `src/services/storage` 是项目和媒体 IO 入口，使用 `{ providerId, id, displayName }` 路由到 `browser-directory`、`tauri-local` 或 `tauri-managed`。上层不解释目录路径、浏览器句柄或未来云盘文件 ID；接口与扩展契约见 [storage.md](storage.md)。
+- `src/services/projectRepository.ts` 保留原生托管目录列表能力，媒体与普通项目读写统一经过存储接口。
+- `src/services/projectTransfer.ts` 编排所选提供商的备份传输。浏览器选择文件/空目录，通过 ZIP 流处理共享归档；原生由 Rust 完成系统选择器、有界传输与 AppCache 清理，WebView 不执行通用文件 IO。
 - `src/services/projectService.ts` 是项目格式边界：打开时迁移并验证，保存前再次进行 Zod 和跨成员图校验。
 - `src/core` 不依赖 Vue 或 Tauri，承载 schema、迁移、关系完整性、称谓与布局算法。
+- PWA 的 Service Worker 仅缓存构建静态资源，不存储项目或媒体，不在 Tauri 中注册；新版本等待旧窗口自然关闭，不强制刷新编辑页面。
 
 ## 家族布局
 
@@ -74,31 +77,36 @@ Rust commands
 保存链路如下：
 
 1. Store 变更产生新的修订号。
-2. Autosave 捕获当前项目令牌、修订号和结构化克隆快照。
+2. Autosave 捕获完整项目引用、当前项目令牌、修订号和数据快照。
 3. `projectService` 校验 schema 与关系图不变量。
-4. Rust 命令确认目录是包含 `meta.json` 和 `family.json` 的真实项目根。
-5. Rust 轮转三份 `family.json.bak.N`，再通过同目录临时文件和 rename 写入。
+4. 存储接口按完整项目引用选择提供商，适配器检查目录权限、项目标记和文件大小。
+5. 两种实现均保留三份 `family.json.bak.N`。原生由 Rust 同目录临时文件加 rename 写入；浏览器使用 `createWritable()`，成功 `close()` 后才确认提交，写前比较磁盘内容以发现外部修改。
 6. 成功结果仍属于当前修订时，Store 才标记为已保存。
 
-浏览器页面隐藏或进入 `pagehide` 时会立即刷新同一个串行保存队列，以降低移动端 WebView 被系统冻结前的数据窗口。iOS/Android 的项目根固定在 AppData 的 `projects/<uuid>.family`；桌面端继续使用用户选择的外部目录。
+浏览器页面隐藏或进入 `pagehide` 时会立即刷新同一个串行保存队列，以降低系统冻结前的数据窗口；这不保证页面被杀死后完成写入。Web 目录句柄存于 IndexedDB，项目文件仍在用户目录；原生 iOS/Android 的项目根固定在 AppData 的 `projects/<uuid>.family`。
 
-照片先写入独立媒体文件并作为暂存 ID 传递。成员保存成功后该 ID 才成为项目引用；取消或组件卸载会回收未引用的暂存媒体。旧照片由显式删除或媒体 GC 移入 `.trash`。
+浏览器同来源窗口使用 Web Locks 串行目录操作，但不同来源、原生应用与外部编辑器不共享这把锁。磁盘内容比较也不是跨进程原子 CAS；应避免多个写入者同时编辑一个项目。统一 IO 不提供跨设备同步、多文件事务或自动冲突合并。
+
+照片先写入独立媒体文件并作为暂存 ID 传递。成员保存成功后该 ID 才成为项目引用；取消或组件卸载会回收未引用的暂存媒体。原生删除/GC 移入 `.trash`；浏览器删除先复制回收副本再删除原文件，暂不提供 GC。浏览器只处理 PNG/JPEG/WebP，沿用主图和缩略图尺寸。
 
 项目格式详见 [project-format.md](project-format.md)。
 
 ## 本地文件安全边界
 
-- Tauri capability 仅授予必要的窗口、对话框和 AppCache `transfers/` 文件操作；没有任意项目目录的 fs 插件权限，也没有 `assetProtocol: ["**"]`。
+- 浏览器只有用户点击选择的目录句柄，后台 IO 不主动请求授权；不支持普通目录 API 时明确停止，不降级保存项目到 OPFS。新建/导入只接受空目录，归档条目和媒体标识必须通过校验。
+- Tauri capability 仅保留必要窗口和对话框权限，没有 WebView 通用 fs 权限，也没有 `assetProtocol: ["**"]`。Rust 选择器直接返回项目引用，备份传输仅使用原生选择器返回的文件句柄/URI。
 - 所有项目命令拒绝相对路径、`.`/`..` 路径片段、非目录和缺少项目标记的目录，并使用 canonical path。
 - AppData 托管项目 ID 必须是 UUID；备份包限制压缩包大小、条目数、解压总量和单文件大小，拒绝路径穿越、符号链接、重复或未知条目。
 - 照片 ID 只允许 ASCII 字母、数字、`_`、`-`；WebView 只接收照片字节并创建临时 Blob URL。
 - CSP 限制脚本、图片和 IPC 来源；Blob 只用于应用生成的图片 URL。
-- 本地项目当前不加密，应用也没有自动更新/签名发布链；这些属于发布阶段的独立安全工作。
+- 本地项目当前不加密。PWA 有静态资源更新流程；原生自动更新与签名发布链仍属于独立发布工作。
 
 ## 测试层次
 
 - 领域单元测试：schema、迁移、关系、称谓、共享家庭事实和两套布局阶段。
 - 组件测试：Vue 交互、拖拽、视口和保存失败路径。
+- 浏览器存储/归档测试：权限、备份、外部修改冲突、媒体处理、流大小限制与失败清理。
+- Playwright：真实 Chromium 验证 Web 流程，使用 OPFS 句柄替代无法操作的系统选择器；生产不运行 OPFS，系统权限和 Android 文档提供程序需真机验收。
 - Rust 单元测试：项目目录、版本、媒体导入/GC 和路径穿越。
 - 性能门禁：确定性的 500 人家谱，CI p95 预算 1000ms。
 - 构建门禁：TypeScript + Vite 生产构建、Cargo fmt/test/clippy、npm audit 和 RustSec audit。

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { projectRepository } from '@/services/projectRepository'
+import { resolvePhotoUrl, importPhoto, deletePhoto } from '@/services/storage'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import PhotoCropper from './PhotoCropper.vue'
@@ -18,6 +18,7 @@ const previewUrl = ref<string | null>(null)
 const pendingFile = ref<File | null>(null)
 const uploading = ref(false)
 let previewRequest = 0
+let uploadRequest = 0
 
 function replacePreviewUrl(next: string | null) {
   const previous = previewUrl.value
@@ -27,26 +28,33 @@ function replacePreviewUrl(next: string | null) {
 
 async function refreshPreview() {
   const request = ++previewRequest
-  if (!props.photoId || !family.projectRef) {
-    replacePreviewUrl(null)
-    return
-  }
+  const project = family.projectRef
+  const projectToken = family.projectToken
+  replacePreviewUrl(null)
+  if (!props.photoId || !project) return
   try {
-    const next = await projectRepository.resolvePhotoUrl(family.projectRef, props.photoId, true)
-    if (request !== previewRequest) {
+    const next = await resolvePhotoUrl(project, props.photoId, true)
+    if (request !== previewRequest || projectToken !== family.projectToken) {
       if (next.startsWith('blob:')) URL.revokeObjectURL(next)
       return
     }
     replacePreviewUrl(next)
   } catch {
-    if (request === previewRequest) replacePreviewUrl(null)
+    if (request === previewRequest && projectToken === family.projectToken) replacePreviewUrl(null)
   }
 }
 
-watch(() => [props.photoId, family.projectRef] as const, refreshPreview, { immediate: true })
+watch(() => [props.photoId, family.projectToken] as const, refreshPreview, { immediate: true })
+
+watch(() => family.projectToken, () => {
+  uploadRequest += 1
+  pendingFile.value = null
+  uploading.value = false
+}, { flush: 'sync' })
 
 onBeforeUnmount(() => {
   previewRequest += 1
+  uploadRequest += 1
   replacePreviewUrl(null)
 })
 
@@ -59,19 +67,33 @@ function onFileChange(e: Event) {
 }
 
 async function onCropConfirm(blob: Blob) {
-  if (!family.projectRef) return
+  const project = family.projectRef
+  if (!project || uploading.value) return
+  const projectToken = family.projectToken
+  const request = ++uploadRequest
+  const isCurrent = () => request === uploadRequest && family.projectToken === projectToken
   uploading.value = true
   try {
     const bytes = new Uint8Array(await blob.arrayBuffer())
-    const { photoId } = await projectRepository.importPhoto(family.projectRef, bytes, 'image/png')
+    if (!isCurrent()) return
+    const { photoId } = await importPhoto(project, bytes, 'image/png')
+    if (!isCurrent()) {
+      // 导入期间切换项目或离开表单时，清理原项目中新建但未被引用的照片。
+      await deletePhoto(project, photoId)
+      return
+    }
     emit('stage', photoId)
     emit('change', photoId)
     ui.showToast('success', '照片已暂存，保存成员后生效')
   } catch (err) {
-    ui.showToast('error', '上传失败：' + (err instanceof Error ? err.message : String(err)))
+    if (isCurrent()) {
+      ui.showToast('error', '上传失败：' + (err instanceof Error ? err.message : String(err)))
+    }
   } finally {
-    uploading.value = false
-    pendingFile.value = null
+    if (isCurrent()) {
+      uploading.value = false
+      pendingFile.value = null
+    }
   }
 }
 
@@ -118,6 +140,7 @@ const hasPhoto = computed(() => !!previewUrl.value)
     </div>
 
     <PhotoCropper
+      :key="family.projectToken"
       :file="pendingFile"
       @confirm="onCropConfirm"
       @cancel="onCropCancel"

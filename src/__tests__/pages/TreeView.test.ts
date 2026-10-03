@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import TreeView from '@/pages/TreeView.vue'
@@ -10,22 +10,31 @@ import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
 import { externalProjectRef } from '@/services/projectRef'
+import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 
-const { exportProjectBundleMock, flushNowMock, routerPush } = vi.hoisted(() => ({
+const { exportProjectBundleMock, prepareExportMock, authorizeProjectMock, flushNowMock, routerPush, gcMediaMock, supportsMediaGcMock } = vi.hoisted(() => ({
   exportProjectBundleMock: vi.fn(),
+  prepareExportMock: vi.fn(),
+  authorizeProjectMock: vi.fn(),
   flushNowMock: vi.fn(),
   routerPush: vi.fn(),
+  gcMediaMock: vi.fn(),
+  supportsMediaGcMock: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
 vi.mock('@/services/projectTransfer', () => ({
-  exportProjectBundle: exportProjectBundleMock,
+  prepareProjectBundleExport: prepareExportMock,
 }))
-vi.mock('@/services/projectRepository', () => ({
-  projectRepository: { gcMedia: vi.fn() },
+vi.mock('@/services/storage', () => ({
+  gcMedia: gcMediaMock,
+  authorizeProject: authorizeProjectMock,
+  supportsMediaGc: supportsMediaGcMock,
 }))
 vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
+
+const project = { providerId: 'test-storage', id: 'opaque-project', displayName: '项目显示名' }
 
 const TreeLayoutHostStub = defineComponent({
   name: 'TreeLayoutHost',
@@ -122,7 +131,15 @@ describe('TreeView row order integration', () => {
     flushNowMock.mockResolvedValue(undefined)
     exportProjectBundleMock.mockReset()
     exportProjectBundleMock.mockResolvedValue(true)
+    prepareExportMock.mockReset()
+    prepareExportMock.mockImplementation(async project => () => exportProjectBundleMock(project))
+    authorizeProjectMock.mockReset()
+    authorizeProjectMock.mockResolvedValue(undefined)
     routerPush.mockReset()
+    gcMediaMock.mockReset()
+    gcMediaMock.mockResolvedValue(0)
+    supportsMediaGcMock.mockReset()
+    supportsMediaGcMock.mockReturnValue(true)
   })
 
   it('persists the row order emitted by FamilyCanvas through the family store', async () => {
@@ -511,6 +528,33 @@ describe('TreeView row order integration', () => {
       .toBeLessThan(exportProjectBundleMock.mock.invocationCallOrder[0]!)
   })
 
+  it.each(['another-project', project.id])('does not export after the session changes while saving (%s)', async (id) => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.setProject(project, createEmptyMeta('原家族'), createEmptyFamily())
+    let finishSave!: () => void
+    flushNowMock.mockImplementationOnce(() => new Promise<void>(resolve => { finishSave = resolve }))
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
+      },
+    })
+
+    await wrapper.findAll('button').find(button => button.text() === '导出备份')!.trigger('click')
+    expect(flushNowMock).toHaveBeenCalledOnce()
+    expect(exportProjectBundleMock).not.toHaveBeenCalled()
+
+    family.setProject({ ...project, id }, createEmptyMeta('新会话'), createEmptyFamily())
+    finishSave()
+    await flushPromises()
+
+    expect(exportProjectBundleMock).not.toHaveBeenCalled()
+    expect(family.projectRef).toEqual({ ...project, id })
+    wrapper.unmount()
+  })
+
   it('keeps the project open when the final save fails', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
@@ -534,8 +578,32 @@ describe('TreeView row order integration', () => {
     const back = wrapper.findAll('button').find(button => button.text() === '返回')!
     await back.trigger('click')
 
-    expect(family.projectPath).toBe('/tmp/test.family')
+    expect(family.projectRef).toEqual(externalProjectRef('/tmp/test.family'))
     expect(routerPush).not.toHaveBeenCalled()
     expect(ui.toast?.text).toContain('项目保持打开')
+  })
+
+  it('shows the project display name and only offers media cleanup when supported', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const data = createEmptyFamily()
+    data.members.a = { ...mk('a'), photoId: 'used-photo' }
+    family.setProject(project, createEmptyMeta('家族名称'), data)
+    const wrapper = mount(TreeView, {
+      global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
+    })
+    expect(wrapper.text()).toContain(project.displayName)
+    expect(wrapper.text()).not.toContain(project.id)
+    const cleanup = wrapper.findAll('button').find(button => button.text() === '清理未用照片')!
+    await cleanup.trigger('click')
+    await flushPromises()
+    expect(gcMediaMock).toHaveBeenCalledWith(project, ['used-photo'])
+
+    supportsMediaGcMock.mockReturnValue(false)
+    family.setProject({ ...project, providerId: 'cloud-without-gc' }, createEmptyMeta('云端'), data)
+    await flushPromises()
+    expect(wrapper.findAll('button').some(button => button.text() === '清理未用照片')).toBe(false)
+    expect(gcMediaMock).toHaveBeenCalledTimes(1)
   })
 })

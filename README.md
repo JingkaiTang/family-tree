@@ -2,15 +2,15 @@
 
 [![CI](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml)
 
-一款面向中文家庭关系的本地优先桌面与移动应用，使用 Tauri 2、Vue 3 和 Rust 构建。
+一款面向中文家庭关系的本地优先应用。桌面与移动设备共用 Vue 网页界面和领域逻辑，通过 Web/PWA 使用用户授权的普通目录；Tauri 原生客户端作为可选宿主保留。
 
 ![家族树主界面，展示虚构的六代家族](docs/assets/family-tree-overview.jpg)
 
 > 截图使用仓库内的虚构测试数据和合成头像，不包含真实个人信息。
 
-> **项目状态：Alpha。** 当前仅建议从源码构建，尚未提供签名安装包、自动更新或稳定数据格式承诺。请定期导出 `.familybundle` 备份；本地项目数据不加密。
+> **项目状态：Alpha。** 支持纯静态部署，无需应用账号或业务后端。尚未提供签名原生安装包或稳定数据格式承诺。请定期导出 `.familybundle` 备份；本地项目数据不加密。
 
-[架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [移动端开发](docs/mobile-development.md) · [发布说明](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
+[Web 部署与使用](docs/web-deployment.md) · [存储接口](docs/storage.md) · [架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [移动端开发](docs/mobile-development.md) · [发布说明](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
 
 ## 功能
 
@@ -18,29 +18,32 @@
 - **复杂家庭结构**：支持当前及历史配偶、养育/继亲、次要父母和干亲等关系。
 - **中文亲属称谓**：计算常见的直系、旁系与姻亲称谓，并支持按家庭习惯自定义覆盖。不同地区和家庭的称谓存在差异，自动结果仍需使用者确认。
 - **成员资料管理**：记录姓名、性别、出生日期、照片、籍贯和职业等信息。
-- **本地优先**：桌面端使用自选普通文件夹，移动端使用应用私有目录；应用不主动上传，并支持导出/导入本地备份。
-- **数据可靠性**：项目打开和保存时执行结构校验，自动保留有限数量的本地备份。
+- **本地优先**：支持目录 API 的桌面和移动浏览器直接读写自选普通文件夹；原生桌面使用外部目录，原生手机使用应用私有目录。应用不自动上传或跨设备同步。
+- **数据可靠性**：打开和保存时校验项目，保留三份滚动备份；浏览器发现外部内容变化时停止覆盖，照片删除前保留回收副本。
+- **可安装网页**：PWA 缓存静态应用供离线打开，项目和照片仍在用户目录；更新等待所有旧窗口关闭，不强制刷新编辑页面。
+- **迁移与扩展**：Web 与原生共享 `.family` 目录和 `.familybundle` 格式；统一 IO 接口为后续 Google Drive 适配保留边界，当前未接入云盘。
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js 20.19+ 或 22.12+
-- Rust stable（推荐通过 [rustup](https://rustup.rs/) 安装）
-- 当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
+- Node.js 20.19+（20.x）或 22.12+
+- Web 使用支持 `showDirectoryPicker` 的浏览器；推荐近期稳定版桌面 Chrome/Edge，Android Chrome 132+ 需目标设备验收。Safari/iOS Safari 和 Firefox 当前不在 Web 支持范围，不提供 OPFS 降级。
+- 仅原生构建需要 Rust stable 和当前平台的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)。
 
 ### 开发与构建
 
 ```bash
 npm ci
-npm run tauri:dev
+npm run dev
 ```
 
-仅调试前端界面时可运行 `npm run dev`；创建项目、打开本地文件和管理照片等能力需要 Tauri 桌面进程。
+在 localhost 打开后即可新建/打开普通目录、编辑成员和管理照片。发布网页时运行 `npm run build`，将 `dist/` 部署到 HTTPS 静态主机；不需要 Google 权限、API 密钥或购买域名。子目录、PWA 和浏览器限制见 [Web 部署说明](docs/web-deployment.md)。
 
-构建当前平台的安装包：
+运行或构建可选原生宿主：
 
 ```bash
+npm run tauri:dev
 npm run tauri:build
 ```
 
@@ -53,6 +56,7 @@ iOS 与 Android 需要各自的原生工具链，初始化、开发、构建和�
 ```bash
 npm test
 npm run build
+npm run test:e2e
 npm run test:layout-perf
 
 cd src-tauri
@@ -61,19 +65,20 @@ cargo test --locked
 cargo clippy --all-targets --all-features --locked -- -D warnings
 ```
 
-`test:layout-perf` 使用确定性的 500 人虚构家谱执行性能门禁，建议在资源稳定的本机或 CI 中运行。
+`test:e2e` 使用真实 Chromium，系统目录选择器由测试句柄替代，不能替代 Android/桌面系统选择器真机验收；环境准备见 [贡献指南](CONTRIBUTING.md)。`test:layout-perf` 使用确定性的 500 人虚构家谱执行性能门禁，建议单独运行。
 
 ## 技术概览
 
 | 层 | 技术 |
 |---|---|
-| 桌面/移动端与本地文件 | Tauri 2、Rust |
-| 前端 | Vue 3、TypeScript、Pinia、Tailwind CSS |
+| Web/PWA 与本地目录 | File System Access API、静态应用缓存 |
+| 可选原生宿主 | Tauri 2、Rust、原生目录/文档选择器 |
+| 共享前端 | Vue 3、TypeScript、Pinia、Tailwind CSS |
 | 数据与校验 | JSON、Zod、版本迁移与本地备份 |
 | 家族树 | 家族网格与聚焦纵流双布局、共享家庭事实、Web Worker |
-| 测试 | Vitest、Rust test/clippy、RustSec audit |
+| 测试 | Vitest、Playwright/Chromium、Rust test/clippy、RustSec audit |
 
-核心领域逻辑位于 `src/core`，Vue 组件负责交互编排；Tauri 后端只暴露受校验的外部目录、应用私有目录和备份传输命令。中文称谓采用“关系图寻路 → 路径规范化 → 规则翻译”的流水线；两套布局共享规范化家庭事实，其中大型网格计算通过 Web Worker 运行。完整边界和数据流见 [架构文档](docs/architecture.md)。
+核心领域逻辑位于 `src/core`，Vue 组件负责交互编排，统一存储接口连接浏览器目录与原生存储。Tauri 只提供平台能力，保留 iOS 等不支持网页目录 API 的使用路径和旧数据迁移入口。中文称谓与两套布局共享领域逻辑，大型网格计算通过 Web Worker 运行。完整边界见 [架构文档](docs/architecture.md)。
 
 ## 参与贡献
 

@@ -6,8 +6,8 @@ import FocusFlowView from '@/components/tree/focus-flow/FocusFlowView.vue'
 import { createEmptyFamily } from '@/core/schema'
 import { multiUnionFamily, threeGenFamily } from '@/__tests__/fixtures/families'
 
-vi.mock('@/services/projectRepository', () => ({
-  projectRepository: { resolvePhotoUrl: vi.fn() },
+vi.mock('@/services/storage', () => ({
+  resolvePhotoUrl: vi.fn(),
 }))
 
 describe('FocusFlowView', () => {

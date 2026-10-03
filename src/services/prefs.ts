@@ -1,47 +1,56 @@
-/**
- * 用 localStorage 保存用户偏好：
- * - 最近打开的项目引用
- * - 其他未来可能加的 UI 偏好
- *
- * 这些数据不跟家族项目走（项目可带走到别的机器，偏好留在本机）。
- */
-
 import type { LayoutModePreference } from '@/core/layoutMode'
-import { isProjectRef, type ProjectRef } from './projectRef'
+import type { ProjectRef } from '@/services/storage/types'
+import { externalProjectRef, managedProjectRef } from './projectRef'
 
-const LAST_PROJECT_KEY = 'family-tree:lastProjectPath'
+/**
+ * 用户偏好只保存在本机；项目引用仅保存定位字段，不包含连接凭证。
+ */
 const LAST_PROJECT_REF_KEY = 'family-tree:lastProjectRef'
+const PREVIOUS_PROJECT_KEY = 'family-tree:lastProject'
+const LEGACY_PROJECT_PATH_KEY = 'family-tree:lastProjectPath'
 const LAYOUT_MODE_KEY = 'family-tree:layoutModePreference'
 
-export function getLastProjectPath(): string | null {
-  try {
-    return localStorage.getItem(LAST_PROJECT_KEY)
-  } catch {
-    return null
-  }
-}
+function parseProjectRef(value: unknown): ProjectRef | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
 
-export function setLastProjectPath(path: string | null): void {
-  try {
-    if (path) {
-      localStorage.setItem(LAST_PROJECT_KEY, path)
-    } else {
-      localStorage.removeItem(LAST_PROJECT_KEY)
-    }
-  } catch {
-    /* ignore quota / privacy mode */
+  if ('providerId' in value) {
+    if (
+      typeof value.providerId !== 'string' || !value.providerId.trim()
+      || !('id' in value) || typeof value.id !== 'string' || !value.id.trim()
+      || !('displayName' in value) || typeof value.displayName !== 'string' || !value.displayName.trim()
+    ) return null
+    return { providerId: value.providerId, id: value.id, displayName: value.displayName }
   }
+
+  // 移动端支持最初以 kind 区分外部目录和应用托管项目。
+  if (
+    'kind' in value && value.kind === 'external'
+    && 'path' in value && typeof value.path === 'string' && value.path.trim()
+  ) return externalProjectRef(value.path)
+  if (
+    'kind' in value && value.kind === 'managed'
+    && 'id' in value && typeof value.id === 'string' && value.id.trim()
+  ) return managedProjectRef(value.id)
+  return null
 }
 
 export function getLastProjectRef(): ProjectRef | null {
   try {
-    const stored = localStorage.getItem(LAST_PROJECT_REF_KEY)
-    if (stored) {
-      const parsed: unknown = JSON.parse(stored)
-      if (isProjectRef(parsed)) return parsed
+    // 已有的新格式记录即使损坏，也不能回落到另一个陈旧项目。
+    for (const key of [LAST_PROJECT_REF_KEY, PREVIOUS_PROJECT_KEY]) {
+      const stored = localStorage.getItem(key)
+      if (stored === null) continue
+      const project = parseProjectRef(JSON.parse(stored))
+      if (!project) return null
+      setLastProjectRef(project)
+      return project
     }
-    const legacyPath = getLastProjectPath()
-    return legacyPath ? { kind: 'external', path: legacyPath } : null
+
+    const path = localStorage.getItem(LEGACY_PROJECT_PATH_KEY)
+    if (!path?.trim()) return null
+    const project = externalProjectRef(path)
+    setLastProjectRef(project)
+    return project
   } catch {
     return null
   }
@@ -50,11 +59,15 @@ export function getLastProjectRef(): ProjectRef | null {
 export function setLastProjectRef(project: ProjectRef | null): void {
   try {
     if (project) {
-      localStorage.setItem(LAST_PROJECT_REF_KEY, JSON.stringify(project))
+      const reference = parseProjectRef(project)
+      if (!reference) return
+      localStorage.setItem(LAST_PROJECT_REF_KEY, JSON.stringify(reference))
     } else {
       localStorage.removeItem(LAST_PROJECT_REF_KEY)
     }
-    localStorage.removeItem(LAST_PROJECT_KEY)
+    // 新记录写入成功后才清理旧键，存储配额错误时仍能重试迁移。
+    localStorage.removeItem(PREVIOUS_PROJECT_KEY)
+    localStorage.removeItem(LEGACY_PROJECT_PATH_KEY)
   } catch {
     /* ignore quota / privacy mode */
   }

@@ -4,13 +4,19 @@
  * MemberNode 组件集成测试
  * 覆盖：姓名渲染、性别符号/颜色、生卒格式化、称呼标签、选中状态、点击事件
  */
-import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MemberNode from '@/components/tree/MemberNode.vue'
 import { mk } from '@/__tests__/fixtures/families'
+import { useFamilyStore } from '@/stores/family'
+import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
+import type { ProjectRef } from '@/services/storage'
 
-function mountNode(props: Record<string, unknown> = {}) {
+const { resolvePhotoUrlMock } = vi.hoisted(() => ({ resolvePhotoUrlMock: vi.fn() }))
+vi.mock('@/services/storage', () => ({ resolvePhotoUrl: resolvePhotoUrlMock }))
+
+function mountNode(props: Record<string, unknown> = {}, pinia = createPinia()) {
   return mount(MemberNode, {
     props: {
       member: mk('test', { gender: 'male', firstName: '靖凯', lastName: '唐' }),
@@ -21,7 +27,7 @@ function mountNode(props: Record<string, unknown> = {}) {
       ...props,
     },
     global: {
-      plugins: [createPinia()],
+      plugins: [pinia],
     },
   })
 }
@@ -29,6 +35,43 @@ function mountNode(props: Record<string, unknown> = {}) {
 describe('MemberNode', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    resolvePhotoUrlMock.mockReset()
+    resolvePhotoUrlMock.mockResolvedValue('blob:private-photo')
+  })
+
+  it('loads a private photo through its provider reference and releases the URL on unmount', async () => {
+    const pinia = createPinia()
+    const project: ProjectRef = { providerId: 'fake-cloud', id: 'opaque-id', displayName: '云端家族' }
+    useFamilyStore(pinia).setProject(project, createEmptyMeta('测试'), createEmptyFamily())
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    const wrapper = mountNode({ member: { ...mk('test'), photoId: 'private-photo' } }, pinia)
+    await flushPromises()
+
+    expect(resolvePhotoUrlMock).toHaveBeenCalledWith(project, 'private-photo', true)
+    expect(wrapper.get('img').attributes('src')).toBe('blob:private-photo')
+    wrapper.unmount()
+    expect(revoke).toHaveBeenCalledWith('blob:private-photo')
+    revoke.mockRestore()
+  })
+
+  it('rejects a late photo from a previous project session and revokes its URL', async () => {
+    const pinia = createPinia()
+    const family = useFamilyStore(pinia)
+    const project: ProjectRef = { providerId: 'fake-cloud', id: 'old-id', displayName: '旧家族' }
+    family.setProject(project, createEmptyMeta('旧家族'), createEmptyFamily())
+    let finishPhoto!: (url: string) => void
+    resolvePhotoUrlMock.mockImplementationOnce(() => new Promise<string>(resolve => { finishPhoto = resolve }))
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    const wrapper = mountNode({ member: { ...mk('test'), photoId: 'private-photo' } }, pinia)
+    family.setProject({ ...project, id: 'new-id' }, createEmptyMeta('新家族'), createEmptyFamily())
+    await flushPromises()
+    finishPhoto('blob:old-session-photo')
+    await flushPromises()
+
+    expect(wrapper.get('img').attributes('src')).toBe('blob:private-photo')
+    expect(revoke).toHaveBeenCalledWith('blob:old-session-photo')
+    wrapper.unmount()
+    revoke.mockRestore()
   })
 
   // ========== 姓名渲染 ==========

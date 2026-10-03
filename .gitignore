@@ -42,6 +42,8 @@ pnpm-debug.log*
 
 # test output
 coverage
+playwright-report/
+test-results/
 
 # superpowers
 .superpowers
