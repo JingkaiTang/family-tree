@@ -73,4 +73,6 @@ npm run preview
 
 `npm run test:e2e` 使用真实 Chromium，覆盖网页交互与文件 API，以及 PC/移动布局、窄桌面窗口、手机横屏和显式偏好。无头环境无法操作系统目录对话框，因此测试选择器返回真实 OPFS 句柄作为替身，验证读写、Blob、Web Locks 和 IndexedDB 克隆；**生产应用不使用 OPFS**。
 
+`npm run test:pwa` 单独构建生产产物，覆盖根目录/子目录部署、离线重开与懒加载、多窗口更新等待以及更新失败时旧缓存继续可用。此套件使用真实 Service Worker；运行方法和测试边界见 [测试说明](testing.md)。
+
 自动化不代表系统目录选择、权限持久性或 Android 文档提供程序已通过真机验收。发布前应在目标桌面与 Android Chrome 验证选空目录、新建/重开、撤销授权、上传照片、备份互导、磁盘不足/保存冲突，以及 PWA 离线重开。Safari/iOS Safari 当前不支持目录 API，安装为 PWA 也不能获得这项能力。

@@ -11,6 +11,7 @@
 - [ ] `npm test`
 - [ ] `npm run build`
 - [ ] `npm run test:e2e`（页面或存储相关改动）
+- [ ] `npm run test:pwa`（生产构建、缓存或更新相关改动）
 - [ ] `npm audit --audit-level=moderate`
 - [ ] `npm run test:layout-perf`（布局相关改动）
 - [ ] 已补充或更新回归测试

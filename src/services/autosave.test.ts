@@ -100,6 +100,70 @@ describe('autosave coordinator', () => {
     expect(family.isDirty).toBe(true)
   })
 
+  it('retries the latest snapshot after an in-flight failure rejects every waiting flush', async () => {
+    const family = openedFamily()
+    const failure = new Error('directory permission revoked')
+    const writes: Array<{
+      data: FamilyData
+      resolve: () => void
+      reject: (error: Error) => void
+    }> = []
+    const save = vi.fn((_project: ProjectRef, data: FamilyData) => new Promise<void>((resolve, reject) => {
+      writes.push({ data, resolve, reject })
+    }))
+    const controller = createAutosaveController(family, { save })
+
+    family.upsertMember(mk('a', { firstName: '写入中的快照' }))
+    const firstFlush = controller.flushNow()
+    family.updateMember('a', { firstName: '写入期间的新编辑' })
+    const secondFlush = controller.flushNow()
+    const failures = Promise.all([
+      expect(firstFlush).rejects.toBe(failure),
+      expect(secondFlush).rejects.toBe(failure),
+    ])
+    writes[0].reject(failure)
+    await failures
+
+    expect(family.isDirty).toBe(true)
+    expect(save).toHaveBeenCalledOnce()
+    expect(writes[0].data.members.a.firstName).toBe('写入中的快照')
+
+    const retry = controller.flushNow()
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(writes[1].data.members.a.firstName).toBe('写入期间的新编辑')
+    expect(family.isDirty).toBe(true)
+    writes[1].resolve()
+    await retry
+    expect(family.isDirty).toBe(false)
+  })
+
+  it('reports a background failure once and resumes autosaving the next edit', async () => {
+    vi.useFakeTimers()
+    const family = openedFamily()
+    const failure = new Error('disk full')
+    const onBackgroundError = vi.fn()
+    const save = vi.fn<(project: ProjectRef, data: FamilyData) => Promise<void>>()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce(undefined)
+    const controller = createAutosaveController(family, { debounceMs: 800, save, onBackgroundError })
+    controller.start()
+
+    family.upsertMember(mk('a', { firstName: '首次编辑' }))
+    await vi.advanceTimersByTimeAsync(800)
+    expect(onBackgroundError).toHaveBeenCalledExactlyOnceWith(failure)
+    expect(family.isDirty).toBe(true)
+    await vi.advanceTimersByTimeAsync(8000)
+    expect(save).toHaveBeenCalledOnce()
+
+    family.updateMember('a', { firstName: '重试时的编辑' })
+    await vi.advanceTimersByTimeAsync(800)
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(save.mock.calls[1][1].members.a.firstName).toBe('重试时的编辑')
+    expect(onBackgroundError).toHaveBeenCalledOnce()
+    expect(family.isDirty).toBe(false)
+    controller.stop()
+  })
+
   it('flushes dirty data when the page is hidden or moved to the background', async () => {
     const flush = vi.fn().mockResolvedValue(undefined)
     let dirty = true

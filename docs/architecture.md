@@ -58,6 +58,8 @@ browser-directory
 
 `src/core/treeLayout.ts` 是网格布局的异步门面。在浏览器中，它通过浏览器 Web Worker 调用 `treeLayoutCore.ts`；Worker 不可用或崩溃时退回同步纯函数，保证功能可用。每个请求由 ID 匹配，`FamilyCanvas` 还使用自己的请求序号丢弃过期结果。
 
+Worker 客户端在发送前对 JSON 领域数据与上一布局场景取独立快照，避免 Vue 响应式代理触发 structured clone 错误。核心层不依赖 Vue。生产浏览器测试直接检查 Worker 返回的布局结果，防止同步回退掩盖 Worker 失效。
+
 核心流水线位于 `src/core/family-layout`：
 
 ```text
@@ -114,7 +116,8 @@ browser-directory
 - 组件测试：Vue 交互、拖拽、视口和保存失败路径。
 - 浏览器存储/归档测试：权限、备份、外部修改冲突、媒体处理、流大小限制与失败清理。
 - Playwright：真实 Chromium 验证 Web 流程，使用 OPFS 句柄替代无法操作的系统选择器；生产不运行 OPFS，系统权限和 Android 文档提供程序需真机验收。
+- 生产 PWA：真实构建与 Service Worker 验证根目录/子目录离线启动、懒加载、更新等待旧窗口关闭及失败更新保留旧缓存。
 - 性能门禁：确定性的 500 人家谱，CI p95 预算 1000ms。
 - 构建门禁：TypeScript + Vite 生产构建、npm audit。
 
-CI 配置位于 `.github/workflows/ci.yml`，依赖用途与兼容决策见 [依赖管理](dependencies.md)。任何跨边界变更都应在对应层添加回归测试。
+CI 配置位于 `.github/workflows/ci.yml`，完整命令与失败排查见 [测试说明](testing.md)，依赖用途与兼容决策见 [依赖管理](dependencies.md)。任何跨边界变更都应在对应层添加回归测试。

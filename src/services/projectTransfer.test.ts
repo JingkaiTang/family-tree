@@ -54,6 +54,24 @@ describe('browser project bundle transfers', () => {
     expect(createWritable).not.toHaveBeenCalled()
   })
 
+  it.each(['open', 'write'] as const)('preserves an export %s failure and requires a new destination before retrying', async phase => {
+    const failure = new Error(phase === 'open' ? 'permission revoked' : 'disk full')
+    const output = new WritableStream<Uint8Array>()
+    const createWritable = vi.fn(async () => output)
+    if (phase === 'open') createWritable.mockRejectedValueOnce(failure)
+    else exportProjectBundleToStream.mockRejectedValueOnce(failure)
+    const picker = vi.fn(async () => ({ name: '家族.familybundle', createWritable }))
+    vi.stubGlobal('window', { showSaveFilePicker: picker })
+    const snapshot = { meta: createEmptyMeta('家族'), family: createEmptyFamily() }
+    const runExport = await prepareProjectBundleExport(project)
+
+    await expect(runExport!(snapshot)).rejects.toBe(failure)
+    await expect(runExport!(snapshot)).rejects.toThrow('重新选择')
+    expect(picker).toHaveBeenCalledOnce()
+    expect(createWritable).toHaveBeenCalledOnce()
+    expect(exportProjectBundleToStream).toHaveBeenCalledTimes(phase === 'open' ? 0 : 1)
+  })
+
   it('selects an empty import directory in the click chain and preserves its opaque reference', async () => {
     const file = new File(['zip'], '迁移.familybundle')
     const meta = createEmptyMeta('迁移')

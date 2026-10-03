@@ -45,10 +45,11 @@ npm run dev
 npm test
 npm run build
 npm run test:e2e
+npm run test:pwa
 npm run test:layout-perf
 ```
 
-`test:e2e` 使用真实 Chromium，系统目录选择器由测试句柄替代，不能替代 Android/桌面系统选择器真机验收；环境准备见 [贡献指南](CONTRIBUTING.md)。`test:layout-perf` 使用确定性的 500 人虚构家谱执行性能门禁，建议单独运行。
+`test:e2e` 验证开发服务器上的目录、照片、备份与桌面/移动布局；`test:pwa` 构建生产资源，验证离线启动和更新。系统目录选择器由测试句柄替代，不能替代真机授权验收。`test:layout-perf` 使用确定性的 500 人虚构家谱执行性能门禁，建议单独运行。完整测试范围和排错方式见 [测试说明](docs/testing.md)。
 
 ## 技术概览
 

@@ -31,7 +31,10 @@ export class LayoutWorkerClient {
     return new Promise<LayoutScene>((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
       try {
-        this.worker.postMessage({ id, members, options })
+        // Project and scene data are JSON values; snapshot them here so callers
+        // can pass reactive proxies without coupling the core to a UI framework.
+        const snapshot: LayoutWorkerRequest = JSON.parse(JSON.stringify({ id, members, options }))
+        this.worker.postMessage(snapshot)
       } catch (error) {
         this.pending.delete(id)
         reject(error instanceof Error ? error : new Error(String(error)))

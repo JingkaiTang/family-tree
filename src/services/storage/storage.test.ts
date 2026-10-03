@@ -94,6 +94,55 @@ describe('storage routing contract', () => {
     expect(pick).toHaveBeenCalledOnce()
   })
 
+  it('允许连接后注册选择器，选择失败时不回退到其他提供商或创建项目', async () => {
+    const local = memoryProvider('local')
+    const remote = memoryProvider('remote')
+    const localPicker = vi.fn(async () => ({ id: 'local-project', displayName: '本地项目' }))
+    const localCreate = vi.spyOn(local, 'createProject')
+    const remoteCreate = vi.spyOn(remote, 'createProject')
+    const storage = createStorage([local], [{ providerId: 'local', pickProject: localPicker }])
+    storage.registerProvider(remote)
+    await expect(storage.pickProject('remote', 'open')).rejects.toThrow('尚未提供项目选择器')
+
+    const failure = new Error('remote account disconnected')
+    const remotePicker = vi.fn<(mode: 'create' | 'open') => Promise<{ id: string; displayName: string } | null>>()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce({ id: 'remote:folder/item', displayName: '远端项目' })
+    storage.registerPicker({ providerId: 'remote', pickProject: remotePicker })
+    await expect(storage.pickProject('remote', 'open')).rejects.toBe(failure)
+    await expect(storage.pickProject('remote', 'create')).resolves.toEqual({
+      providerId: 'remote', id: 'remote:folder/item', displayName: '远端项目',
+    })
+
+    expect(remotePicker.mock.calls).toEqual([['open'], ['create']])
+    expect(localPicker).not.toHaveBeenCalled()
+    expect(localCreate).not.toHaveBeenCalled()
+    expect(remoteCreate).not.toHaveBeenCalled()
+  })
+
+  it('缩略图 URL 仅使用所选提供商的私有 Blob，读取失败不生成 URL', async () => {
+    const local = memoryProvider('local')
+    const remote = memoryProvider('remote')
+    const photo = new Blob(['private thumbnail'], { type: 'image/webp' })
+    const failure = new Error('photo permission revoked')
+    const localRead = vi.spyOn(local, 'readPhoto')
+    const remoteRead = vi.spyOn(remote, 'readPhoto').mockResolvedValueOnce(photo).mockRejectedValueOnce(failure)
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:private-thumbnail')
+    const storage = createStorage([local, remote])
+    try {
+      await expect(storage.resolvePhotoUrl(target('remote'), 'same-photo-id', true)).resolves.toBe('blob:private-thumbnail')
+      expect(remoteRead).toHaveBeenCalledExactlyOnceWith('opaque-parent-id', 'same-photo-id', true)
+      expect(createObjectURL).toHaveBeenCalledExactlyOnceWith(photo)
+
+      await expect(storage.resolvePhotoUrl(target('remote'), 'same-photo-id')).rejects.toBe(failure)
+      expect(remoteRead).toHaveBeenLastCalledWith('opaque-parent-id', 'same-photo-id', false)
+      expect(createObjectURL).toHaveBeenCalledOnce()
+      expect(localRead).not.toHaveBeenCalled()
+    } finally {
+      createObjectURL.mockRestore()
+    }
+  })
+
   it('清理是可选能力，不为缺少安全实现的提供商执行 GC', async () => {
     const provider = memoryProvider('remote')
     const remove = vi.spyOn(provider, 'deletePhoto')

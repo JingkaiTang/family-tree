@@ -174,7 +174,7 @@ export function startAutosave() {
     closeGuardStarted = true
     window.addEventListener('beforeunload', event => {
       if (family.isDirty && family.projectRef) {
-        void controller?.flushNow()
+        void controller?.flushNow().catch(reportSaveError)
         event.preventDefault()
       }
     })

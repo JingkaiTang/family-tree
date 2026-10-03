@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { reactive } from 'vue'
+import { threeGenFamily } from '@/__tests__/fixtures/families'
+import { createEmptyFamily } from './schema'
 import type { LayoutScene } from './family-layout/types'
+import { layoutFamilyTreeSync } from './treeLayoutCore'
 import { LayoutWorkerClient, type LayoutWorkerPort } from './treeLayoutWorkerClient'
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from './treeLayoutProtocol'
 
@@ -23,7 +27,8 @@ class FakeWorker implements LayoutWorkerPort {
   terminated = false
 
   postMessage(message: LayoutWorkerRequest) {
-    this.requests.push(message)
+    // Match the real Worker boundary: Vue proxies cannot be structured-cloned.
+    this.requests.push(structuredClone(message))
   }
 
   terminate() {
@@ -40,6 +45,37 @@ class FakeWorker implements LayoutWorkerPort {
 }
 
 describe('LayoutWorkerClient', () => {
+  it('将响应式项目及嵌套布局状态发送为独立快照，后续编辑不改变已发送的数据', async () => {
+    const worker = new FakeWorker()
+    const client = new LayoutWorkerClient(worker)
+    const data = reactive({ ...createEmptyFamily(), members: threeGenFamily() })
+    data.members.self.firstName = '发送时的名字'
+    const previousScene = reactive(layoutFamilyTreeSync(Object.values(data.members), { data }))
+    const options = {
+      data,
+      previousScene,
+      view: reactive({ primaryPartnershipByPerson: { dad: 'selected-partnership' } }),
+      changedIds: reactive(['self']),
+    }
+    const expected = JSON.parse(JSON.stringify({ members: Object.values(data.members), options }))
+    const pending = client.layout(Object.values(data.members), options)
+
+    data.members.self.firstName = '发送后的新编辑'
+    previousScene.cards[0].rect.x += 100
+    options.view.primaryPartnershipByPerson.dad = 'changed-partnership'
+    options.changedIds.push('dad')
+    worker.respond({ id: worker.requests[0]?.id ?? 1, ok: true, scene: emptyScene })
+
+    await expect(pending).resolves.toEqual(emptyScene)
+    expect(worker.requests[0]).toEqual({ id: 1, ...expected })
+    expect(worker.terminated).toBe(false)
+
+    const next = client.layout(Object.values(data.members), options)
+    worker.respond({ id: worker.requests[1].id, ok: true, scene: emptyScene })
+    await expect(next).resolves.toEqual(emptyScene)
+    expect(worker.requests[1].options.data?.members.self.firstName).toBe('发送后的新编辑')
+  })
+
   it('按请求 ID 匹配乱序返回的布局结果', async () => {
     const worker = new FakeWorker()
     const client = new LayoutWorkerClient(worker)
@@ -54,6 +90,26 @@ describe('LayoutWorkerClient', () => {
 
     await expect(first).resolves.toEqual(emptyScene)
     await expect(second).resolves.toEqual(secondScene)
+  })
+
+  it('快照编码失败只拒绝该请求，保留并发请求且允许后续调用', async () => {
+    const worker = new FakeWorker()
+    const client = new LayoutWorkerClient(worker)
+    const pending = client.layout([], {})
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+    const invalidData = { ...createEmptyFamily(), extension: circular }
+
+    await expect(client.layout([], { data: invalidData })).rejects.toBeInstanceOf(TypeError)
+    expect(worker.requests).toHaveLength(1)
+    expect(worker.terminated).toBe(false)
+    worker.respond({ id: worker.requests[0].id, ok: true, scene: emptyScene })
+    await expect(pending).resolves.toEqual(emptyScene)
+
+    const next = client.layout([], {})
+    expect(worker.requests[1].id).toBe(3)
+    worker.respond({ id: worker.requests[1].id, ok: true, scene: emptyScene })
+    await expect(next).resolves.toEqual(emptyScene)
   })
 
   it('只拒绝 Worker 返回错误的对应请求', async () => {
