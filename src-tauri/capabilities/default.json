@@ -8,7 +8,9 @@
     "core:window:allow-destroy",
     "dialog:allow-open",
     "dialog:allow-save",
-    "fs:allow-copy-file",
+    "fs:allow-open",
+    "fs:allow-read",
+    "fs:allow-write",
     "fs:allow-mkdir",
     "fs:allow-remove",
     {

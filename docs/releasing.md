@@ -17,6 +17,23 @@
 - 发布工作流只能由受保护的 tag 或手工审批触发，默认 `contents: read`，仅上传 Release 的 job 获得最小写权限。
 - 发布前重复执行 CI 的测试、构建、性能和依赖审计，并保存产物校验和；正式发布不得复用开发机上来源不明的构建产物。
 
+## Linux 本地安装包验证
+
+Linux 平台配置使用 `family-tree` 作为安装包名称，避免中文 `productName` 生成不符合 Debian 规则的 `Package` 字段。窗口标题和应用菜单仍显示“家族树”；其他平台继续使用原有配置。
+
+在已安装 Tauri Linux 前置依赖的 amd64 环境中，可先验证未签名的 Debian 包。以下产物路径对应当前版本 0.1.0，版本更新后需同步调整：
+
+```bash
+npm run tauri:build -- --ci --no-sign --bundles deb -- --locked
+artifact=src-tauri/target/release/bundle/deb/family-tree_0.1.0_amd64.deb
+dpkg-deb --info "$artifact"
+dpkg --validate-pkgname "$(dpkg-deb --field "$artifact" Package)"
+dpkg-deb --contents "$artifact"
+sha256sum "$artifact"
+```
+
+包名校验必须通过，产物中应包含 `usr/bin/family-tree` 和显示中文名称的 `usr/share/applications/family-tree.desktop`。生成安装包不等于完成干净系统上的安装、启动和功能冒烟；本地 Debian 包验证也不覆盖 RPM、AppImage、macOS、Windows 或签名验证。
+
 ## 平台签名凭据
 
 以下内容只能保存在平台密钥库或 GitHub Encrypted Secrets 中，不得写入仓库、Issue、日志或测试 fixture：

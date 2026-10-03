@@ -181,13 +181,24 @@ pub(crate) fn managed_project_root(base: &Path, id: &str) -> CmdResult<PathBuf> 
 
 pub(crate) fn resolve_project_root(app: &AppHandle, project: &ProjectRef) -> CmdResult<PathBuf> {
     let managed_base = managed_projects_dir(app)?;
-    resolve_project_root_from_base(project, &managed_base)
+    resolve_project_root_from_base(project, &managed_base, cfg!(mobile))
+}
+
+fn validate_project_platform(project: &ProjectRef, mobile: bool) -> CmdResult<()> {
+    if mobile && matches!(project, ProjectRef::External { .. }) {
+        return Err(CmdError::InvalidPath(
+            "移动端仅允许 AppData 托管项目".into(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn resolve_project_root_from_base(
     project: &ProjectRef,
     managed_base: &Path,
+    mobile: bool,
 ) -> CmdResult<PathBuf> {
+    validate_project_platform(project, mobile)?;
     match project {
         ProjectRef::External { path } => validate_project_root_path(Path::new(path)),
         ProjectRef::Managed { id } => {
@@ -366,14 +377,16 @@ pub(crate) fn save_project_at(root: &Path, family_json: &str) -> CmdResult<()> {
 #[tauri::command]
 pub fn create_project(app: AppHandle, project: ProjectRef, name: String) -> CmdResult<ProjectMeta> {
     let managed_base = managed_projects_dir(&app)?;
-    create_project_with_base(&project, &name, &managed_base)
+    create_project_with_base(&project, &name, &managed_base, cfg!(mobile))
 }
 
 fn create_project_with_base(
     project: &ProjectRef,
     name: &str,
     managed_base: &Path,
+    mobile: bool,
 ) -> CmdResult<ProjectMeta> {
+    validate_project_platform(project, mobile)?;
     let (root, remove_on_error) = match project {
         ProjectRef::External { path } => (validate_absolute_directory(path)?, false),
         ProjectRef::Managed { id } => {
@@ -593,10 +606,10 @@ mod tests {
             id: uuid::Uuid::new_v4().to_string(),
         };
 
-        let meta = create_project_with_base(&project, "移动家族", &base).unwrap();
+        let meta = create_project_with_base(&project, "移动家族", &base, true).unwrap();
         assert_eq!(meta.name, "移动家族");
 
-        let root = resolve_project_root_from_base(&project, &base).unwrap();
+        let root = resolve_project_root_from_base(&project, &base, true).unwrap();
         let family = serde_json::json!({
             "schemaVersion": CURRENT_SCHEMA_VERSION,
             "members": {},
@@ -614,6 +627,40 @@ mod tests {
         assert_eq!(projects[0].meta.name, "移动家族");
 
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn mobile_rejects_external_creation_and_resolution_without_writing() {
+        let base = tmp_dir("mobile-managed-base");
+        let outside = tmp_dir("mobile-external");
+        fs::create_dir_all(&outside).unwrap();
+        let project = external_project(&outside);
+
+        let error = create_project_with_base(&project, "外部项目", &base, true).unwrap_err();
+        assert!(error.to_string().contains("移动端仅允许"));
+        assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
+        assert!(!base.exists());
+
+        initialize_project(&outside, "已有外部项目").unwrap();
+        let error = resolve_project_root_from_base(&project, &base, true).unwrap_err();
+        assert!(error.to_string().contains("移动端仅允许"));
+        fs::remove_dir_all(outside).ok();
+    }
+
+    #[test]
+    fn desktop_keeps_external_project_creation_and_resolution() {
+        let base = tmp_dir("desktop-managed-base");
+        let outside = tmp_dir("desktop-external");
+        fs::create_dir_all(&outside).unwrap();
+        let project = external_project(&outside);
+
+        create_project_with_base(&project, "桌面项目", &base, false).unwrap();
+        assert_eq!(
+            resolve_project_root_from_base(&project, &base, false).unwrap(),
+            fs::canonicalize(&outside).unwrap()
+        );
+        assert!(!base.exists());
+        fs::remove_dir_all(outside).ok();
     }
 
     #[test]

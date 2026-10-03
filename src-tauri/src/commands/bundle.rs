@@ -41,6 +41,51 @@ pub struct BundleExport {
     pub suggested_name: String,
 }
 
+fn validate_archive_size(size: u64) -> CmdResult<()> {
+    if size > MAX_ARCHIVE_BYTES {
+        return Err(CmdError::Other("备份包超过 512 MiB 限制".into()));
+    }
+    Ok(())
+}
+
+fn validate_entry_count(count: usize) -> CmdResult<()> {
+    if count > MAX_ENTRY_COUNT {
+        return Err(CmdError::Other("备份包文件数量超过 5000 个".into()));
+    }
+    Ok(())
+}
+
+/// 导入与导出共用逐文件和总体积限制，避免成功导出的备份无法恢复。
+#[derive(Default)]
+struct BundleBudget {
+    entry_count: usize,
+    extracted_bytes: u64,
+}
+
+impl BundleBudget {
+    fn include_file(&mut self, path: &Path, size: u64) -> CmdResult<u64> {
+        validate_entry_count(self.entry_count + 1)?;
+        let max_size = max_entry_size(path)
+            .ok_or_else(|| CmdError::Other(format!("备份包包含未知文件：{}", path.display())))?;
+        if size > max_size {
+            return Err(CmdError::Other(format!(
+                "备份包条目过大：{}",
+                path.display()
+            )));
+        }
+        let extracted_bytes = self
+            .extracted_bytes
+            .checked_add(size)
+            .ok_or_else(|| CmdError::Other("备份包解压大小溢出".into()))?;
+        if extracted_bytes > MAX_EXTRACTED_BYTES {
+            return Err(CmdError::Other("备份包解压后超过 1 GiB 限制".into()));
+        }
+        self.entry_count += 1;
+        self.extracted_bytes = extracted_bytes;
+        Ok(max_size)
+    }
+}
+
 fn transfer_name() -> String {
     format!("{}{}", uuid::Uuid::new_v4(), BUNDLE_SUFFIX)
 }
@@ -91,9 +136,11 @@ fn file_options() -> SimpleFileOptions {
 
 fn write_bytes<W: Write + io::Seek>(
     writer: &mut ZipWriter<W>,
+    budget: &mut BundleBudget,
     archive_path: &str,
     bytes: &[u8],
 ) -> CmdResult<()> {
+    budget.include_file(Path::new(archive_path), bytes.len() as u64)?;
     writer.start_file(archive_path, file_options())?;
     writer.write_all(bytes)?;
     Ok(())
@@ -101,12 +148,21 @@ fn write_bytes<W: Write + io::Seek>(
 
 fn write_file<W: Write + io::Seek>(
     writer: &mut ZipWriter<W>,
+    budget: &mut BundleBudget,
     archive_path: &str,
     source: &Path,
 ) -> CmdResult<()> {
+    let file = File::open(source)?;
+    let expected = file.metadata()?.len();
+    let max_size = budget.include_file(Path::new(archive_path), expected)?;
     writer.start_file(archive_path, file_options())?;
-    let mut file = File::open(source)?;
-    io::copy(&mut file, writer)?;
+    let copied = io::copy(&mut file.take(max_size + 1), writer)?;
+    if copied != expected {
+        return Err(CmdError::Other(format!(
+            "导出期间媒体文件大小发生变化：{}",
+            source.display()
+        )));
+    }
     Ok(())
 }
 
@@ -125,12 +181,6 @@ fn media_files(root: &Path, subdir: &str) -> CmdResult<Vec<PathBuf>> {
             )));
         }
         validate_photo_file_name(&entry.path())?;
-        if entry.metadata()?.len() > MAX_MEDIA_BYTES {
-            return Err(CmdError::CorruptedProject(format!(
-                "媒体文件超过 25 MiB：{}",
-                entry.path().display()
-            )));
-        }
         files.push(entry.path());
     }
     files.sort();
@@ -141,27 +191,28 @@ fn export_bundle_at(project_root: &Path, destination: &Path) -> CmdResult<Projec
     let root = validate_project_root_path(project_root)?;
     let meta_bytes = fs::read(root.join(META_FILE))?;
     let family_bytes = fs::read(root.join(FAMILY_FILE))?;
-    if meta_bytes.len() as u64 > MAX_JSON_BYTES || family_bytes.len() as u64 > MAX_JSON_BYTES {
-        return Err(CmdError::CorruptedProject(
-            "项目 JSON 超过 50 MiB 限制".into(),
-        ));
-    }
-    let meta: ProjectMeta = serde_json::from_slice(&meta_bytes)?;
     fs::create_dir_all(
         destination
             .parent()
             .ok_or_else(|| CmdError::InvalidPath(destination.display().to_string()))?,
     )?;
 
-    let result = (|| -> CmdResult<()> {
+    let result = (|| -> CmdResult<ProjectMeta> {
         let file = File::create(destination)?;
         let mut writer = ZipWriter::new(file);
+        let mut budget = BundleBudget::default();
         let manifest = serde_json::to_vec_pretty(&ArchiveManifest {
             archive_version: ARCHIVE_VERSION,
         })?;
-        write_bytes(&mut writer, MANIFEST_FILE, &manifest)?;
-        write_bytes(&mut writer, "project/meta.json", &meta_bytes)?;
-        write_bytes(&mut writer, "project/family.json", &family_bytes)?;
+        write_bytes(&mut writer, &mut budget, MANIFEST_FILE, &manifest)?;
+        write_bytes(&mut writer, &mut budget, "project/meta.json", &meta_bytes)?;
+        let meta: ProjectMeta = serde_json::from_slice(&meta_bytes)?;
+        write_bytes(
+            &mut writer,
+            &mut budget,
+            "project/family.json",
+            &family_bytes,
+        )?;
 
         for subdir in ["photos", "thumbs"] {
             for path in media_files(&root, subdir)? {
@@ -171,19 +222,21 @@ fn export_bundle_at(project_root: &Path, destination: &Path) -> CmdResult<Projec
                     .ok_or_else(|| CmdError::InvalidPath(path.display().to_string()))?;
                 write_file(
                     &mut writer,
+                    &mut budget,
                     &format!("project/media/{}/{}", subdir, file_name),
                     &path,
                 )?;
             }
         }
-        writer.finish()?;
-        Ok(())
+        let file = writer.finish()?;
+        validate_archive_size(file.metadata()?.len())?;
+        Ok(meta)
     })();
 
     if result.is_err() {
         let _ = fs::remove_file(destination);
     }
-    result.map(|_| meta)
+    result
 }
 
 fn allowed_directory(path: &Path) -> bool {
@@ -214,18 +267,14 @@ fn is_allowed_media_file(path: &Path) -> bool {
 
 fn extract_bundle(archive_path: &Path, extraction_root: &Path) -> CmdResult<PathBuf> {
     let archive_size = fs::metadata(archive_path)?.len();
-    if archive_size > MAX_ARCHIVE_BYTES {
-        return Err(CmdError::Other("备份包超过 512 MiB 限制".into()));
-    }
+    validate_archive_size(archive_size)?;
 
     let file = File::open(archive_path)?;
     let mut archive = ZipArchive::new(file)?;
-    if archive.len() > MAX_ENTRY_COUNT {
-        return Err(CmdError::Other("备份包文件数量超过 5000 个".into()));
-    }
+    validate_entry_count(archive.len())?;
 
     let mut seen = HashSet::new();
-    let mut extracted_bytes = 0u64;
+    let mut budget = BundleBudget::default();
     fs::create_dir_all(extraction_root)?;
 
     for index in 0..archive.len() {
@@ -255,17 +304,7 @@ fn extract_bundle(archive_path: &Path, extraction_root: &Path) -> CmdResult<Path
             continue;
         }
 
-        let max_size = max_entry_size(&enclosed)
-            .ok_or_else(|| CmdError::Other(format!("备份包包含未知文件：{}", normalized)))?;
-        if entry.size() > max_size {
-            return Err(CmdError::Other(format!("备份包条目过大：{}", normalized)));
-        }
-        extracted_bytes = extracted_bytes
-            .checked_add(entry.size())
-            .ok_or_else(|| CmdError::Other("备份包解压大小溢出".into()))?;
-        if extracted_bytes > MAX_EXTRACTED_BYTES {
-            return Err(CmdError::Other("备份包解压后超过 1 GiB 限制".into()));
-        }
+        let max_size = budget.include_file(&enclosed, entry.size())?;
 
         let output_path = extraction_root.join(&enclosed);
         if let Some(parent) = output_path.parent() {
@@ -423,6 +462,122 @@ mod tests {
         fs::remove_dir_all(source).ok();
         fs::remove_file(archive).ok();
         fs::remove_dir_all(managed_base).ok();
+    }
+
+    #[test]
+    fn export_rejects_too_many_media_entries_and_cleans_output() {
+        let source = source_project("entry-limit");
+        let archive = tmp_dir("entry-limit-archive").with_extension("familybundle");
+        for index in 2..=2_500 {
+            for subdir in ["photos", "thumbs"] {
+                fs::write(
+                    source.join(format!("media/{}/photo-{}.webp", subdir, index)),
+                    b"photo",
+                )
+                .unwrap();
+            }
+        }
+
+        let result = export_bundle_at(&source, &archive);
+        let output_exists = archive.exists();
+        fs::remove_dir_all(source).ok();
+        fs::remove_file(archive).ok();
+
+        assert!(result.unwrap_err().to_string().contains("5000"));
+        assert!(!output_exists);
+    }
+
+    #[test]
+    fn export_rejects_metadata_above_import_limit_and_cleans_output() {
+        let source = source_project("meta-limit");
+        let archive = tmp_dir("meta-limit-archive").with_extension("familybundle");
+        let mut meta = fs::read(source.join(META_FILE)).unwrap();
+        // 补空白仍是合法 JSON，用于验证导入的 1 MiB 元数据限制。
+        meta.resize(1024 * 1024 + 1, b' ');
+        fs::write(source.join(META_FILE), meta).unwrap();
+
+        let result = export_bundle_at(&source, &archive);
+        let output_exists = archive.exists();
+        fs::remove_dir_all(source).ok();
+        fs::remove_file(archive).ok();
+
+        assert!(result.unwrap_err().to_string().contains("条目过大"));
+        assert!(!output_exists);
+    }
+
+    #[test]
+    fn export_metadata_at_import_limit_roundtrips() {
+        let source = source_project("meta-boundary");
+        let archive = tmp_dir("meta-boundary-archive").with_extension("familybundle");
+        let managed_base = tmp_dir("meta-boundary-managed");
+        let mut meta = fs::read(source.join(META_FILE)).unwrap();
+        meta.resize(1024 * 1024, b' ');
+        fs::write(source.join(META_FILE), meta).unwrap();
+
+        export_bundle_at(&source, &archive).unwrap();
+        let imported = import_bundle_at(&archive, &managed_base).unwrap();
+        assert_eq!(imported.meta.name, "测试家族");
+
+        fs::remove_dir_all(source).ok();
+        fs::remove_file(archive).ok();
+        fs::remove_dir_all(managed_base).ok();
+    }
+
+    #[test]
+    fn bundle_budget_accepts_total_limit_and_rejects_next_byte() {
+        let mut budget = BundleBudget::default();
+        let full_files = MAX_EXTRACTED_BYTES / MAX_MEDIA_BYTES;
+        for index in 0..full_files {
+            budget
+                .include_file(
+                    Path::new(&format!("project/media/photos/photo-{}.webp", index)),
+                    MAX_MEDIA_BYTES,
+                )
+                .unwrap();
+        }
+        budget
+            .include_file(
+                Path::new("project/media/photos/final.webp"),
+                MAX_EXTRACTED_BYTES % MAX_MEDIA_BYTES,
+            )
+            .unwrap();
+
+        let error = budget
+            .include_file(Path::new("project/media/photos/overflow.webp"), 1)
+            .unwrap_err();
+        assert!(error.to_string().contains("1 GiB"));
+    }
+
+    #[test]
+    fn bundle_budget_applies_each_import_entry_limit() {
+        for (path, limit) in [
+            (MANIFEST_FILE, 1024 * 1024),
+            ("project/meta.json", 1024 * 1024),
+            ("project/family.json", MAX_JSON_BYTES),
+            ("project/media/photos/photo.webp", MAX_MEDIA_BYTES),
+            ("project/media/thumbs/photo.webp", MAX_MEDIA_BYTES),
+        ] {
+            let mut budget = BundleBudget::default();
+            budget.include_file(Path::new(path), limit).unwrap();
+            let error = budget.include_file(Path::new(path), limit + 1).unwrap_err();
+            assert!(error.to_string().contains("条目过大"), "{}", path);
+        }
+    }
+
+    #[test]
+    fn import_rejects_oversized_archive_before_extraction() {
+        let archive = tmp_dir("archive-size").with_extension("familybundle");
+        let extraction = tmp_dir("archive-size-extraction");
+        File::create(&archive)
+            .unwrap()
+            .set_len(MAX_ARCHIVE_BYTES + 1)
+            .unwrap();
+
+        let error = extract_bundle(&archive, &extraction).unwrap_err();
+        fs::remove_file(archive).ok();
+
+        assert!(error.to_string().contains("512 MiB"));
+        assert!(!extraction.exists());
     }
 
     #[test]
