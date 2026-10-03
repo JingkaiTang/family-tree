@@ -2,23 +2,23 @@
 
 [![CI](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/JingkaiTang/family-tree/actions/workflows/ci.yml)
 
-一款面向中文家庭关系的本地优先桌面应用，使用 Tauri 2、Vue 3 和 Rust 构建。
+一款面向中文家庭关系的本地优先桌面与移动应用，使用 Tauri 2、Vue 3 和 Rust 构建。
 
 ![家族树主界面，展示虚构的六代家族](docs/assets/family-tree-overview.jpg)
 
 > 截图使用仓库内的虚构测试数据和合成头像，不包含真实个人信息。
 
-> **项目状态：Alpha。** 当前仅建议从源码构建，尚未提供签名安装包、自动更新或稳定数据格式承诺。请定期备份真实项目；本地 `.family` 项目文件不加密。
+> **项目状态：Alpha。** 当前仅建议从源码构建，尚未提供签名安装包、自动更新或稳定数据格式承诺。请定期导出 `.familybundle` 备份；本地项目数据不加密。
 
-[架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [发布说明](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
+[架构说明](docs/architecture.md) · [项目格式](docs/project-format.md) · [移动端开发](docs/mobile-development.md) · [发布说明](docs/releasing.md) · [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [更新记录](CHANGELOG.md)
 
 ## 功能
 
-- **家族关系可视化**：按家庭单元和代际布局成员，支持缩放、平移、家庭拖拽与恢复默认布局。
+- **两种家族布局**：桌面默认使用可缩放、平移和拖拽的家族网格；窄屏触控设备默认使用按家庭渐进展开的聚焦纵流，可随时切换。
 - **复杂家庭结构**：支持当前及历史配偶、养育/继亲、次要父母和干亲等关系。
 - **中文亲属称谓**：计算常见的直系、旁系与姻亲称谓，并支持按家庭习惯自定义覆盖。不同地区和家庭的称谓存在差异，自动结果仍需使用者确认。
 - **成员资料管理**：记录姓名、性别、出生日期、照片、籍贯和职业等信息。
-- **本地优先**：数据保存在使用者选择的普通文件夹中，应用不主动上传，便于自行复制和备份。
+- **本地优先**：桌面端使用自选普通文件夹，移动端使用应用私有目录；应用不主动上传，并支持导出/导入本地备份。
 - **数据可靠性**：项目打开和保存时执行结构校验，自动保留有限数量的本地备份。
 
 ## 快速开始
@@ -46,6 +46,8 @@ npm run tauri:build
 
 产物位于 `src-tauri/target/release/bundle/`。跨平台环境准备和常见构建问题见 [贡献指南](CONTRIBUTING.md)。
 
+iOS 与 Android 需要各自的原生工具链，初始化、开发、构建和真机验收步骤见[移动端开发说明](docs/mobile-development.md)。
+
 ### 验证改动
 
 ```bash
@@ -65,13 +67,13 @@ cargo clippy --all-targets --all-features --locked -- -D warnings
 
 | 层 | 技术 |
 |---|---|
-| 桌面与本地文件 | Tauri 2、Rust |
+| 桌面/移动端与本地文件 | Tauri 2、Rust |
 | 前端 | Vue 3、TypeScript、Pinia、Tailwind CSS |
 | 数据与校验 | JSON、Zod、版本迁移与本地备份 |
-| 家族树 | 自研家庭单元布局与连线路由、Web Worker |
+| 家族树 | 家族网格与聚焦纵流双布局、共享家庭事实、Web Worker |
 | 测试 | Vitest、Rust test/clippy、RustSec audit |
 
-核心领域逻辑位于 `src/core`，Vue 组件负责交互编排；Tauri 后端只暴露受校验的本地文件命令。中文称谓采用“关系图寻路 → 路径规范化 → 规则翻译”的流水线，布局采用确定性的纯函数核心并通过 Web Worker 运行。完整边界和数据流见 [架构文档](docs/architecture.md)。
+核心领域逻辑位于 `src/core`，Vue 组件负责交互编排；Tauri 后端只暴露受校验的外部目录、应用私有目录和备份传输命令。中文称谓采用“关系图寻路 → 路径规范化 → 规则翻译”的流水线；两套布局共享规范化家庭事实，其中大型网格计算通过 Web Worker 运行。完整边界和数据流见 [架构文档](docs/architecture.md)。
 
 ## 参与贡献
 

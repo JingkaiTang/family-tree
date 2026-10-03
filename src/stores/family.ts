@@ -25,7 +25,8 @@ import {
   orderSiblingIds,
   reconcileSiblingOrders,
 } from '@/core/siblingOrder'
-import { setLastProjectPath } from '@/services/prefs'
+import { setLastProjectRef } from '@/services/prefs'
+import { projectRefLocation, type ProjectRef } from '@/services/projectRef'
 
 /**
  * family store 的职责：
@@ -36,7 +37,8 @@ import { setLastProjectPath } from '@/services/prefs'
  * 持久化由 services/autosave.ts 订阅本 store 的 mutation 后防抖写盘。
  */
 export const useFamilyStore = defineStore('family', () => {
-  const projectPath = ref<string | null>(null)
+  const projectRef = ref<ProjectRef | null>(null)
+  const projectPath = computed(() => projectRef.value ? projectRefLocation(projectRef.value) : null)
   const projectMeta = ref<ProjectMeta | null>(null)
   const data = ref<FamilyData>(createEmptyFamily())
   const isDirty = ref(false)
@@ -50,26 +52,26 @@ export const useFamilyStore = defineStore('family', () => {
   const membersArray = computed(() => Object.values(data.value.members))
   const memberCount = computed(() => membersArray.value.length)
 
-  function setProject(path: string, meta: ProjectMeta, family: FamilyData) {
+  function setProject(project: ProjectRef, meta: ProjectMeta, family: FamilyData) {
     projectToken.value += 1
     isDirty.value = false
     revision.value = 0
-    projectPath.value = path
+    projectRef.value = project
     projectMeta.value = meta
     data.value = family
     lastSavedAt.value = Date.now()
-    setLastProjectPath(path)
+    setLastProjectRef(project)
   }
 
   function closeProject() {
     projectToken.value += 1
     isDirty.value = false
     revision.value = 0
-    projectPath.value = null
+    projectRef.value = null
     projectMeta.value = null
     data.value = createEmptyFamily()
     lastSavedAt.value = null
-    setLastProjectPath(null)
+    setLastProjectRef(null)
   }
 
   function markClean() {
@@ -415,6 +417,7 @@ export const useFamilyStore = defineStore('family', () => {
 
   return {
     // state
+    projectRef,
     projectPath,
     projectMeta,
     data,

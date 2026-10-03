@@ -6,11 +6,11 @@ import type {
   RootOrderPreference,
   RowOrderPreference,
 } from '@/core/schema'
+import { normalizeFacts } from '@/core/family-graph/normalizeFacts'
 import { assignGenerations } from './assignGenerations'
 import { buildRootDomains } from './buildRootDomains'
 import { buildFamilyUnits, type BuiltFamilyUnits } from './buildFamilyUnits'
 import { discoverRootFamilies } from './discoverRootFamilies'
-import { normalizeFacts } from './normalizeFacts'
 import { projectView } from './projectView'
 import { propagateRootSignatures } from './propagateRootSignatures'
 import {

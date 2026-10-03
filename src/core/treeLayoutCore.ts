@@ -1,6 +1,6 @@
 import { createEmptyFamily, type FamilyData, type Member } from './schema'
 import { layoutFamilyScene } from './family-layout/layoutFamilyScene'
-import { normalizeFacts } from './family-layout/normalizeFacts'
+import { normalizeFacts } from './family-graph/normalizeFacts'
 import {
   DEFAULT_FAMILY_VIEW_POLICY,
   DEFAULT_LAYOUT_METRICS,

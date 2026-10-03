@@ -9,21 +9,42 @@ import TreeView from '@/pages/TreeView.vue'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
+import { externalProjectRef } from '@/services/projectRef'
 
-const { flushNowMock, routerPush } = vi.hoisted(() => ({
+const { exportProjectBundleMock, flushNowMock, routerPush } = vi.hoisted(() => ({
+  exportProjectBundleMock: vi.fn(),
   flushNowMock: vi.fn(),
   routerPush: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
-vi.mock('@/services/tauriApi', () => ({ gcMedia: vi.fn() }))
+vi.mock('@/services/projectTransfer', () => ({
+  exportProjectBundle: exportProjectBundleMock,
+}))
+vi.mock('@/services/projectRepository', () => ({
+  projectRepository: { gcMedia: vi.fn() },
+}))
 vi.mock('uuid', () => ({ v4: vi.fn(() => 'new-member') }))
 
-const FamilyCanvasStub = defineComponent({
-  name: 'FamilyCanvas',
-  props: ['selectedId', 'viewpointId', 'showAuxiliaryRelations', 'layoutResetVersion'],
+const TreeLayoutHostStub = defineComponent({
+  name: 'TreeLayoutHost',
+  props: [
+    'mode',
+    'selectedId',
+    'viewpointId',
+    'layoutFocusId',
+    'showAuxiliaryRelations',
+    'layoutResetVersion',
+    'initialGridView',
+    'initialFocusScrollTop',
+    'expandedBranchIds',
+  ],
   emits: [
+    'grid-view-change',
+    'focus-scroll-change',
+    'layout-focus-change',
+    'focus-branch-toggle',
     'domain-row-order-change',
     'bridge-order-change',
     'root-order-change',
@@ -31,6 +52,22 @@ const FamilyCanvasStub = defineComponent({
   ],
   setup(_, { emit }) {
     return () => h('div', [
+      h('button', {
+        'data-testid': 'change-grid-view',
+        onClick: () => emit('grid-view-change', { x: 24, y: -12, scale: 1.4 }),
+      }),
+      h('button', {
+        'data-testid': 'change-focus-scroll',
+        onClick: () => emit('focus-scroll-change', 320),
+      }),
+      h('button', {
+        'data-testid': 'change-layout-focus',
+        onClick: () => emit('layout-focus-change', 'focus-target'),
+      }),
+      h('button', {
+        'data-testid': 'toggle-focus-branch',
+        onClick: () => emit('focus-branch-toggle', 'ancestors:focus-target'),
+      }),
       h('button', {
         'data-testid': 'reorder-row',
         onClick: () => emit('domain-row-order-change', {
@@ -83,6 +120,8 @@ describe('TreeView row order integration', () => {
   beforeEach(() => {
     flushNowMock.mockReset()
     flushNowMock.mockResolvedValue(undefined)
+    exportProjectBundleMock.mockReset()
+    exportProjectBundleMock.mockResolvedValue(true)
     routerPush.mockReset()
   })
 
@@ -94,7 +133,7 @@ describe('TreeView row order integration', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          FamilyCanvas: FamilyCanvasStub,
+          TreeLayoutHost: TreeLayoutHostStub,
           SearchBar: true,
         },
       },
@@ -123,7 +162,7 @@ describe('TreeView row order integration', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          FamilyCanvas: FamilyCanvasStub,
+          TreeLayoutHost: TreeLayoutHostStub,
           SearchBar: true,
         },
       },
@@ -152,7 +191,7 @@ describe('TreeView row order integration', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          FamilyCanvas: FamilyCanvasStub,
+          TreeLayoutHost: TreeLayoutHostStub,
           SearchBar: true,
         },
       },
@@ -220,7 +259,7 @@ describe('TreeView row order integration', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          FamilyCanvas: FamilyCanvasStub,
+          TreeLayoutHost: TreeLayoutHostStub,
           SearchBar: true,
         },
       },
@@ -247,7 +286,7 @@ describe('TreeView row order integration', () => {
     expect(ui.selectedId).toBe('child')
     expect(ui.viewpointId).toBe('viewpoint')
     expect(ui.canvasView).toBeNull()
-    expect(wrapper.getComponent(FamilyCanvasStub).props('layoutResetVersion')).toBe(1)
+    expect(wrapper.getComponent(TreeLayoutHostStub).props('layoutResetVersion')).toBe(1)
     expect(button.attributes('disabled')).toBeDefined()
   })
 
@@ -280,7 +319,7 @@ describe('TreeView row order integration', () => {
     const wrapper = mount(TreeView, {
       global: {
         plugins: [pinia],
-        stubs: { FamilyCanvas: FamilyCanvasStub, SearchBar: true },
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
       },
     })
 
@@ -299,7 +338,7 @@ describe('TreeView row order integration', () => {
     const wrapper = mount(TreeView, {
       global: {
         plugins: [pinia],
-        stubs: { FamilyCanvas: FamilyCanvasStub, SearchBar: true },
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
       },
     })
 
@@ -324,7 +363,7 @@ describe('TreeView row order integration', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          FamilyCanvas: FamilyCanvasStub,
+          TreeLayoutHost: TreeLayoutHostStub,
           SearchBar: true,
         },
       },
@@ -335,12 +374,90 @@ describe('TreeView row order integration', () => {
     await toggle.setValue(true)
 
     expect(ui.showAuxiliaryRelations).toBe(true)
-    const canvas = wrapper.getComponent(FamilyCanvasStub)
+    const canvas = wrapper.getComponent(TreeLayoutHostStub)
     expect(canvas.props()).toMatchObject({
       selectedId: 'selected',
       viewpointId: 'viewpoint',
       showAuxiliaryRelations: true,
     })
+  })
+
+  it('switches layouts without dirtying the project and preserves each layout state', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const ui = useUiStore()
+    family.$patch(state => {
+      state.data.members = {
+        selected: mk('selected'),
+        'focus-target': mk('focus-target'),
+      }
+    })
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="layout-mode-select"] option[value="auto"]').text())
+      .toBe('自动（网格）')
+
+    await wrapper.get('[data-testid="change-grid-view"]').trigger('click')
+    await wrapper.get('[data-testid="layout-mode-select"]').setValue('focus-flow')
+    await wrapper.get('[data-testid="change-layout-focus"]').trigger('click')
+    await wrapper.get('[data-testid="toggle-focus-branch"]').trigger('click')
+    await wrapper.get('[data-testid="change-focus-scroll"]').trigger('click')
+
+    expect(ui.resolvedLayoutMode).toBe('focus-flow')
+    expect(wrapper.get('[data-testid="layout-mode-select"] option[value="auto"]').text())
+      .toBe('自动（网格）')
+    expect(ui.canvasView).toEqual({ x: 24, y: -12, scale: 1.4 })
+    expect(ui.layoutFocusId).toBe('focus-target')
+    expect(ui.focusFlowExpandedBranchIds).toEqual(['ancestors:focus-target'])
+    expect(ui.focusFlowScrollTop).toBe(320)
+    expect(family.isDirty).toBe(false)
+    expect(wrapper.getComponent(TreeLayoutHostStub).props()).toMatchObject({
+      mode: 'focus-flow',
+      layoutFocusId: 'focus-target',
+      initialGridView: { x: 24, y: -12, scale: 1.4 },
+      initialFocusScrollTop: 320,
+      expandedBranchIds: ['ancestors:focus-target'],
+    })
+
+    await wrapper.get('[data-testid="layout-mode-select"]').setValue('family-grid')
+    expect(ui.resolvedLayoutMode).toBe('family-grid')
+    expect(ui.focusFlowScrollTop).toBe(320)
+    expect(family.isDirty).toBe(false)
+  })
+
+  it('resolves the initial layout focus without conflating selection and viewpoint', () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const ui = useUiStore()
+    family.$patch(state => {
+      state.data.members = {
+        root: mk('root'),
+        selected: mk('selected'),
+        viewpoint: mk('viewpoint'),
+      }
+      state.data.rootMemberId = 'root'
+    })
+    ui.setSelected('selected')
+    ui.setViewpoint('viewpoint')
+
+    mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
+      },
+    })
+
+    expect(ui.layoutFocusId).toBe('selected')
+    expect(ui.selectedId).toBe('selected')
+    expect(ui.viewpointId).toBe('viewpoint')
+    expect(family.isDirty).toBe(false)
   })
 
   it('resets auxiliary visibility when closing the project', async () => {
@@ -352,7 +469,7 @@ describe('TreeView row order integration', () => {
       global: {
         plugins: [pinia],
         stubs: {
-          FamilyCanvas: FamilyCanvasStub,
+          TreeLayoutHost: TreeLayoutHostStub,
           SearchBar: true,
         },
       },
@@ -366,12 +483,40 @@ describe('TreeView row order integration', () => {
     expect(routerPush).toHaveBeenCalledWith('/')
   })
 
+  it('flushes pending changes before exporting a project backup', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const project = externalProjectRef('/tmp/test.family')
+    family.setProject(project, {
+      name: '测试',
+      schemaVersion: 4,
+      createdAt: '2026-07-16T00:00:00.000Z',
+      updatedAt: '2026-07-16T00:00:00.000Z',
+    }, family.data)
+    const wrapper = mount(TreeView, {
+      global: {
+        plugins: [pinia],
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
+      },
+    })
+
+    const exportButton = wrapper.findAll('button')
+      .find(button => button.text() === '导出备份')!
+    await exportButton.trigger('click')
+
+    expect(flushNowMock).toHaveBeenCalledOnce()
+    expect(exportProjectBundleMock).toHaveBeenCalledWith(project)
+    expect(flushNowMock.mock.invocationCallOrder[0])
+      .toBeLessThan(exportProjectBundleMock.mock.invocationCallOrder[0]!)
+  })
+
   it('keeps the project open when the final save fails', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const family = useFamilyStore()
     const ui = useUiStore()
-    family.setProject('/tmp/test.family', {
+    family.setProject(externalProjectRef('/tmp/test.family'), {
       name: '测试',
       schemaVersion: 4,
       createdAt: '2026-07-16T00:00:00.000Z',
@@ -382,7 +527,7 @@ describe('TreeView row order integration', () => {
     const wrapper = mount(TreeView, {
       global: {
         plugins: [pinia],
-        stubs: { FamilyCanvas: FamilyCanvasStub, SearchBar: true },
+        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
       },
     })
 

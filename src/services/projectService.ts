@@ -7,32 +7,41 @@ import {
 } from '@/core/schema'
 import { migrate } from '@/core/migrate'
 import { assertFamilyIntegrity } from '@/core/familyIntegrity'
-import * as api from './tauriApi'
+import { v4 as uuidv4 } from 'uuid'
+import { projectRepository } from './projectRepository'
+import { managedProjectRef, projectRefName, type ProjectRef } from './projectRef'
 
 export interface OpenResult {
-  path: string
+  project: ProjectRef
   meta: ProjectMeta
   family: FamilyData
 }
 
 /**
- * 在 dirPath 下创建一个新项目。
- * dirPath 应当是"项目根目录"（用户自选，比如 ~/Documents/MyFamily.family）。
+ * 通过统一项目引用创建项目。桌面端引用外部目录，移动端使用托管项目 ID。
  */
-export async function createProject(dirPath: string, name: string): Promise<OpenResult> {
-  const meta = await api.createProject(dirPath, name)
+export async function createProject(project: ProjectRef, name: string): Promise<OpenResult> {
+  const meta = await projectRepository.create(project, name)
   const family = createEmptyFamily()
   // 初始空数据写盘一次
-  await api.saveProject(dirPath, family)
-  return { path: dirPath, meta, family }
+  await projectRepository.save(project, family)
+  return { project, meta, family }
+}
+
+export async function createManagedProject(name: string): Promise<OpenResult> {
+  return createProject(managedProjectRef(uuidv4()), name)
+}
+
+export async function listManagedProjects() {
+  return projectRepository.listManaged()
 }
 
 /**
  * 打开一个已有项目。会做 schema 迁移 + Zod 校验。
  * 校验失败时抛出带中文说明的错误。
  */
-export async function openProject(dirPath: string): Promise<OpenResult> {
-  const loaded = await api.loadProject(dirPath)
+export async function openProject(project: ProjectRef): Promise<OpenResult> {
+  const loaded = await projectRepository.load(project)
   const migrated = migrate(loaded.family)
   const parsed = FamilyData.safeParse(migrated)
   if (!parsed.success) {
@@ -48,11 +57,11 @@ export async function openProject(dirPath: string): Promise<OpenResult> {
   }
   const meta = parsedMeta.success
     ? { ...parsedMeta.data, schemaVersion: parsed.data.schemaVersion }
-    : createEmptyMeta(dirPath.split('/').pop() ?? '未命名家族')
-  return { path: loaded.path, meta, family: parsed.data }
+    : createEmptyMeta(projectRefName(project) || '未命名家族')
+  return { project: loaded.project, meta, family: parsed.data }
 }
 
-export async function saveProject(dirPath: string, family: FamilyData): Promise<void> {
+export async function saveProject(project: ProjectRef, family: FamilyData): Promise<void> {
   const parsed = FamilyData.safeParse(family)
   if (!parsed.success) {
     throw new Error(
@@ -60,5 +69,5 @@ export async function saveProject(dirPath: string, family: FamilyData): Promise<
     )
   }
   assertFamilyIntegrity(parsed.data)
-  await api.saveProject(dirPath, parsed.data)
+  await projectRepository.save(project, parsed.data)
 }

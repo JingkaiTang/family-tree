@@ -1,5 +1,5 @@
 import type { FamilyData, Member, SiblingOrders } from './schema'
-import { normalizeFacts } from './family-layout/normalizeFacts'
+import { normalizeFacts } from './family-graph/normalizeFacts'
 
 export interface SiblingOrderGroup {
   id: string

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { resolvePhotoUrl, importPhoto } from '@/services/tauriApi'
+import { projectRepository } from '@/services/projectRepository'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import PhotoCropper from './PhotoCropper.vue'
@@ -27,12 +27,12 @@ function replacePreviewUrl(next: string | null) {
 
 async function refreshPreview() {
   const request = ++previewRequest
-  if (!props.photoId || !family.projectPath) {
+  if (!props.photoId || !family.projectRef) {
     replacePreviewUrl(null)
     return
   }
   try {
-    const next = await resolvePhotoUrl(family.projectPath, props.photoId, true)
+    const next = await projectRepository.resolvePhotoUrl(family.projectRef, props.photoId, true)
     if (request !== previewRequest) {
       if (next.startsWith('blob:')) URL.revokeObjectURL(next)
       return
@@ -43,7 +43,7 @@ async function refreshPreview() {
   }
 }
 
-watch(() => [props.photoId, family.projectPath] as const, refreshPreview, { immediate: true })
+watch(() => [props.photoId, family.projectRef] as const, refreshPreview, { immediate: true })
 
 onBeforeUnmount(() => {
   previewRequest += 1
@@ -54,16 +54,16 @@ function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = '' // allow re-picking same file
-  if (!file || !family.projectPath) return
+  if (!file || !family.projectRef) return
   pendingFile.value = file
 }
 
 async function onCropConfirm(blob: Blob) {
-  if (!family.projectPath) return
+  if (!family.projectRef) return
   uploading.value = true
   try {
     const bytes = new Uint8Array(await blob.arrayBuffer())
-    const { photoId } = await importPhoto(family.projectPath, bytes, 'image/png')
+    const { photoId } = await projectRepository.importPhoto(family.projectRef, bytes, 'image/png')
     emit('stage', photoId)
     emit('change', photoId)
     ui.showToast('success', '照片已暂存，保存成员后生效')

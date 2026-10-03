@@ -1,9 +1,12 @@
+/** @vitest-environment happy-dom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createEmptyFamily, createEmptyMeta, type FamilyData } from '@/core/schema'
 import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
-import { createAutosaveController } from './autosave'
+import { createAutosaveController, installPageLifecycleFlush } from './autosave'
+import { externalProjectRef } from './projectRef'
+import type { ProjectRef } from './projectRef'
 
 describe('autosave coordinator', () => {
   beforeEach(() => {
@@ -12,12 +15,13 @@ describe('autosave coordinator', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('debounces every revision instead of only the first dirty transition', async () => {
     vi.useFakeTimers()
     const family = openedFamily()
-    const save = vi.fn(async (_path: string, _data: FamilyData) => {})
+    const save = vi.fn(async (_project: ProjectRef, _data: FamilyData) => {})
     const controller = createAutosaveController(family, { debounceMs: 800, save })
     controller.start()
 
@@ -42,7 +46,7 @@ describe('autosave coordinator', () => {
       data: FamilyData
       resolve: () => void
     }> = []
-    const save = vi.fn((_path: string, data: FamilyData) => new Promise<void>(resolve => {
+    const save = vi.fn((_project: ProjectRef, data: FamilyData) => new Promise<void>(resolve => {
       pending.push({ data, resolve })
     }))
     const controller = createAutosaveController(family, { save })
@@ -80,10 +84,43 @@ describe('autosave coordinator', () => {
 
     expect(family.isDirty).toBe(true)
   })
+
+  it('flushes dirty data when the page is hidden or moved to the background', async () => {
+    const flush = vi.fn().mockResolvedValue(undefined)
+    let dirty = true
+    const onError = vi.fn()
+    const cleanup = installPageLifecycleFlush(flush, () => dirty, onError)
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('pagehide'))
+    await vi.waitFor(() => expect(flush).toHaveBeenCalledTimes(2))
+
+    dirty = false
+    window.dispatchEvent(new Event('pagehide'))
+    expect(flush).toHaveBeenCalledTimes(2)
+    expect(onError).not.toHaveBeenCalled()
+    cleanup()
+  })
+
+  it('reports a lifecycle flush failure without losing the dirty state', async () => {
+    const error = new Error('background write failed')
+    const onError = vi.fn()
+    const cleanup = installPageLifecycleFlush(
+      vi.fn().mockRejectedValue(error),
+      () => true,
+      onError,
+    )
+
+    window.dispatchEvent(new Event('pagehide'))
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(error))
+    cleanup()
+  })
 })
 
 function openedFamily() {
   const family = useFamilyStore()
-  family.setProject('/tmp/test.family', createEmptyMeta('测试'), createEmptyFamily())
+  family.setProject(externalProjectRef('/tmp/test.family'), createEmptyMeta('测试'), createEmptyFamily())
   return family
 }

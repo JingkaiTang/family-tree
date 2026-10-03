@@ -3,11 +3,12 @@ import type { FamilyData } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { saveProject } from './projectService'
+import type { ProjectRef } from './projectRef'
 
 const DEBOUNCE_MS = 800
 
 type FamilyStore = ReturnType<typeof useFamilyStore>
-type SaveProject = (path: string, family: FamilyData) => Promise<void>
+type SaveProject = (project: ProjectRef, family: FamilyData) => Promise<void>
 
 export interface AutosaveController {
   start: () => void
@@ -19,6 +20,38 @@ interface AutosaveOptions {
   debounceMs?: number
   save?: SaveProject
   onBackgroundError?: (error: unknown) => void
+}
+
+type LifecycleDocument = Pick<
+  Document,
+  'addEventListener' | 'removeEventListener' | 'visibilityState'
+>
+type LifecycleWindow = Pick<Window, 'addEventListener' | 'removeEventListener'>
+
+/**
+ * 移动端 WebView 进入后台后可能很快被冻结，因此在 pagehide 和页面隐藏时立即发起保存。
+ */
+export function installPageLifecycleFlush(
+  flush: () => Promise<void>,
+  shouldFlush: () => boolean,
+  onError: (error: unknown) => void,
+  windowTarget: LifecycleWindow = window,
+  documentTarget: LifecycleDocument = document,
+): () => void {
+  const flushIfNeeded = () => {
+    if (!shouldFlush()) return
+    void flush().catch(onError)
+  }
+  const onVisibilityChange = () => {
+    if (documentTarget.visibilityState === 'hidden') flushIfNeeded()
+  }
+
+  windowTarget.addEventListener('pagehide', flushIfNeeded)
+  documentTarget.addEventListener('visibilitychange', onVisibilityChange)
+  return () => {
+    windowTarget.removeEventListener('pagehide', flushIfNeeded)
+    documentTarget.removeEventListener('visibilitychange', onVisibilityChange)
+  }
 }
 
 export function createAutosaveController(
@@ -47,9 +80,9 @@ export function createAutosaveController(
   }
 
   function snapshot() {
-    if (!family.projectPath || !family.isDirty) return null
+    if (!family.projectRef || !family.isDirty) return null
     return {
-      path: family.projectPath,
+      project: family.projectRef,
       projectToken: family.projectToken,
       revision: family.revision,
       data: JSON.parse(JSON.stringify(family.data)) as FamilyData,
@@ -62,7 +95,7 @@ export function createAutosaveController(
       const current = snapshot()
       if (current === null) continue
 
-      await save(current.path, current.data)
+      await save(current.project, current.data)
       family.markSaved(current.projectToken, current.revision)
 
       if (
@@ -88,7 +121,7 @@ export function createAutosaveController(
     stopWatch = watch(
       () => family.revision,
       () => {
-        if (family.projectPath && family.isDirty) schedule()
+        if (family.projectRef && family.isDirty) schedule()
       },
       { flush: 'sync' },
     )
@@ -106,7 +139,7 @@ export function createAutosaveController(
       await saveLoop
       return
     }
-    if (!family.projectPath || !family.isDirty) return
+    if (!family.projectRef || !family.isDirty) return
     await enqueueSave()
   }
 
@@ -127,23 +160,29 @@ export function startAutosave() {
 
   const family = useFamilyStore()
   const ui = useUiStore()
+  const reportSaveError = (error: unknown) => {
+    const msg = error instanceof Error ? error.message : String(error)
+    ui.showToast('error', '保存失败：' + msg)
+    console.error('[autosave] save failed:', error)
+  }
   controller = createAutosaveController(family, {
-    onBackgroundError: e => {
-      const msg = e instanceof Error ? e.message : String(e)
-      ui.showToast('error', '保存失败：' + msg)
-      console.error('[autosave] save failed:', e)
-    },
+    onBackgroundError: reportSaveError,
   })
   controller.start()
 
   if (typeof window !== 'undefined' && !closeGuardStarted) {
     closeGuardStarted = true
     window.addEventListener('beforeunload', event => {
-      if (family.isDirty && family.projectPath) {
+      if (family.isDirty && family.projectRef) {
         void controller?.flushNow()
         event.preventDefault()
       }
     })
+    installPageLifecycleFlush(
+      () => controller?.flushNow() ?? Promise.resolve(),
+      () => Boolean(family.isDirty && family.projectRef),
+      reportSaveError,
+    )
 
     if ('__TAURI_INTERNALS__' in window) {
       void installTauriCloseGuard(family, ui)
@@ -158,7 +197,7 @@ async function installTauriCloseGuard(
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
   const currentWindow = getCurrentWindow()
   await currentWindow.onCloseRequested(async event => {
-    if (!family.isDirty || !family.projectPath) return
+    if (!family.isDirty || !family.projectRef) return
     event.preventDefault()
     try {
       await flushNow()

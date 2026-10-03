@@ -43,7 +43,7 @@ function onBlur() {
 </script>
 
 <template>
-  <div class="relative w-64">
+  <div class="relative w-full basis-full sm:w-64 sm:basis-auto">
     <input
       v-model="q"
       type="search"

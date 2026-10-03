@@ -5,12 +5,13 @@ import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { flushNow } from '@/services/autosave'
-import { deletePhoto } from '@/services/tauriApi'
+import { projectRepository } from '@/services/projectRepository'
 import MemberForm from '@/components/member/MemberForm.vue'
 import RelationEditor from '@/components/member/RelationEditor.vue'
 import SiblingOrderEditor from '@/components/member/SiblingOrderEditor.vue'
 import { getKinship } from '@/core/kinship'
 import type { Member } from '@/core/schema'
+import type { ProjectRef } from '@/services/projectRef'
 
 const props = defineProps<{ id: string }>()
 
@@ -24,7 +25,7 @@ const member = computed(() => family.getMember(props.id))
 
 // 表单本地副本
 const draft = ref<Member | null>(null)
-const stagedPhotos = new Map<string, string>()
+const stagedPhotos = new Map<string, ProjectRef>()
 
 watch(
   member,
@@ -103,8 +104,8 @@ async function onBack() {
 }
 
 function onMediaStaged(photoId: string) {
-  if (!family.projectPath) return
-  stagedPhotos.set(photoId, family.projectPath)
+  if (!family.projectRef) return
+  stagedPhotos.set(photoId, family.projectRef)
 }
 
 async function discardUnreferencedStagedPhotos() {
@@ -114,13 +115,13 @@ async function discardUnreferencedStagedPhotos() {
       .map(value => value.photoId)
       .filter((value): value is string => value !== undefined),
   )
-  for (const [photoId, projectPath] of [...stagedPhotos]) {
+  for (const [photoId, project] of [...stagedPhotos]) {
     if (referencedPhotoIds.has(photoId)) {
       stagedPhotos.delete(photoId)
       continue
     }
     try {
-      await deletePhoto(projectPath, photoId)
+      await projectRepository.deletePhoto(project, photoId)
       stagedPhotos.delete(photoId)
     } catch (e) {
       ui.showToast('error', '暂存照片清理失败：' + (e instanceof Error ? e.message : String(e)))
@@ -134,15 +135,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
-    <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-      <div>
-        <h2 class="text-lg font-semibold">
+  <div class="app-safe-area flex h-full flex-col">
+    <header class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <div class="min-w-0">
+        <h2 class="truncate text-lg font-semibold">
           {{ member ? `${member.lastName}${member.firstName}` : '成员不存在' }}
         </h2>
         <p class="text-xs text-slate-400">ID: {{ id }}</p>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex shrink-0 items-center gap-3">
         <span class="text-sm" :class="isDirty ? 'text-amber-600' : 'text-emerald-600'">
           {{ isDirty ? '未保存…' : '已保存' }}
         </span>
@@ -150,9 +151,9 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <main class="flex flex-1 overflow-hidden">
+    <main class="flex min-h-0 flex-1 flex-col overflow-auto md:flex-row md:overflow-hidden">
       <!-- 左侧：基本信息表单 -->
-      <section class="flex-1 overflow-auto border-r border-slate-200 bg-white p-6">
+      <section class="shrink-0 border-b border-slate-200 bg-white p-4 md:min-h-0 md:flex-1 md:overflow-auto md:border-r md:border-b-0 md:p-6">
         <div v-if="!draft" class="text-slate-400">找不到该成员。</div>
         <MemberForm
           v-else
@@ -165,7 +166,7 @@ onBeforeUnmount(() => {
       </section>
 
       <!-- 右侧：关系编辑 + 称呼覆盖 -->
-      <aside class="w-96 overflow-auto bg-slate-50 p-6">
+      <aside class="w-full shrink-0 bg-slate-50 p-4 md:w-96 md:overflow-auto md:p-6">
         <h3 class="mb-3 font-semibold">家庭关系</h3>
         <RelationEditor v-if="member" :member-id="id" />
         <SiblingOrderEditor v-if="member" :member-id="id" />
@@ -209,7 +210,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="ui.toast"
-      class="pointer-events-none fixed bottom-4 left-1/2 -translate-x-1/2 rounded-md px-4 py-2 text-sm text-white shadow"
+      class="safe-area-toast pointer-events-none fixed left-1/2 -translate-x-1/2 rounded-md px-4 py-2 text-sm text-white shadow"
       :class="{
         'bg-emerald-600': ui.toast.type === 'success',
         'bg-rose-600': ui.toast.type === 'error',

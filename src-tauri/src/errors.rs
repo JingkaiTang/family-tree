@@ -9,6 +9,9 @@ pub enum CmdError {
     #[error("JSON 错误: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("归档错误: {0}")]
+    Zip(#[from] zip::result::ZipError),
+
     #[error("无效路径: {0}")]
     InvalidPath(String),
 

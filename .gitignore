@@ -5,6 +5,7 @@ dist-ssr
 
 # local family data; only the synthetic fixture under test-data is public
 *.family/
+*.familybundle
 !test-data/synthetic-family-200-6.family/
 !test-data/synthetic-family-200-6.family/**
 
