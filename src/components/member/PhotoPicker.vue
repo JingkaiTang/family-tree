@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { resolvePhotoUrl, importPhoto, deletePhoto } from '@/services/storage'
+import { googleDriveState } from '@/services/googleDriveConnection'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import PhotoCropper from './PhotoCropper.vue'
@@ -44,7 +45,7 @@ async function refreshPreview() {
   }
 }
 
-watch(() => [props.photoId, family.projectToken] as const, refreshPreview, { immediate: true })
+watch(() => [props.photoId, family.projectToken, googleDriveState.mediaEpoch] as const, refreshPreview, { immediate: true })
 
 watch(() => family.projectToken, () => {
   uploadRequest += 1

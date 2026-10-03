@@ -8,6 +8,9 @@ import {
 
 const providers = vi.hoisted(() => new Set<string>())
 vi.mock('./storage', () => ({ hasProvider: (id: string) => providers.has(id) }))
+vi.mock('./googleDriveConnection', () => ({
+  isGoogleDriveProvider: (id: string) => id === 'google-drive:configured-client:known-account',
+}))
 
 const LAST_PROJECT_REF_KEY = 'family-tree:lastProjectRef'
 const PREVIOUS_PROJECT_KEY = 'family-tree:lastProject'
@@ -33,6 +36,14 @@ afterEach(() => {
 })
 
 describe('recent project preferences', () => {
+  it('保留当前部署的 Drive 账号引用，刷新后无需 token 也能显示重新连接入口', () => {
+    const remote = { providerId: 'google-drive:configured-client:known-account', id: 'cloud-folder', displayName: '云端家族' }
+    setLastProjectRef(remote)
+    expect(providers.has(remote.providerId)).toBe(false)
+    expect(getLastProjectRef()).toEqual(remote)
+    expect(JSON.parse(entries.get(LAST_PROJECT_REF_KEY)!)).toEqual(remote)
+  })
+
   it('stores and restores only the public project reference fields', () => {
     const withCredentials = { ...project, accessToken: 'must-not-be-persisted' }
     setLastProjectRef(withCredentials)

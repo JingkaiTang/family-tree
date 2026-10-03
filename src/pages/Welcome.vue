@@ -14,26 +14,139 @@ import { createProject, openProject } from '@/services/projectService'
 import { startAutosave } from '@/services/autosave'
 import { getLastProjectRef, setLastProjectRef } from '@/services/prefs'
 import { importProjectBundle } from '@/services/projectTransfer'
+import {
+  googleDriveState,
+  prepareGoogleDrive,
+  connectGoogleDrive,
+  disconnectGoogleDrive,
+  listGoogleDriveProjects,
+  isGoogleDriveProvider,
+  listGoogleDriveVersions,
+  selectGoogleDriveVersion,
+} from '@/services/googleDriveConnection'
 
 const router = useRouter()
 const family = useFamilyStore()
 const ui = useUiStore()
 
 const busy = ref(false)
+const preparingDrive = ref(false)
 const error = ref<string | null>(null)
 const bundleFileInput = ref<HTMLInputElement | null>(null)
 const pendingBundleFile = ref<File | null>(null)
 /** 启动时是否正在自动尝试恢复上次项目（让 UI 显示 loading 而不是闪一下按钮） */
 const autoRestoring = ref(false)
 const lastProject = ref<ProjectRef | null>(null)
+const driveProjects = ref<ProjectRef[]>([])
+const driveName = ref('')
+const conflictingProject = ref<ProjectRef | null>(null)
+const driveVersions = ref<Awaited<ReturnType<typeof listGoogleDriveVersions>>>([])
 const directoryAvailability = computed(() => getDirectoryStorageAvailability())
-const canOpenRecent = computed(() => lastProject.value?.providerId !== 'browser-directory'
-  || directoryAvailability.value.supported)
+const canOpenRecent = computed(() => {
+  const providerId = lastProject.value?.providerId
+  if (providerId && isGoogleDriveProvider(providerId)) return googleDriveState.ready && !googleDriveState.busy
+  return providerId !== 'browser-directory' || directoryAvailability.value.supported
+})
+const driveAccountLabel = computed(() => googleDriveState.account?.emailAddress
+  || googleDriveState.account?.displayName || '已连接账号')
+
+async function onPrepareDrive() {
+  if (preparingDrive.value || !googleDriveState.configured) return
+  preparingDrive.value = true
+  error.value = null
+  try {
+    await prepareGoogleDrive()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    preparingDrive.value = false
+  }
+}
+
+async function onConnectDrive() {
+  if (busy.value || googleDriveState.busy || !googleDriveState.ready) return
+  busy.value = true
+  error.value = null
+  try {
+    const providerId = await connectGoogleDrive()
+    driveProjects.value = await listGoogleDriveProjects(providerId)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onRefreshDrive() {
+  const providerId = googleDriveState.providerId
+  if (!providerId || busy.value) return
+  busy.value = true
+  error.value = null
+  try {
+    driveProjects.value = await listGoogleDriveProjects(providerId)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+function onDisconnectDrive() {
+  if (busy.value) return
+  disconnectGoogleDrive()
+  driveProjects.value = []
+  driveVersions.value = []
+  conflictingProject.value = null
+}
+
+async function onCreateDrive() {
+  const providerId = googleDriveState.providerId
+  const name = driveName.value.trim()
+  if (!providerId || !name || busy.value) return
+  busy.value = true
+  error.value = null
+  try {
+    const result = await createProject({ providerId, id: 'root', displayName: name }, name)
+    family.setProject(result.project, result.meta, result.family)
+    startAutosave()
+    ui.showToast('success', `已新建家族：${name}`)
+    await router.push('/tree')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onChooseDriveVersion(revisionId: string) {
+  const project = conflictingProject.value
+  if (!project || busy.value) return
+  busy.value = true
+  error.value = null
+  try {
+    const result = await selectGoogleDriveVersion(project, revisionId)
+    family.setProject(result.project, result.meta, result.family)
+    startAutosave()
+    ui.showToast('info', '已打开所选版本；其他版本仍保留在 Google Drive。')
+    await router.push('/tree')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onOpenDrive(project: ProjectRef) {
+  if (busy.value) return
+  await tryOpen(project)
+}
 
 async function tryOpen(project: ProjectRef, restoring = false): Promise<boolean> {
   try {
     busy.value = true
     error.value = null
+    conflictingProject.value = null
+    driveVersions.value = []
     const result = await openProject(project)
     family.setProject(result.project, result.meta, result.family)
     startAutosave()
@@ -44,6 +157,14 @@ async function tryOpen(project: ProjectRef, restoring = false): Promise<boolean>
     const msg = e instanceof Error ? e.message : String(e)
     // 授权失效或临时不可用时保留记录，允许用户重新授权并重试。
     error.value = restoring ? `暂时无法恢复最近的家族，请重试：${msg}` : msg
+    if (isGoogleDriveProvider(project.providerId) && e instanceof Error && e.name === 'GoogleDriveConflictError') {
+      conflictingProject.value = project
+      try {
+        driveVersions.value = await listGoogleDriveVersions(project)
+      } catch (versionError) {
+        error.value += '；版本列表读取失败：' + (versionError instanceof Error ? versionError.message : String(versionError))
+      }
+    }
     return false
   } finally {
     busy.value = false
@@ -153,10 +274,14 @@ function onForgetLast() {
 }
 
 onMounted(async () => {
+  // 只准备授权脚本；OAuth 弹窗始终由用户点击触发。本地功能不等待网络。
+  void onPrepareDrive()
+  if (googleDriveState.providerId) void onRefreshDrive()
   // 布局默认值由 UI store 在会话开始时检测一次，返回首页不改变用户的选择。
   const stored = getLastProjectRef()
-  lastProject.value = stored && hasProvider(stored.providerId) ? stored : null
+  lastProject.value = stored && (hasProvider(stored.providerId) || isGoogleDriveProvider(stored.providerId)) ? stored : null
   if (!lastProject.value || !canOpenRecent.value) return
+  if (isGoogleDriveProvider(lastProject.value.providerId)) return
 
   // 启动自动恢复。失败时保留记录供用户重试。
   autoRestoring.value = true
@@ -169,7 +294,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="app-safe-area-padded flex h-full flex-col items-center justify-center gap-6 overflow-auto">
+  <div class="app-safe-area-padded flex h-full flex-col items-center gap-6 overflow-auto py-8">
     <div class="text-center">
       <h1 class="text-4xl font-bold tracking-tight">家族树</h1>
       <p class="mt-3 text-slate-500">记录家族成员、关系与故事</p>
@@ -204,6 +329,53 @@ onMounted(async () => {
           打开已有家族
         </button>
       </div>
+
+      <section class="flex w-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4" aria-label="Google Drive 存储">
+        <div>
+          <h2 class="font-semibold text-slate-900">Google Drive</h2>
+          <p class="mt-1 text-xs text-slate-500">使用自己的 Google 账号保存家族资料与照片，可在不同设备打开。</p>
+        </div>
+        <p v-if="!googleDriveState.configured" class="text-xs text-slate-500">此站点尚未配置 Google Drive 连接。</p>
+        <template v-else>
+          <p v-if="googleDriveState.account" class="break-all text-sm text-slate-600">{{ driveAccountLabel }}</p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-50"
+              :disabled="busy || googleDriveState.busy || !googleDriveState.ready"
+              @click="onConnectDrive"
+            >{{ googleDriveState.account ? '重新连接 Google Drive' : '连接 Google Drive' }}</button>
+            <button v-if="googleDriveState.account" type="button" class="text-sm text-slate-500 disabled:opacity-50" :disabled="busy" @click="onDisconnectDrive">断开连接</button>
+          </div>
+          <p v-if="!googleDriveState.ready && !googleDriveState.error" class="text-xs text-slate-500">正在准备 Google 授权…</p>
+          <p v-if="googleDriveState.error" class="text-sm text-rose-700">{{ googleDriveState.error }}</p>
+          <button v-if="!googleDriveState.ready && googleDriveState.error" type="button" class="self-start text-sm text-sky-800 disabled:opacity-50" :disabled="preparingDrive" @click="onPrepareDrive">重试加载 Google 授权</button>
+          <template v-if="googleDriveState.providerId">
+            <form class="flex gap-2" @submit.prevent="onCreateDrive">
+              <input v-model="driveName" aria-label="Google Drive 家族名称" maxlength="100" placeholder="家族名称" class="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-sm" :disabled="busy">
+              <button type="submit" class="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50" :disabled="busy || !driveName.trim()">在 Drive 新建</button>
+            </form>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-slate-600">此应用可访问的家族</span>
+              <button type="button" class="text-sky-700 disabled:opacity-50" :disabled="busy" @click="onRefreshDrive">刷新列表</button>
+            </div>
+            <p v-if="!driveProjects.length" class="text-xs text-slate-500">暂无家族，可先新建一个。</p>
+            <ul v-else class="flex max-h-48 flex-col gap-2 overflow-auto">
+              <li v-for="project in driveProjects" :key="project.id">
+                <button type="button" class="w-full rounded border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:opacity-50" :disabled="busy" @click="onOpenDrive(project)">{{ project.displayName }}</button>
+              </li>
+            </ul>
+          </template>
+        </template>
+      </section>
+      <section v-if="conflictingProject && driveVersions.length" class="w-full rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="选择 Drive 冲突版本">
+        <p class="text-sm text-amber-900">此家族存在多个版本。选择要查看的版本，进入后可保留当前内容作为后续版本；其他版本仍可查看。</p>
+        <ul class="mt-2 flex max-h-48 flex-col gap-2 overflow-auto">
+          <li v-for="version in driveVersions" :key="version.id">
+            <button type="button" class="text-left text-sm text-sky-800 disabled:opacity-50" :disabled="busy" @click="onChooseDriveVersion(version.id)">{{ version.createdTime }}{{ version.isHead ? '（当前分支）' : '' }}</button>
+          </li>
+        </ul>
+      </section>
 
       <div v-if="directoryAvailability.supported" class="flex w-full flex-col gap-3">
         <input
@@ -277,7 +449,7 @@ onMounted(async () => {
     </p>
 
     <p class="text-center text-xs text-slate-400">
-      数据直接保存在你授权的本地目录，不上传服务器。权限失效时需要重新授权，请定期复制目录备份。
+      数据直接保存在你授权的本地目录，或你连接的 Google Drive；本站不托管家族资料。权限失效时需要重新授权，请定期导出备份。
     </p>
   </div>
 </template>

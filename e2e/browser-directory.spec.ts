@@ -1,12 +1,15 @@
 import { expect, test, type Page } from '@playwright/test'
+import { installGoogleIdentity } from './helpers/googleDrive'
 
 const directoryName = 'browser-test-family'
 const errorsByPage = new WeakMap<Page, string[]>()
 
-test.beforeEach(({ page }) => {
+test.beforeEach(async ({ page }) => {
   const errors: string[] = []
   errorsByPage.set(page, errors)
   page.on('pageerror', error => errors.push(error.stack || error.message))
+  // The test server enables optional Drive; local storage tests stay independent of Google.
+  await installGoogleIdentity(page)
 })
 
 test.afterEach(async ({ page }, testInfo) => {

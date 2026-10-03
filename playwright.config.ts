@@ -26,6 +26,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1 --port 4179',
+    env: { VITE_GOOGLE_DRIVE_CLIENT_ID: 'e2e-public.apps.googleusercontent.com' },
     url: 'http://127.0.0.1:4179',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

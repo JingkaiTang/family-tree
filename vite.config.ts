@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
       id: './',
       name: '家族树',
       short_name: '家族树',
-      description: '在自己的本地目录中管理家谱与照片',
+      description: '在自己的本地目录或 Google Drive 中管理家谱与照片',
       lang: 'zh-CN',
       start_url: './',
       scope: './',

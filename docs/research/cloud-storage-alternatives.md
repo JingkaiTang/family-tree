@@ -1,6 +1,6 @@
 # 家族树云存储替代方案
 
-> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 尚未实现。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
+> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 适配已接入，配置与限制见 [Google Drive](../google-drive.md)。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
 
 调研日期：2026-10-03。本文延续[公开网页与 Google Drive 调研](public-web-google-drive.md)，比较个人开发者可以考虑的存储路线。结论为选型建议，本次未接入账户、测试服务或部署应用。
 

@@ -8,7 +8,7 @@ vi.mock('./storage', () => ({ pickProject, readPhoto }))
 vi.mock('./storage/browserDirectory', () => ({ importBrowserProjectBundle }))
 vi.mock('./storage/projectBundle', () => ({ exportProjectBundleToStream }))
 
-import { importProjectBundle, prepareProjectBundleExport } from './projectTransfer'
+import { DOWNLOAD_BUNDLE_MAX_BYTES, importProjectBundle, prepareProjectBundleExport } from './projectTransfer'
 
 describe('browser project bundle transfers', () => {
   const project = { providerId: 'browser-directory', id: 'opaque-id', displayName: '家族' }
@@ -31,7 +31,7 @@ describe('browser project bundle transfers', () => {
     const runExport = await pending
     expect(createWritable).not.toHaveBeenCalled()
     const snapshot = { meta: createEmptyMeta('家族'), family: createEmptyFamily() }
-    await expect(runExport!(snapshot)).resolves.toBe(true)
+    await expect(runExport!(snapshot)).resolves.toEqual({ kind: 'saved' })
     expect(exportProjectBundleToStream).toHaveBeenCalledWith(expect.objectContaining(snapshot), output)
     await expect(runExport!(snapshot)).rejects.toThrow('重新选择')
   })
@@ -50,7 +50,7 @@ describe('browser project bundle transfers', () => {
     const createWritable = vi.fn()
     vi.stubGlobal('window', { showSaveFilePicker: vi.fn(async () => ({ name: 'x.familybundle', createWritable })) })
     const runExport = await prepareProjectBundleExport(project)
-    await expect(runExport!()).rejects.toThrow('已保存的项目快照')
+    await expect(runExport!()).rejects.toThrow('项目快照')
     expect(createWritable).not.toHaveBeenCalled()
   })
 
@@ -99,12 +99,66 @@ describe('browser project bundle transfers', () => {
     }
   })
 
-  it('rejects unimplemented provider exports before opening a file picker', async () => {
-    const picker = vi.fn()
+  it('streams a cloud project through the same photo IO and destination picker', async () => {
+    const output = new WritableStream<Uint8Array>()
+    const picker = vi.fn(async () => ({ name: 'cloud.familybundle', createWritable: async () => output }))
     vi.stubGlobal('window', { showSaveFilePicker: picker })
+    const cloudProject = { ...project, providerId: 'google-drive:account' }
+    const photo = new Blob(['private image'])
+    readPhoto.mockResolvedValue(photo)
+    exportProjectBundleToStream.mockImplementationOnce(async source => {
+      expect(await source.readPhoto('image-id', false)).toBe(photo)
+      expect(await source.readPhoto('image-id', true)).toBe(photo)
+    })
 
-    await expect(prepareProjectBundleExport({ ...project, providerId: 'drive' }))
-      .rejects.toThrow('不支持浏览器备份导出')
-    expect(picker).not.toHaveBeenCalled()
+    const runExport = await prepareProjectBundleExport(cloudProject)
+    await expect(runExport!({ meta: createEmptyMeta('家族'), family: createEmptyFamily() }))
+      .resolves.toEqual({ kind: 'saved' })
+    expect(readPhoto).toHaveBeenNthCalledWith(1, cloudProject, 'image-id', false)
+    expect(readPhoto).toHaveBeenNthCalledWith(2, cloudProject, 'image-id', true)
+  })
+
+  it('prepares a downloadable archive without a picker and snapshots reused chunks', async () => {
+    vi.stubGlobal('window', {})
+    exportProjectBundleToStream.mockImplementationOnce(async (_, output: WritableStream<Uint8Array>) => {
+      const writer = output.getWriter()
+      const chunk = new Uint8Array([1, 2, 3])
+      await writer.write(chunk)
+      chunk.fill(9)
+      await writer.write(new Uint8Array([4]))
+      await writer.close()
+      writer.releaseLock()
+    })
+    const runExport = await prepareProjectBundleExport({ ...project, displayName: '家族/备份' })
+    const result = await runExport!({ meta: createEmptyMeta('家族'), family: createEmptyFamily() })
+    expect(result.kind).toBe('download')
+    if (result.kind !== 'download') throw new Error('Expected download')
+    expect(result.filename).toBe('家族_备份.familybundle')
+    expect(result.blob.type).toBe('application/zip')
+    expect(new Uint8Array(await result.blob.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]))
+  })
+
+  it('rejects a download archive exceeding 128 MiB before retaining the oversized chunk', async () => {
+    vi.stubGlobal('window', {})
+    exportProjectBundleToStream.mockImplementationOnce(async (_, output: WritableStream<Uint8Array>) => {
+      const writer = output.getWriter()
+      try {
+        await writer.write(new Uint8Array(DOWNLOAD_BUNDLE_MAX_BYTES + 1))
+      } finally {
+        writer.releaseLock()
+      }
+    })
+    const runExport = await prepareProjectBundleExport(project)
+    await expect(runExport!({ meta: createEmptyMeta('家族'), family: createEmptyFamily() }))
+      .rejects.toThrow('128 MiB')
+  })
+
+  it.each(['Network request failed', '授权已过期'])('does not offer an incomplete backup when photos fail: %s', async message => {
+    vi.stubGlobal('window', {})
+    readPhoto.mockRejectedValueOnce(new Error(message))
+    exportProjectBundleToStream.mockImplementationOnce(async source => source.readPhoto('missing', false))
+    const runExport = await prepareProjectBundleExport({ ...project, providerId: 'google-drive:account' })
+    await expect(runExport!({ meta: createEmptyMeta('家族'), family: createEmptyFamily() }))
+      .rejects.toThrow(`未生成完整备份。请检查网络及存储授权后重试：${message}`)
   })
 })

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
-import { flushNow } from '@/services/autosave'
+import { flushNow, startAutosave } from '@/services/autosave'
 import TreeLayoutHost from '@/components/tree/TreeLayoutHost.vue'
 import SearchBar from '@/components/search/SearchBar.vue'
 import { getKinship } from '@/core/kinship'
@@ -12,6 +12,8 @@ import { authorizeProject, gcMedia, supportsMediaGc } from '@/services/storage'
 import { v4 as uuidv4 } from 'uuid'
 import type { LayoutModePreference } from '@/core/layoutMode'
 import { prepareProjectBundleExport } from '@/services/projectTransfer'
+import { copyProject } from '@/services/projectService'
+import { connectGoogleDrive, googleDriveState, prepareGoogleDrive } from '@/services/googleDriveConnection'
 
 const router = useRouter()
 const family = useFamilyStore()
@@ -39,6 +41,10 @@ const rootId = computed(() => data.value.rootMemberId)
 const canGcMedia = computed(() => !!projectRef.value && supportsMediaGc(projectRef.value))
 const layoutResetVersion = ref(0)
 const exporting = ref(false)
+const copyingToDrive = ref(false)
+const retryingDrive = ref(false)
+const bundleDownload = ref<{ url: string; filename: string } | null>(null)
+let disposed = false
 const canRestoreDefaultLayout = computed(() => {
   const preferences = data.value.layoutPreferences
   return preferences.rootOrders.length > 0
@@ -111,22 +117,87 @@ async function onExportBundle() {
   const projectToken = family.projectToken
   try {
     exporting.value = true
+    clearBundleDownload()
     const runExport = await prepareProjectBundleExport(project)
-    if (!runExport || family.projectToken !== projectToken) return
-    await flushNow()
-    if (family.projectToken !== projectToken) return
+    if (!runExport || disposed || family.projectToken !== projectToken) return
+    // A cloud conflict must not block rescuing the current editor snapshot.
+    if (project.providerId === 'browser-directory') await flushNow()
+    if (disposed || family.projectToken !== projectToken) return
     if (!family.projectMeta) return
     const exported = await runExport({
-      meta: { ...family.projectMeta },
+      meta: { ...family.projectMeta, updatedAt: new Date().toISOString() },
       family: JSON.parse(JSON.stringify(family.data)),
     })
-    if (family.projectToken !== projectToken) return
-    if (exported) ui.showToast('success', '家族备份已导出')
+    if (disposed || family.projectToken !== projectToken) return
+    if (exported.kind === 'download') {
+      bundleDownload.value = { url: URL.createObjectURL(exported.blob), filename: exported.filename }
+      ui.showToast('info', '备份已准备，请点击下载备份。备份不代表项目已保存。')
+    } else {
+      ui.showToast('success', project.providerId === 'browser-directory'
+        ? '家族备份已导出'
+        : '家族备份已导出；项目的保存状态未改变')
+    }
   } catch (e) {
-    if (family.projectToken !== projectToken) return
+    if (disposed || family.projectToken !== projectToken) return
     ui.showToast('error', '导出失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     exporting.value = false
+  }
+}
+
+function clearBundleDownload() {
+  if (bundleDownload.value) URL.revokeObjectURL(bundleDownload.value.url)
+  bundleDownload.value = null
+}
+
+watch(() => family.projectToken, clearBundleDownload)
+onBeforeUnmount(() => {
+  disposed = true
+  clearBundleDownload()
+})
+
+async function onCopyToDrive() {
+  const source = family.projectRef
+  if (!source || copyingToDrive.value) return
+  const projectToken = family.projectToken
+  try {
+    copyingToDrive.value = true
+    const providerId = await connectGoogleDrive()
+    if (disposed || family.projectToken !== projectToken || !family.projectMeta) return
+    const revision = family.revision
+    const snapshot = {
+      meta: { ...family.projectMeta, updatedAt: new Date().toISOString() },
+      family: JSON.parse(JSON.stringify(family.data)),
+    }
+    const result = await copyProject(source, {
+      providerId, id: 'root', displayName: `${snapshot.meta.name}（副本）`,
+    }, snapshot)
+    if (disposed || family.projectToken !== projectToken) return
+    // Keep edits made during a large upload in the original editor session.
+    if (family.revision !== revision) {
+      ui.showToast('info', 'Google Drive 副本已创建。上传期间又有修改，当前项目保持打开；可在首页打开副本。')
+      return
+    }
+    family.setProject(result.project, result.meta, result.family)
+    startAutosave()
+    ui.showToast('success', '已另存到 Google Drive，并打开副本')
+  } catch (error) {
+    if (disposed || family.projectToken !== projectToken) return
+    ui.showToast('error', '另存失败，当前项目保持打开：' + (error instanceof Error ? error.message : String(error)))
+  } finally {
+    copyingToDrive.value = false
+  }
+}
+
+async function retryDrivePreparation() {
+  if (retryingDrive.value) return
+  retryingDrive.value = true
+  try {
+    await prepareGoogleDrive()
+  } catch (error) {
+    if (!disposed) ui.showToast('error', '加载 Google 授权失败：' + (error instanceof Error ? error.message : String(error)))
+  } finally {
+    retryingDrive.value = false
   }
 }
 
@@ -160,6 +231,7 @@ function clearViewpoint() {
  *   - data.defaultViewpointId 也失效 → 清空项目里的存值
  */
 onMounted(() => {
+  void prepareGoogleDrive().catch(() => undefined)
   if (ui.viewpointId && !family.getMember(ui.viewpointId)) {
     ui.setViewpoint(null)
   }
@@ -365,6 +437,27 @@ function seedFixture() {
         >
           {{ exporting ? '导出中…' : '导出备份' }}
         </button>
+        <a
+          v-if="bundleDownload"
+          data-testid="download-bundle"
+          :href="bundleDownload.url"
+          :download="bundleDownload.filename"
+          class="rounded bg-emerald-700 px-3 py-1 text-sm text-white hover:bg-emerald-600"
+        >下载备份</a>
+        <button
+          v-if="googleDriveState.configured"
+          data-testid="copy-to-drive"
+          class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50"
+          :disabled="copyingToDrive || !googleDriveState.ready || googleDriveState.busy"
+          @click="onCopyToDrive"
+        >{{ copyingToDrive ? '正在另存…' : '另存到 Google Drive' }}</button>
+        <button
+          v-if="googleDriveState.configured && !googleDriveState.ready && googleDriveState.error"
+          data-testid="retry-drive-preparation"
+          class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50"
+          :disabled="retryingDrive"
+          @click="retryDrivePreparation"
+        >{{ retryingDrive ? '加载中…' : '重试加载 Google 授权' }}</button>
         <button
           v-if="canGcMedia"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"

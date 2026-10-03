@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyFamily, createEmptyMeta, SCHEMA_VERSION, type Member } from '@/core/schema'
-import { createProject, openProject, saveProject } from './projectService'
+import { copyProject, createProject, openProject, saveProject } from './projectService'
 import type { ProjectRef } from './storage'
 
 const api = vi.hoisted(() => ({
   loadProject: vi.fn(),
   saveProject: vi.fn(),
   createProject: vi.fn(),
+  readPhoto: vi.fn(),
+  importPhoto: vi.fn(),
 }))
 
 vi.mock('./storage', () => api)
@@ -104,6 +106,40 @@ describe('projectService format boundary', () => {
     api.saveProject.mockRejectedValue(new Error('storage unavailable'))
 
     await expect(createProject(project, '新家族')).rejects.toThrow('storage unavailable')
+  })
+
+  it('另存复制共享照片一次并重写引用，不改变原快照', async () => {
+    const destination = { providerId: 'another-account', id: 'new-id', displayName: '副本' }
+    const family = createEmptyFamily()
+    family.members.a = { ...member('a'), photoId: 'shared-photo' }
+    family.members.b = { ...member('b'), photoId: 'shared-photo' }
+    const meta = createEmptyMeta('原件')
+    api.createProject.mockResolvedValue({ ref: destination, meta: createEmptyMeta('副本') })
+    api.readPhoto.mockResolvedValue(new Blob(['photo'], { type: 'image/webp' }))
+    api.importPhoto.mockResolvedValue({ photoId: 'new-photo' })
+
+    const result = await copyProject(project, destination, { family, meta })
+
+    expect(api.readPhoto).toHaveBeenCalledExactlyOnceWith(project, 'shared-photo', false)
+    expect(api.importPhoto).toHaveBeenCalledExactlyOnceWith(destination, new TextEncoder().encode('photo'), 'image/webp')
+    expect(result.family.members.a.photoId).toBe('new-photo')
+    expect(result.family.members.b.photoId).toBe('new-photo')
+    expect(family.members.a.photoId).toBe('shared-photo')
+    expect(api.saveProject).toHaveBeenCalledExactlyOnceWith(destination, result.family)
+  })
+
+  it('照片复制失败不提交引用不完整的新项目，也不写原件', async () => {
+    const destination = { ...project, id: 'new-id' }
+    const family = createEmptyFamily()
+    family.members.a = { ...member('a'), photoId: 'photo' }
+    api.createProject.mockResolvedValue({ ref: destination, meta: createEmptyMeta('副本') })
+    api.readPhoto.mockRejectedValue(new Error('Google Drive 授权已过期'))
+
+    await expect(copyProject(project, destination, { family, meta: createEmptyMeta('原件') }))
+      .rejects.toThrow('原项目未改变')
+    expect(api.saveProject).not.toHaveBeenCalled()
+    expect(api.importPhoto).not.toHaveBeenCalled()
+    expect(family.members.a.photoId).toBe('photo')
   })
 
 })

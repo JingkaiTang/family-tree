@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Member } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { resolvePhotoUrl } from '@/services/storage'
+import { googleDriveState } from '@/services/googleDriveConnection'
 import DefaultAvatar from '@/components/member/DefaultAvatar.vue'
 import { getDefaultAvatarAgeBand } from '@/core/defaultAvatar'
 
@@ -48,7 +49,7 @@ function replacePhotoUrl(next: string | null) {
 }
 
 watch(
-  () => [props.member.photoId, family.projectToken] as const,
+  () => [props.member.photoId, family.projectToken, googleDriveState.mediaEpoch] as const,
   async ([photoId]) => {
     const project = family.projectRef
     const projectToken = family.projectToken

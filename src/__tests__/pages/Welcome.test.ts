@@ -21,7 +21,35 @@ const mocks = vi.hoisted(() => ({
   importProjectBundle: vi.fn(),
   routerPush: vi.fn(),
   startAutosave: vi.fn(),
+  driveState: {
+    configured: false, ready: false, busy: false, mediaEpoch: 0,
+    error: null as string | null,
+    providerId: null as string | null,
+    account: null as { permissionId: string; displayName: string; emailAddress?: string } | null,
+  },
+  prepareGoogleDrive: vi.fn(),
+  connectGoogleDrive: vi.fn(),
+  disconnectGoogleDrive: vi.fn(),
+  listGoogleDriveProjects: vi.fn(),
+  isGoogleDriveProvider: vi.fn(),
+  listGoogleDriveVersions: vi.fn(),
+  selectGoogleDriveVersion: vi.fn(),
 }))
+
+vi.mock('@/services/googleDriveConnection', async () => {
+  const { reactive } = await import('vue')
+  mocks.driveState = reactive(mocks.driveState)
+  return {
+    googleDriveState: mocks.driveState,
+    prepareGoogleDrive: mocks.prepareGoogleDrive,
+    connectGoogleDrive: mocks.connectGoogleDrive,
+    disconnectGoogleDrive: mocks.disconnectGoogleDrive,
+    listGoogleDriveProjects: mocks.listGoogleDriveProjects,
+    isGoogleDriveProvider: mocks.isGoogleDriveProvider,
+    listGoogleDriveVersions: mocks.listGoogleDriveVersions,
+    selectGoogleDriveVersion: mocks.selectGoogleDriveVersion,
+  }
+})
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.routerPush }) }))
 vi.mock('@/services/projectService', () => ({
@@ -50,6 +78,10 @@ const selected = { providerId: 'browser-directory', id: 'opaque-handle-id', disp
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.resetAllMocks()
+  Object.assign(mocks.driveState, { configured: false, ready: false, busy: false, mediaEpoch: 0, error: null, providerId: null, account: null })
+  mocks.prepareGoogleDrive.mockResolvedValue(undefined)
+  mocks.isGoogleDriveProvider.mockImplementation((id: string) => id.startsWith('google-drive:'))
+  mocks.listGoogleDriveProjects.mockResolvedValue([])
   mocks.getDirectoryStorageAvailability.mockReturnValue({ supported: true, reason: null })
   mocks.hasProvider.mockImplementation((id: string) => ['browser-directory', 'test-cloud'].includes(id))
   mocks.getLastProjectRef.mockReturnValue(null)
@@ -65,6 +97,100 @@ beforeEach(() => {
     family: createEmptyFamily(),
   })
   mocks.routerPush.mockResolvedValue(undefined)
+})
+
+describe('Welcome Google Drive connections', () => {
+  const driveProject = { providerId: 'google-drive:client:account', id: 'drive-folder', displayName: '云端家族' }
+  beforeEach(() => {
+    Object.assign(mocks.driveState, { configured: true, ready: true })
+    mocks.connectGoogleDrive.mockImplementation(async () => {
+      mocks.driveState.providerId = driveProject.providerId
+      mocks.driveState.account = { permissionId: 'account', displayName: '我的账号', emailAddress: 'me@example.test' }
+      return driveProject.providerId
+    })
+    mocks.listGoogleDriveProjects.mockResolvedValue([driveProject])
+    mocks.openProject.mockResolvedValue({ project: driveProject, meta: createEmptyMeta('云端家族'), family: createEmptyFamily() })
+  })
+
+  it('connects directly from a user click and opens projects without a local directory API', async () => {
+    mocks.getDirectoryStorageAvailability.mockReturnValue({ supported: false, reason: '不支持目录 API' })
+    const { wrapper, family } = await mountedWelcome()
+    expect(mocks.connectGoogleDrive).not.toHaveBeenCalled()
+    wrapper.findAll('button').find(button => button.text() === '连接 Google Drive')!.element.click()
+    expect(mocks.connectGoogleDrive).toHaveBeenCalledOnce()
+    await flushPromises()
+    expect(wrapper.text()).toContain('me@example.test')
+    expect(mocks.listGoogleDriveProjects).toHaveBeenCalledWith(driveProject.providerId)
+    await wrapper.findAll('button').find(button => button.text() === '云端家族')!.trigger('click')
+    await flushPromises()
+    expect(family.projectRef).toEqual(driveProject)
+    expect(mocks.pickProject).not.toHaveBeenCalled()
+  })
+
+  it('creates a named project in the connected account and adopts the returned folder ID', async () => {
+    const { wrapper, family } = await mountedWelcome()
+    await wrapper.findAll('button').find(button => button.text() === '连接 Google Drive')!.trigger('click')
+    await flushPromises()
+    mocks.createProject.mockResolvedValue({ project: driveProject, meta: createEmptyMeta('我的家谱'), family: createEmptyFamily() })
+    await wrapper.get('input[aria-label="Google Drive 家族名称"]').setValue(' 我的家谱 ')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.createProject).toHaveBeenCalledWith({ providerId: driveProject.providerId, id: 'root', displayName: '我的家谱' }, '我的家谱')
+    expect(family.projectRef).toEqual(driveProject)
+  })
+
+  it('retains an unconnected recent Drive project without opening an authorization popup on mount', async () => {
+    mocks.getLastProjectRef.mockReturnValue(driveProject)
+    const { wrapper } = await mountedWelcome()
+    expect(mocks.openProject).not.toHaveBeenCalled()
+    expect(mocks.authorizeProject).not.toHaveBeenCalled()
+    expect(mocks.connectGoogleDrive).not.toHaveBeenCalled()
+    await wrapper.findAll('button').find(button => button.text() === driveProject.displayName)!.trigger('click')
+    await flushPromises()
+    expect(mocks.authorizeProject).toHaveBeenCalledExactlyOnceWith(driveProject)
+    expect(mocks.openProject).toHaveBeenCalledExactlyOnceWith(driveProject)
+  })
+
+  it('keeps local actions available while the OAuth script is not ready', async () => {
+    mocks.driveState.ready = false
+    const { wrapper } = await mountedWelcome()
+    expect(wrapper.findAll('button').find(button => button.text() === '连接 Google Drive')!.attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('button').find(button => button.text() === '打开已有家族')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('retries a failed authorization script without opening OAuth until a separate connect click', async () => {
+    mocks.driveState.ready = false
+    mocks.prepareGoogleDrive.mockImplementationOnce(async () => {
+      mocks.driveState.error = 'Google 授权加载失败'
+      throw new Error('Google 授权加载失败')
+    }).mockImplementationOnce(async () => {
+      mocks.driveState.ready = true
+      mocks.driveState.error = null
+    })
+    const { wrapper } = await mountedWelcome()
+    await wrapper.findAll('button').find(button => button.text() === '重试加载 Google 授权')!.trigger('click')
+    await flushPromises()
+    expect(mocks.prepareGoogleDrive).toHaveBeenCalledTimes(2)
+    expect(mocks.connectGoogleDrive).not.toHaveBeenCalled()
+    expect(wrapper.findAll('button').find(button => button.text() === '连接 Google Drive')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('offers retained conflict versions instead of trapping an unopened project', async () => {
+    const conflict = Object.assign(new Error('存在多个远端分支'), { name: 'GoogleDriveConflictError', heads: ['a', 'b'] })
+    mocks.getLastProjectRef.mockReturnValue(driveProject)
+    mocks.openProject.mockRejectedValue(conflict)
+    mocks.listGoogleDriveVersions.mockResolvedValue([{ id: 'a', createdTime: '2026-10-01', isHead: true }, { id: 'b', createdTime: '2026-10-02', isHead: true }])
+    mocks.selectGoogleDriveVersion.mockResolvedValue({ project: driveProject, meta: createEmptyMeta('云端家族'), family: createEmptyFamily() })
+    const { wrapper, family } = await mountedWelcome()
+    await wrapper.findAll('button').find(button => button.text() === driveProject.displayName)!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('此家族存在多个版本')
+    await wrapper.findAll('button').find(button => button.text() === '2026-10-02（当前分支）')!.trigger('click')
+    await flushPromises()
+    expect(mocks.selectGoogleDriveVersion).toHaveBeenCalledWith(driveProject, 'b')
+    expect(family.projectRef).toEqual(driveProject)
+    expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
+  })
 })
 
 afterEach(() => {

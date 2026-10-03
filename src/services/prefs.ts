@@ -2,6 +2,7 @@ import type { LayoutModePreference } from '@/core/layoutMode'
 import type { ProjectRef } from '@/services/storage/types'
 import { hasProvider } from './storage'
 import { isProjectRef } from './projectRef'
+import { isGoogleDriveProvider } from './googleDriveConnection'
 
 /**
  * 用户偏好只保存在本机；项目引用仅保存定位字段，不包含连接凭证。
@@ -23,8 +24,8 @@ export function getLastProjectRef(): ProjectRef | null {
       const stored = localStorage.getItem(key)
       if (stored === null) continue
       const project = parseProjectRef(JSON.parse(stored))
-      // 不恢复已移除或尚未连接的提供商，也不把旧目录路径解释为浏览器句柄。
-      if (!project || !hasProvider(project.providerId)) return null
+      // Drive references survive reload, but restoration still requires an explicit account connection.
+      if (!project || (!hasProvider(project.providerId) && !isGoogleDriveProvider(project.providerId))) return null
       setLastProjectRef(project)
       return project
     }

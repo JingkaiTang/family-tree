@@ -21,13 +21,14 @@
 | 数据和图片 | Zod 校验、UUID 标识、`vue-advanced-cropper` 裁剪；浏览器解码并生成主图与缩略图 |
 | 家族布局 | 自有网格/纵流引擎，网格视口使用 `@panzoom/panzoom` |
 | 普通目录 | 浏览器 File System Access API；`idb-keyval` 只持久化授权目录句柄，不保存项目文件 |
+| Google Drive | Google 托管的 Google Identity Services 脚本处理浏览器授权；原生 `fetch` 调用 Drive v3 REST，无额外 npm SDK |
 | 备份 | `@zip.js/zip.js` 处理 `.familybundle` 格式 |
 | 离线应用 | `vite-plugin-pwa` 构建静态应用缓存；不缓存项目和照片 |
 | 验证 | Vitest、Vue Test Utils、happy-dom、Playwright、TypeScript |
 
 `relatives-tree` 已不参与现有布局，连同旧适配器、对应测试及孤立 fixture 移除。原生桌面和移动应用工程、Tauri API/CLI、Rust 依赖、平台桥接代码与对应 CI 已移除；项目开发和发布无需原生工具链。
 
-未为 Google Drive 提前添加 SDK；后续实现应通过统一 `ProjectStorageProvider` 接入，并单独处理授权和远端版本冲突。通用 IO 接口仍保留，不因当前只有一个提供商而退回页面直接操作文件。
+Google Drive 通过统一 `ProjectStorageProvider` 接入，授权、REST 请求和版本冲突分别由连接层、客户端与适配器管理。GIS 脚本地址为 `https://accounts.google.com/gsi/client`，只有配置 Drive 的部署才需要加载；它不进入 PWA 预缓存。Google 托管脚本不受 npm 锁文件固定版本约束，升级或服务变更需通过真实 OAuth 验收。网页不包含 Client Secret，也不依赖 `gapi`、Google Picker 或 Google API Key；配置见 [Google Drive](google-drive.md)。
 
 ## 单一 Web 分发
 

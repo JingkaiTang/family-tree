@@ -1,12 +1,10 @@
 import {
   FamilyData,
   ProjectMeta,
-  SCHEMA_VERSION,
   createEmptyFamily,
-  createEmptyMeta,
 } from '@/core/schema'
-import { migrate } from '@/core/migrate'
 import { assertFamilyIntegrity } from '@/core/familyIntegrity'
+import { validateLoadedProject } from './projectValidation'
 import * as api from './storage'
 import type { ProjectRef } from './storage'
 
@@ -33,23 +31,37 @@ export async function createProject(target: ProjectRef, name: string): Promise<O
  */
 export async function openProject(ref: ProjectRef): Promise<OpenResult> {
   const loaded = await api.loadProject(ref)
-  const migrated = migrate(loaded.family)
-  const parsed = FamilyData.safeParse(migrated)
-  if (!parsed.success) {
-    throw new Error(
-      '家族数据校验失败：' + parsed.error.issues.map((i) => i.message).join('; '),
-    )
-  }
-  assertFamilyIntegrity(parsed.data)
+  return validateLoadedProject(loaded)
+}
 
-  const parsedMeta = ProjectMeta.safeParse(loaded.meta)
-  if (parsedMeta.success && parsedMeta.data.schemaVersion > SCHEMA_VERSION) {
-    throw new Error('项目元数据版本过新，当前版本不支持')
+/** Copy a complete snapshot through the common IO boundary, preserving the source on failure. */
+export async function copyProject(
+  source: ProjectRef,
+  target: ProjectRef,
+  snapshot: { meta: ProjectMeta; family: FamilyData },
+): Promise<OpenResult> {
+  const validated = validateLoadedProject({ ref: source, ...snapshot })
+  const family = FamilyData.parse(JSON.parse(JSON.stringify(validated.family)))
+  const name = target.displayName || `${validated.meta.name}（副本）`
+  const created = await api.createProject(target, name)
+  try {
+    const ids = new Map<string, string>()
+    for (const member of Object.values(family.members)) {
+      if (!member.photoId) continue
+      let replacement = ids.get(member.photoId)
+      if (!replacement) {
+        const photo = await api.readPhoto(source, member.photoId, false)
+        if (photo.size > 25 * 1024 * 1024) throw new Error('照片超过 25 MiB 限制')
+        replacement = (await api.importPhoto(created.ref, new Uint8Array(await photo.arrayBuffer()), photo.type)).photoId
+        ids.set(member.photoId, replacement)
+      }
+      member.photoId = replacement
+    }
+    await saveProject(created.ref, family)
+    return { project: created.ref, meta: created.meta, family }
+  } catch (cause) {
+    throw new Error(`另存失败，原项目未改变；目标「${name}」可能留有未完成的副本。${cause instanceof Error ? cause.message : String(cause)}`, { cause })
   }
-  const meta = parsedMeta.success
-    ? { ...parsedMeta.data, schemaVersion: parsed.data.schemaVersion }
-    : createEmptyMeta(loaded.ref.displayName || '未命名家族')
-  return { project: loaded.ref, meta, family: parsed.data }
 }
 
 export async function saveProject(ref: ProjectRef, family: FamilyData): Promise<void> {

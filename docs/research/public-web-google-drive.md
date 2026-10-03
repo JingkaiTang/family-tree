@@ -1,6 +1,6 @@
 # 家族树对外开放与 Google Drive 存储调研
 
-> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 尚未实现。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
+> 历史调研：正文记录实现前的候选方案与当时代码，不代表当前功能。项目现已仅保留 Web/PWA，已实现浏览器普通目录、图片处理和备份；原生工程已移除，Google Drive 适配已接入，配置与限制见 [Google Drive](../google-drive.md)。当前支持范围以 [Web 部署说明](../web-deployment.md) 为准，架构与 IO 见 [架构说明](../architecture.md) 和 [存储接口](../storage.md)。
 
 调研日期：2026-10-03。代码基线：`c33861279d48b93c33b00d2ea92e8d66407e8c23`。本次检查代码、项目文档及公开的一方资料；未改动业务代码，未部署服务，未读取真实家谱或照片，未操作 Google 账户。
 

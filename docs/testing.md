@@ -7,9 +7,9 @@
 | 命令 | 范围 |
 | --- | --- |
 | `npm run typecheck` | Vue、应用与单元测试；Vite/Vitest/Playwright 配置、浏览器用例和测试服务器的严格类型检查 |
-| `npm test` | 领域算法、组件、存储提供商契约、目录读写、照片、备份和保存队列 |
+| `npm test` | 领域算法、组件、存储提供商契约、目录与 Drive 读写、照片、备份和保存队列 |
 | `npm run build` | 完整类型检查和生产静态产物构建 |
-| `npm run test:e2e` | 开发服务器上的 Chromium 流程：目录恢复、照片、备份、路由离开保存和桌面/手机布局 |
+| `npm run test:e2e` | 开发服务器上的 Chromium 流程：目录恢复、照片、备份、路由离开保存、桌面/手机布局及替身 GIS/REST 的 Drive 流程 |
 | `npm run test:pwa` | 真实生产构建、Service Worker、离线重开与多窗口更新 |
 | `npm run test:layout-perf` | 500 人虚构家谱的独立布局性能门禁 |
 | `npm audit --audit-level=moderate` | 锁定的 npm 依赖审计 |
@@ -22,7 +22,17 @@
 
 开发 E2E 使用端口 4179。生产 PWA 套件使用独立端口 4178，自动启动测试专用静态服务器并构建临时产物，无需预先运行 `npm run build` 或修改 `dist/`。测试服务器通过 Node.js 内置 TypeScript 执行能力运行，命令显式使用 `--experimental-strip-types`，兼容所声明的 Node.js 22.12+ 范围；CI 使用 Node.js 24。
 
-两套浏览器测试只替换无法在无头环境操作的系统选择器，返回真实目录句柄，继续执行浏览器 IO。OPFS 仅是测试替身，应用不会把用户项目存入 OPFS。目录授权持久性、磁盘不足和 Android 文档提供程序仍需目标设备验收。
+涉及目录的浏览器测试替换无法在无头环境操作的系统选择器，返回真实目录句柄，继续执行浏览器 IO。OPFS 仅是测试替身，应用不会把用户项目存入 OPFS。目录授权持久性、磁盘不足和 Android 文档提供程序仍需目标设备验收。
+
+## Google Drive 回归与真实验收
+
+客户端与适配器通过依赖注入替换 GIS、时钟和 REST，使用虚构账号、文件与家谱验证授权失败/过期、账号不匹配、分页、网络重试、上传结果不确定及版本图冲突。项目与媒体仍经统一 IO 边界，避免以直接调用假实现代替业务集成。
+
+Chromium Drive 流程使用替身 GIS 与 REST 服务，在真实页面中连接、新建/恢复项目及处理保存；它验证页面与适配器的协作，不登录真实 Google 账号，不代表 Google 侧权限或 API 实际行为全部通过验收。没有 Client ID 时，本地目录与生产 PWA 测试仍可独立执行。
+
+配置真实 Client ID 后，按 [Google Drive 验收清单](google-drive.md#验收边界与排错) 检查：授权取消/撤销/过期、来源限制、同账号跨设备项目列表、错账号重连、照片、同时保存后的版本处理、网络中断后重试，以及完整备份下载和恢复。Safari/iOS Safari、Firefox 与 Android 的登录弹窗、图片编解码和下载均需目标设备验证；不能用 Chromium 通过推断这些设备已兼容。
+
+PWA 的离线项目与照片回归使用本地目录。Drive 没有离线数据缓存或持久化上传队列，不能把静态应用可离线打开解释为云端项目可离线保存。
 
 ## 生产 PWA 回归
 
