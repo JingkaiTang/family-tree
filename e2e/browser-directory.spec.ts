@@ -222,6 +222,53 @@ test('browser Back flushes pending changes before leaving the project and reopen
 test.describe('narrow touch Web', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
+  test('shows half siblings and keeps automatic kinship distinct from a saved custom label', async ({ page }) => {
+    await installDirectoryPicker(page)
+    await page.goto('/')
+    await page.getByRole('button', { name: '新建家族', exact: true }).click()
+    await expect(page).toHaveURL(/#\/tree$/)
+    await page.evaluate(async () => {
+      const { multiUnionFamily } = await import('/src/__tests__/fixtures/families.ts')
+      const { createEmptyFamily } = await import('/src/core/schema.ts')
+      const { useFamilyStore } = await import('/src/stores/family.ts')
+      const { useUiStore } = await import('/src/stores/ui.ts')
+      const family = useFamilyStore()
+      const members = multiUnionFamily()
+      members.parentA.firstName = '父亲测试'
+      members.childAB1.firstName = '视角成员'
+      members.childAC.firstName = '异母弟弟测试'
+      family.setProject(family.projectRef!, family.projectMeta!, {
+        ...createEmptyFamily(), members,
+        rootMemberId: 'childAB1', defaultViewpointId: 'childAB1',
+      })
+      family.markDirty()
+      const ui = useUiStore()
+      ui.setViewpoint('childAB1')
+      ui.setLayoutFocus('childAB1')
+    })
+
+    await expect(page.getByTestId('focus-flow-section-siblings')
+      .getByText('异母弟弟测试', { exact: true })).toBeVisible()
+    const parentCard = page.getByTestId('focus-flow-section-parents')
+      .getByTestId('focus-member-card').filter({ hasText: '父亲测试' })
+    await parentCard.getByRole('button', { name: '详情', exact: true }).click()
+    await expect(page.getByText('自动推算：父亲', { exact: true })).toBeVisible()
+    await page.getByPlaceholder('例如：二叔 / 表姨婆').fill('老爸')
+    await page.getByRole('button', { name: '保存覆盖', exact: true }).click()
+    await expect(page.getByText('自动推算：父亲', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '返回', exact: true }).click()
+    await expect(parentCard.getByText('老爸', { exact: true })).toBeVisible()
+    await expect(page.getByText('已保存', { exact: true })).toBeVisible()
+
+    await page.reload()
+    await expect(parentCard.getByText('老爸', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('focus-flow-section-siblings')
+      .getByText('异母弟弟测试', { exact: true })).toBeVisible()
+    await parentCard.getByRole('button', { name: '详情', exact: true }).click()
+    await expect(page.getByText('自动推算：父亲', { exact: true })).toBeVisible()
+    await expect(page.getByPlaceholder('例如：二叔 / 表姨婆')).toHaveValue('老爸')
+  })
+
   test('uses directory storage and the compact layout in the browser or user-agent gate', async ({ page }) => {
     await createAndSaveMember(page)
     await expect(page.getByTestId('layout-mode-select')).toHaveValue('auto')

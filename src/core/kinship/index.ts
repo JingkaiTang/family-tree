@@ -30,9 +30,11 @@ export function getKinship(
   const me = members[fromId]
   const target = members[toId]
   if (me.godparents.some((r) => r.id === toId)) {
+    if (target.gender === 'other') return '干亲长辈'
     return target.gender === 'female' ? '干妈' : '干爹'
   }
   if (me.godchildren.some((r) => r.id === toId)) {
+    if (target.gender === 'other') return '干亲子女'
     return target.gender === 'female' ? '干女儿' : '干儿子'
   }
 

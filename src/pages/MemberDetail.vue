@@ -46,7 +46,7 @@ const autoKinship = computed(() => {
     viewpointId.value,
     props.id,
     data.value.members,
-    data.value.nicknameOverrides,
+    {},
     data.value.siblingOrders,
   )
 })

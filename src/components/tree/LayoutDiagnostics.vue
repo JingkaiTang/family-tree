@@ -5,15 +5,19 @@ import type { LayoutDiagnostic } from '@/core/family-layout/types'
 const props = defineProps<{ diagnostics: LayoutDiagnostic[] }>()
 const emit = defineEmits<{ (event: 'dismiss'): void }>()
 
-const title = computed(() => (
-  props.diagnostics.every(value => (
+const title = computed(() => {
+  if (props.diagnostics.length > 0 && props.diagnostics.every(value => (
+    value.code === 'UNROUTABLE_AUXILIARY_EDGE'
+  ))) return '部分辅助连线暂时无法显示'
+  return props.diagnostics.every(value => (
     value.code === 'UNROUTABLE_PRIMARY_EDGE'
+    || value.code === 'UNROUTABLE_AUXILIARY_EDGE'
     || value.code === 'CROSS_FAMILY_SEGMENT_OVERLAP'
     || value.code === 'NODE_OVERLAP'
   ))
     ? '连线路由已降级'
     : '家谱数据需要检查'
-))
+})
 </script>
 
 <template>

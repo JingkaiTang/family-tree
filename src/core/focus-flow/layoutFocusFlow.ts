@@ -259,8 +259,17 @@ function currentPartnerIds(context: FocusFlowContext, memberId: string): string[
 
 function siblingIdsFor(context: FocusFlowContext, focusId: string): string[] {
   const focusMember = context.memberById.get(focusId)!
+  const focusParentages = parentagesForChild(context.facts, focusId)
+  const biologicalParentIds = new Set(focusParentages
+    .filter(parentage => parentage.typeByChildId[focusId] === 'blood')
+    .flatMap(parentage => parentage.parentIds))
+  const halfSiblingIds = context.facts.parentages
+    .filter(parentage => parentage.parentIds.some(id => biologicalParentIds.has(id)))
+    .flatMap(parentage => parentage.childIds
+      .filter(id => parentage.typeByChildId[id] === 'blood'))
   const ids = uniqueKnownIds([
-    ...parentagesForChild(context.facts, focusId).flatMap(parentage => parentage.childIds),
+    ...focusParentages.flatMap(parentage => parentage.childIds),
+    ...halfSiblingIds,
     ...focusMember.siblings.map(sibling => sibling.id),
   ], context.memberById).filter(id => id !== focusId)
   return orderRelatedIds(context, ids)

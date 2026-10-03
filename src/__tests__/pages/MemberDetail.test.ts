@@ -7,8 +7,9 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import MemberDetail from '@/pages/MemberDetail.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
-import { mk } from '@/__tests__/fixtures/families'
+import { addParent, mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
+import { useUiStore } from '@/stores/ui'
 import type { ProjectRef } from '@/services/storage'
 
 const { deletePhotoMock, flushNowMock, routerBack, routerPush } = vi.hoisted(() => ({
@@ -124,6 +125,33 @@ describe('MemberDetail photo transaction', () => {
 
     expect(previousData.members.a.photoId).toBe('new-photo-1')
     expect(deletePhotoMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('MemberDetail kinship override', () => {
+  it('keeps the inferred kinship visible while loading, editing and clearing a custom label', async () => {
+    const { family, wrapper } = mountedMember()
+    family.data.members.a.gender = 'male'
+    family.data.members.child = mk('child', { gender: 'female' })
+    addParent(family.data.members.child, family.data.members.a)
+    family.setNicknameOverride('child', 'a', '老爸')
+    useUiStore().setViewpoint('child')
+    await flushPromises()
+
+    const overrideInput = wrapper.get<HTMLInputElement>('input[placeholder="例如：二叔 / 表姨婆"]')
+    expect(wrapper.text()).toContain('自动推算：父亲')
+    expect(overrideInput.element.value).toBe('老爸')
+
+    await overrideInput.setValue('爸爸')
+    await wrapper.findAll('button').find(button => button.text() === '保存覆盖')!.trigger('click')
+    expect(family.data.nicknameOverrides.child.a).toBe('爸爸')
+    expect(wrapper.text()).toContain('自动推算：父亲')
+
+    await wrapper.findAll('button').find(button => button.text() === '清除')!.trigger('click')
+    expect(family.data.nicknameOverrides.child?.a).toBeUndefined()
+    expect(overrideInput.element.value).toBe('')
+    expect(wrapper.text()).toContain('自动推算：父亲')
+    wrapper.unmount()
   })
 })
 

@@ -6,9 +6,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, nextTick } from 'vue'
 import FamilyCanvas from '@/components/tree/FamilyCanvas.vue'
-import { createEmptyFamily, type FamilyData, type Member } from '@/core/schema'
+import { createEmptyFamily, type FamilyData, type LayoutRowPreferenceBatch, type Member } from '@/core/schema'
 import type { LayoutScene } from '@/core/family-layout/types'
-import { mk } from '@/__tests__/fixtures/families'
+import { addParent, mk, multiUnionFamily } from '@/__tests__/fixtures/families'
+import { layoutFamilyTreeSync } from '@/core/treeLayoutCore'
 import { useFamilyStore } from '@/stores/family'
 
 const { focusStagePoint, getScale, layoutFamilyTree, resetToDefaultView } = vi.hoisted(() => ({
@@ -1339,6 +1340,48 @@ describe('FamilyCanvas', () => {
     pending.resolve(structuredClone(nextScene))
     await flushPromises()
     expect(wrapper.find('[data-testid="family-unit-placeholder"]').exists()).toBe(false)
+  })
+
+  it('previews and saves descendants from every marriage when Ctrl-dragging a non-root family', async () => {
+    const members = multiUnionFamily()
+    members.grandparent = mk('grandparent')
+    members.grandchildAB = mk('grandchildAB')
+    members.grandchildAC = mk('grandchildAC')
+    addParent(members.parentA, members.grandparent)
+    addParent(members.grandchildAB, members.childAB1)
+    addParent(members.grandchildAC, members.childAC)
+    const data = familyData(Object.values(members))
+    const nextScene = layoutFamilyTreeSync(Object.values(members), { data })
+    const pending = deferred<LayoutScene>()
+    layoutFamilyTree
+      .mockResolvedValueOnce(structuredClone(nextScene))
+      .mockReturnValueOnce(pending.promise)
+    const wrapper = mountCanvas(data)
+    await flushPromises()
+    const memberIndex = wrapper.findAll('[data-testid="member-name"]')
+      .findIndex(node => node.text() === 'parentA')
+
+    const node = await beginDrag(wrapper, memberIndex, 600, 0, { ctrlKey: true })
+    const movedMemberIds = ['childAB1', 'childAB2', 'childAC', 'grandchildAB', 'grandchildAC', 'parentA', 'parentB']
+    const units = wrapper.findAll('[data-testid="family-unit"]')
+    for (const [index, unit] of nextScene.units.entries()) {
+      const dx = unit.memberIds.some(id => movedMemberIds.includes(id)) ? 600 : 0
+      expect(units[index].attributes('style'))
+        .toContain(`translate(${unit.rect.x + dx}px, ${unit.rect.y}px)`)
+    }
+
+    await node.trigger('pointerup', { pointerId: 1, clientX: 1200, clientY: 100 })
+    await nextTick()
+    const batch = wrapper.emitted<[LayoutRowPreferenceBatch]>('subtree-order-change')?.[0][0]
+    expect(batch).toBeDefined()
+    const movedUnitIds = [...batch!.rowOrders, ...batch!.bridgeOrders]
+      .flatMap(row => Object.keys(row.columns ?? {}))
+    expect(nextScene.cards.filter(card => movedUnitIds.includes(card.unitId))
+      .map(card => card.id).sort())
+      .toEqual(movedMemberIds)
+
+    pending.resolve(structuredClone(nextScene))
+    await flushPromises()
   })
 
   it('cancels an active root-unit preview when a newer data layout starts', async () => {

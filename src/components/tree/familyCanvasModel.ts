@@ -71,7 +71,10 @@ export function buildFamilyCanvasSceneModel(scene: LayoutScene, padding: number)
     })
     primaryChildUnitIdsBySourceId.set(
       group.sourceUnitId,
-      [...new Set(childUnitIds)].sort((left, right) => left.localeCompare(right)),
+      [...new Set([
+        ...(primaryChildUnitIdsBySourceId.get(group.sourceUnitId) ?? []),
+        ...childUnitIds,
+      ])].sort((left, right) => left.localeCompare(right)),
     )
   }
 

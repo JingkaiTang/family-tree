@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { layoutFamilyScene } from './layoutFamilyScene'
 import { routeAuxiliaryEdges } from './routeAuxiliaryEdges'
 import { normalizeFacts } from './normalizeFacts'
-import { familyData, linkSpouse, member, positiveCollinearOverlap } from './testHelpers'
+import { familyData, linkParent, linkSpouse, member, positiveCollinearOverlap } from './testHelpers'
 import {
   DEFAULT_FAMILY_VIEW_POLICY,
   DEFAULT_LAYOUT_METRICS,
@@ -17,6 +17,78 @@ import type {
 } from './types'
 
 describe('routeAuxiliaryEdges', () => {
+  it('routes a godparent connection around an unrelated three-generation family', () => {
+    const normalized = normalizeFacts(staggeredFamily())
+    const hidden = layoutFamilyScene(layoutRequest(normalized, false))
+    const scene = layoutFamilyScene({
+      ...layoutRequest(normalized, true),
+      auxiliaryFocusPersonId: 'f-godchild',
+    })
+
+    const routes = scene.routes.filter(route => route.kind === 'godparent')
+    expect(routes).toHaveLength(1)
+    const [start, end] = routeEndpoints(routes[0])
+    expect(isSafeSidePort(scene, 'a-godmother', start)).toBe(true)
+    expect(isSafeSidePort(scene, 'f-godchild', end)).toBe(true)
+    expectRouteAvoidsCards(routes[0], scene)
+    expectNoFalseConnections(routes[0], scene.routes.filter(route => route.kind === 'primary'))
+    expect(primaryGeometry(scene)).toEqual(primaryGeometry(hidden))
+    expect(scene.routes.filter(route => route.kind === 'primary')).toEqual(hidden.routes)
+    expect(scene.diagnostics).toEqual([])
+  })
+
+  it('keeps crowded auxiliary owners separate and deterministic around staggered obstacles', () => {
+    const scene = layoutFamilyScene(layoutRequest(normalizeFacts(staggeredFamily()), false))
+    const relations: AuxiliaryRelation[] = [{
+      id: 'aux:a-godparent', kind: 'godparent', sourceId: 'a-godmother', targetId: 'f-godchild',
+    }, {
+      id: 'aux:b-secondary', kind: 'secondary-parentage', sourceId: 'a-godmother', targetId: 'g-unrelated-child',
+    }, {
+      id: 'aux:c-historical', kind: 'historical-partnership', sourceId: 'a-godmother', targetId: 'e-mother',
+    }]
+    const input = {
+      geometry: scene, auxiliaryRelations: relations, primaryRoutes: scene.routes, metrics: DEFAULT_LAYOUT_METRICS,
+    }
+    const routes = routeAuxiliaryEdges(input)
+    expect(routes.map(route => route.routeOwnerId)).toEqual(relations.map(relation => relation.id))
+    for (const [index, route] of routes.entries()) {
+      const [start, end] = routeEndpoints(route)
+      expect(isSafeSidePort(scene, relations[index].sourceId, start)).toBe(true)
+      expect(isSafeSidePort(scene, relations[index].targetId, end)).toBe(true)
+      expectRouteAvoidsCards(route, scene)
+      expectNoFalseConnections(route, [...scene.routes, ...routes.slice(0, index)])
+    }
+    expect(new Set(routes.map(route => pointKey(routeEndpoints(route)[0]))).size).toBe(3)
+    expect(routeAuxiliaryEdges({
+      ...input,
+      geometry: { ...scene, cards: [...scene.cards].reverse(), units: [...scene.units].reverse() },
+      auxiliaryRelations: [...relations].reverse(),
+      primaryRoutes: [...scene.routes].reverse(),
+    })).toEqual(routes)
+  })
+
+  it('reports a blocked auxiliary relation without replacing otherwise valid primary geometry', () => {
+    const spouse = member('a-spouse', { gender: 'male' })
+    const godmother = member('b-godmother', { gender: 'female' })
+    const godchild = member('c-godchild', { godparents: [{ id: godmother.id, type: 'godparent' }] })
+    linkSpouse(spouse, godmother)
+    const normalized = normalizeFacts(familyData([spouse, godmother, godchild]))
+    const request = {
+      ...layoutRequest(normalized, true),
+      metrics: { ...DEFAULT_LAYOUT_METRICS, rootGap: 0, cardClearance: 32 },
+    }
+    const hidden = layoutFamilyScene(request)
+    const focused = layoutFamilyScene({ ...request, auxiliaryFocusPersonId: godmother.id })
+
+    expect(focused.routes).toEqual(hidden.routes)
+    expect(primaryGeometry(focused)).toEqual(primaryGeometry(hidden))
+    expect(focused.diagnostics).toEqual([{
+      code: 'UNROUTABLE_AUXILIARY_EDGE',
+      ids: ['aux:godparent:b-godmother>c-godchild', 'b-godmother', 'c-godchild'],
+      message: '部分辅助连线暂时无法显示：当前卡片间没有找到安全通道。',
+    }])
+  })
+
   it('routes historical and secondary partnerships from side ports with separate owners', () => {
     const geometry = rowGeometry(['a', 'b', 'c'])
     const relations: AuxiliaryRelation[] = [{
@@ -282,6 +354,24 @@ function primaryGeometry(scene: ReturnType<typeof layoutFamilyScene>) {
   }
 }
 
+function staggeredFamily() {
+  const godmother = member('a-godmother', { gender: 'female', birthDate: '1948-10-12' })
+  const grandfather = member('b-grandfather', { gender: 'male', birthDate: '1944-03-20' })
+  const father = member('c-father', { gender: 'male', birthDate: '1971-08-26' })
+  const unrelatedParent = member('d-unrelated-parent', { gender: 'male', birthDate: '1971-09-13' })
+  const mother = member('e-mother', { gender: 'female', birthDate: '1970-05-16' })
+  const godchild = member('f-godchild', {
+    gender: 'female', birthDate: '1995-11-24', godparents: [{ id: godmother.id, type: 'godparent' }],
+  })
+  const unrelatedChild = member('g-unrelated-child', { gender: 'male', birthDate: '1992-09-20' })
+  linkParent(unrelatedParent, grandfather)
+  linkParent(unrelatedChild, unrelatedParent)
+  linkSpouse(father, mother)
+  linkParent(godchild, father)
+  linkParent(godchild, mother)
+  return familyData([godmother, grandfather, father, unrelatedParent, mother, godchild, unrelatedChild])
+}
+
 function rowGeometry(ids: string[]): SceneGeometry {
   const units = ids.map((id, index) => ({
     id: `unit:${id}`,
@@ -330,6 +420,40 @@ function rowGeometry(ids: string[]): SceneGeometry {
 
 function routeEndpoints(route: RoutedFamilyEdge): [Point, Point] {
   return [route.segments[0].points[0], route.segments.at(-1)!.points.at(-1)!]
+}
+
+function expectRouteAvoidsCards(route: RoutedFamilyEdge, geometry: SceneGeometry) {
+  for (const segment of route.segments) {
+    const [start, end] = segment.points
+    for (const { rect } of geometry.cards) {
+      const crossesInterior = start.y === end.y
+        ? start.y > rect.y && start.y < rect.y + rect.height
+          && Math.max(start.x, end.x) > rect.x && Math.min(start.x, end.x) < rect.x + rect.width
+        : start.x > rect.x && start.x < rect.x + rect.width
+          && Math.max(start.y, end.y) > rect.y && Math.min(start.y, end.y) < rect.y + rect.height
+      expect(crossesInterior).toBe(false)
+    }
+  }
+}
+
+function expectNoFalseConnections(route: RoutedFamilyEdge, others: RoutedFamilyEdge[]) {
+  const strictlyOnEdge = (point: Point, [a, b]: Edge) => (
+    (point.x - a.x) * (b.y - a.y) === (point.y - a.y) * (b.x - a.x)
+    && point.x >= Math.min(a.x, b.x) && point.x <= Math.max(a.x, b.x)
+    && point.y >= Math.min(a.y, b.y) && point.y <= Math.max(a.y, b.y)
+    && pointKey(point) !== pointKey(a) && pointKey(point) !== pointKey(b)
+  )
+  for (const other of others) {
+    expect(route.segments.some(auxiliary => (
+      other.segments.some(existing => positiveCollinearOverlap(auxiliary, existing))
+    ))).toBe(false)
+    for (const auxiliary of routeEdges(route)) {
+      for (const existing of routeEdges(other)) {
+        expect(auxiliary.some(point => strictlyOnEdge(point, existing))).toBe(false)
+        expect(existing.some(point => strictlyOnEdge(point, auxiliary))).toBe(false)
+      }
+    }
+  }
 }
 
 function isSafeSidePort(geometry: SceneGeometry, id: string, point: Point): boolean {

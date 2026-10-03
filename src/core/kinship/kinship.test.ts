@@ -1061,9 +1061,10 @@ describe('getKinship — P2: 妯娌/连襟', () => {
     expect(getKinship('wife', 'bro_wife', m)).toBe('妯娌')
   })
 
-  it('wife → sis_husb (连襟)', () => {
+  it('wife → sis_husb 是丈夫姐妹的丈夫，不是连襟', () => {
     const m = buildSistersInLawFixture()
-    expect(getKinship('wife', 'sis_husb', m)).toBe('连襟')
+    expect(getKinship('wife', 'sis_husb', m)).toBe('丈夫的姐妹的丈夫')
+    expect(getKinship('sis_husb', 'wife', m)).toBe('妻子的兄弟的妻子')
   })
 })
 

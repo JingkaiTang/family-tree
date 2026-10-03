@@ -8,6 +8,7 @@ import {
   twoDisconnectedRootComponents,
 } from '@/__tests__/fixtures/families'
 import { createEmptyFamily } from '@/core/schema'
+import { linkParent, member } from '@/core/family-layout/testHelpers'
 import { layoutFocusFlow } from './layoutFocusFlow'
 
 describe('layoutFocusFlow', () => {
@@ -94,6 +95,55 @@ describe('layoutFocusFlow', () => {
     })
     expect(expanded.sections.find(section => section.kind === 'historical')?.blocks[0])
       .toMatchObject({ kind: 'couple', memberIds: ['parentA', 'parentC'] })
+  })
+
+  it('includes siblings who share either biological parent across different parent groups', () => {
+    const members = multiUnionFamily()
+    members.parentD = member('parentD', { gender: 'male' })
+    members.childBD = member('childBD', { birthDate: '2005-01-01' })
+    linkParent(members.childBD, members.parentB)
+    linkParent(members.childBD, members.parentD)
+    members.childAB1.siblings.push({ id: 'childAB2', type: 'blood' })
+    const data = { ...createEmptyFamily(), members }
+
+    for (const expandedBranchIds of [[], ['siblings:childAB1']]) {
+      const scene = layoutFocusFlow(data, { focusId: 'childAB1', expandedBranchIds })
+      expect(scene.sections.find(section => section.kind === 'siblings')?.blocks
+        .map(block => block.memberIds[0]))
+        .toEqual(['childAB2', 'childBD', 'childAC'])
+    }
+
+    const paternalHalfSibling = layoutFocusFlow(data, { focusId: 'childAC' })
+    expect(paternalHalfSibling.sections.find(section => section.kind === 'siblings')?.blocks
+      .map(block => block.memberIds[0]))
+      .toEqual(['childAB1', 'childAB2'])
+  })
+
+  it('preserves existing sibling groups without inferring blood siblings through adopted or step parents', () => {
+    const members = auxiliaryRelationsFamily()
+    members['other-parent'] = member('other-parent')
+    members['step-parent-child'] = member('step-parent-child')
+    members['other-adopted-child'] = member('other-adopted-child')
+    members['other-step-child'] = member('other-step-child')
+    members['explicit-sibling'] = member('explicit-sibling')
+    linkParent(members['step-parent-child'], members['step-parent'])
+    linkParent(members['step-parent-child'], members['other-parent'])
+    linkParent(members['other-adopted-child'], members['parent-a'], 'adopted')
+    linkParent(members['other-adopted-child'], members['other-parent'], 'adopted')
+    linkParent(members['other-step-child'], members['parent-b'], 'step')
+    linkParent(members['other-step-child'], members['other-parent'], 'step')
+    members['blood-child'].siblings.push({ id: 'explicit-sibling', type: 'blood' })
+    const data = { ...createEmptyFamily(), members }
+
+    const bloodScene = layoutFocusFlow(data, { focusId: 'blood-child' })
+    expect(bloodScene.sections.find(section => section.kind === 'siblings')?.blocks
+      .map(block => block.memberIds[0]))
+      .toEqual(['adopted-child', 'explicit-sibling'])
+
+    const adoptedScene = layoutFocusFlow(data, { focusId: 'adopted-child' })
+    expect(adoptedScene.sections.find(section => section.kind === 'siblings')?.blocks
+      .map(block => block.memberIds[0]))
+      .toEqual(['blood-child'])
   })
 
   it('keeps adopted, step and godparent relationships visible without grid preferences', () => {

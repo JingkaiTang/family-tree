@@ -193,14 +193,25 @@ function buildAttempt(
   }
   const focusId = request.auxiliaryFocusPersonId
   if (focusId !== undefined) {
-    scene.routes.push(...routeAuxiliaryEdges({
+    const focusedRelations = auxiliaryRelations.filter(relation => (
+      relation.sourceId === focusId || relation.targetId === focusId
+    ))
+    const auxiliaryRoutes = routeAuxiliaryEdges({
       geometry,
-      auxiliaryRelations: auxiliaryRelations.filter(relation => (
-        relation.sourceId === focusId || relation.targetId === focusId
-      )),
+      auxiliaryRelations: focusedRelations,
       primaryRoutes: routing.routes,
       metrics,
-    }))
+    })
+    scene.routes.push(...auxiliaryRoutes)
+    const routedOwnerIds = new Set(auxiliaryRoutes.map(route => route.routeOwnerId))
+    for (const relation of focusedRelations) {
+      if (routedOwnerIds.has(relation.id)) continue
+      scene.diagnostics.push({
+        code: 'UNROUTABLE_AUXILIARY_EDGE',
+        ids: [relation.id, relation.sourceId, relation.targetId],
+        message: '部分辅助连线暂时无法显示：当前卡片间没有找到安全通道。',
+      })
+    }
   }
   scene.diagnostics.push(...validateScene(scene, metrics))
   scene.diagnostics.sort(compareDiagnostics)

@@ -7,12 +7,12 @@ type TargetGender = 'male' | 'female' | 'other'
 /**
  * 把规范化后的路径翻译成中文称呼。
  *
- * 路径只含 parent/child/spouse（sibling 已展开为 parent+child）。
+ * 已知共同父母的 sibling 展开为 parent+child；其余保留明确的 sibling 边。
  *
  * 策略（按优先级）：
  * 1. 全是 parent → 直系祖先
  * 2. 全是 child → 直系后代
- * 3. 含有 sibling（未展开）→ 兜底
+ * 3. 含有 sibling 的谱系路径 → 按明确的兄弟姐妹分支解释
  * 4. parent+ 然后 child+（无 spouse）→ 旁系
  * 5. 末尾 spouse（仅1个spouse）→ 姻亲后缀（某亲属的配偶）
  * 6. 开头 spouse（仅1个spouse）→ 姻亲前缀（配偶的亲属）
@@ -53,16 +53,24 @@ export function describeRelation(
 
   // --- 直系祖先：parent × N ---
   if (kinds.every((k) => k === 'parent')) {
+    if (path.length > 1 && (targetGender === 'other' || path[0].toGender === 'other')) {
+      return descriptivePathLabel(path, selfId, members, siblingOrders)
+    }
     return ancestorLabel(path, targetGender, members)
   }
 
   // --- 直系后代：child × N ---
   if (kinds.every((k) => k === 'child')) {
+    const through = path.slice(0, -1)
+    if (path.length > 1 && (targetGender === 'other'
+      || (through.some(step => step.toGender === 'other') && !through.some(step => step.toGender === 'female')))) {
+      return descriptivePathLabel(path, selfId, members, siblingOrders)
+    }
     return descendantLabel(path, targetGender, members)
   }
 
   // --- 含有未展开的 sibling 边 ---
-  if (kinds.includes('sibling')) {
+  if (kinds.includes('sibling') && !kinds.includes('spouse')) {
     return siblingFallbackLabel(path, targetGender, selfId, members, siblingOrders)
   }
 
@@ -118,12 +126,12 @@ export function describeRelation(
       members,
       siblingOrders,
     )
-    return viaSpouseLabel(innerLabel, targetGender, selfGender)
+    return viaSpouseLabel(innerLabel, path[0].toGender)
   }
 
   // --- 两端 spouse 或多处 spouse → 妯娌/连襟等 ---
   if (spouseCount >= 2) {
-    return multiSpouseLabel(path)
+    return multiSpouseLabel(path, selfGender, members, siblingOrders)
   }
 
   // 回退
@@ -159,6 +167,9 @@ function ancestorLabel(path: PathStep[], targetGender: TargetGender, members: Re
   const paternalFirst = path[0].toGender === 'male'
 
   if (n === 1) {
+    if (targetGender === 'other') {
+      return path[0].relType === 'step' ? '继父母' : path[0].relType === 'adopted' ? '养父母' : '父母'
+    }
     if (path[0].relType === 'step') {
       return targetGender === 'female' ? '继母' : '继父'
     }
@@ -195,6 +206,9 @@ function descendantLabel(path: PathStep[], targetGender: TargetGender, members: 
   })
 
   if (n === 1) {
+    if (targetGender === 'other') {
+      return path[0].relType === 'step' ? '继子女' : path[0].relType === 'adopted' ? '养子女' : '子女'
+    }
     if (path[0].relType === 'adopted') {
       return targetGender === 'female' ? '养女' : '养子'
     }
@@ -234,14 +248,11 @@ function descendantLabel(path: PathStep[], targetGender: TargetGender, members: 
  * - down = 从共同祖先到目标的 child 步数
  * - genDiff = up - down = 代际差（正=长辈，负=晚辈，0=同辈）
  * - paternal = 第一步 parent 走向的是否为男性（决定父系/母系大方向）
- * - 分叉点性别 = path[up] 的 toGender（从共同祖先往下的第一步），
- *   决定这一支是走儿子（堂）还是女儿（表）
+ * - descentStart 是下行支系的起点；未展开的 sibling 自身就是这个起点。
  *
  * 堂/表判定规则：
- * - 分叉点是男性 → 堂系（同姓）
- * - 分叉点是女性 → 表系（异姓）
- * - 特例：up=1,down=1 时，分叉点就是父母，此时用 paternal 判定
- *   因为如果第一步走父亲→共同祖先→兄弟，分叉点就是父亲（男）= 堂=亲兄弟
+ * - 比较两侧最近的同辈祖先（本人或父母/祖辈），到共同祖先的两支
+ *   都沿男性才为堂系；任一侧经过女性为表系。
  */
 function collateralLabel(
   up: number,
@@ -252,23 +263,36 @@ function collateralLabel(
   selfId: string,
   members: Record<string, Member>,
   siblingOrders: SiblingOrders,
+  descentStart = up,
 ): string {
   const genDiff = up - down  // 代际差：正=长辈，0=同辈，负=晚辈
+  const descendants = path.slice(descentStart)
 
-  // 分叉点：从共同祖先往下的第一步 = path[up]
-  // 同辈一代表亲只有“父亲的兄弟子女”算堂，其余姑舅姨子女都算表。
-  // 更远的父母表/堂辈仍保留原有按分叉性别区分的规则。
-  const branchIsMale = up === 1
-    ? paternal
-    : (up < path.length ? path[up].toGender === 'male' : true)
-  const sameGenerationTang = collateralPrefixIsTang(up, paternal, branchIsMale)
+  const pairedDepth = Math.min(up, down)
+  const cousinBranches = [
+    ...path.slice(up - pairedDepth, up - 1),
+    ...descendants.slice(0, pairedDepth - 1),
+  ]
+  const sameGenerationTang = cousinBranches.every(step => step.toGender === 'male')
+  // 共同祖先的性别不影响兄弟姐妹；只有参与父母系、堂表或侄甥判定
+  // 的成员性别不明确时，才改用已知关系的描述。
+  if (!(up === 1 && down === 1) && (
+    targetGender === 'other'
+    || (genDiff > 0 && path[0].toGender === 'other')
+    || (genDiff === 2 && up === 3 && path[1].toGender === 'other')
+    || (cousinBranches.some(step => step.toGender === 'other')
+      && !cousinBranches.some(step => step.toGender === 'female'))
+    || (genDiff < 0 && descendants[up - 1]?.toGender === 'other')
+  )) {
+    return descriptivePathLabel(path, selfId, members, siblingOrders)
+  }
 
   // --- 同辈：genDiff === 0 ---
   if (genDiff === 0) {
     if (up === 1) {
       // 兄弟姐妹
       const selfVsTarget = compareAgeById(targetId(path), selfId, members, siblingOrders)
-      return siblingLabel(targetGender, selfVsTarget, path[1]?.relType)
+      return siblingLabel(targetGender, selfVsTarget, descendants[0]?.relType)
     }
     if (up === 2) {
       const prefix = sameGenerationTang ? '堂' : '表'
@@ -302,7 +326,7 @@ function collateralLabel(
       // 例如：父亲的表兄弟（up=3,down=2）
       return collateralUncleLabel(
         paternal,
-        branchIsMale,
+        sameGenerationTang,
         targetGender,
         path,
         selfId,
@@ -317,7 +341,7 @@ function collateralLabel(
         return grandCollateralLabel(path, paternal, targetGender, members, siblingOrders)
       }
       // 祖辈的堂/表兄弟姐妹（如：up=4,down=2）
-      const prefix = branchIsMale ? '堂' : '表'
+      const prefix = sameGenerationTang ? '堂' : '表'
       if (paternal) {
         return targetGender === 'female' ? `${prefix}姑奶奶` : `${prefix}叔公`
       }
@@ -333,9 +357,9 @@ function collateralLabel(
     const absDiff = -genDiff  // 晚几代
 
     // 同辈旁系亲属：侄/甥区分取决于同辈亲属的性别（男→侄，女→甥）
-    // 同辈旁系在 path 中的索引 = 2*up - 1（up个parent回到共同祖先，再up-1个child回到同辈）
-    const sameGenIdx = 2 * up - 1
-    const throughMale = sameGenIdx < path.length ? path[sameGenIdx].toGender === 'male' : true
+    // 下行支系中的第 up 位成员与本人同辈。
+    const sameGenIdx = up - 1
+    const throughMale = descendants[sameGenIdx]?.toGender === 'male'
 
     if (absDiff === 1) {
       // 侄甥辈
@@ -365,13 +389,6 @@ function collateralLabel(
   }
 
   return `${up}代上${down}代下旁系`
-}
-
-function collateralPrefixIsTang(up: number, paternal: boolean, branchIsMale: boolean): boolean {
-  if (up === 2) {
-    return paternal && branchIsMale
-  }
-  return branchIsMale
 }
 
 function grandCollateralLabel(
@@ -419,19 +436,18 @@ function targetId(path: PathStep[]): string {
  * 例如：父亲的表兄弟 → 表叔/表伯，母亲的表姐妹 → 表姨
  *
  * paternal: 第一步走男（父系）还是女（母系）
- * branchIsMale: 分叉点是男（堂系）还是女（表系）
+ * isTang: 两侧支系均经过男性（堂系）
  */
 function collateralUncleLabel(
   paternal: boolean,
-  branchIsMale: boolean,
+  isTang: boolean,
   targetGender: TargetGender,
   path: PathStep[],
   selfId: string,
   members: Record<string, Member>,
   siblingOrders: SiblingOrders,
 ): string {
-  // 分叉点是男性 → 堂系（同姓旁系）；分叉点是女性 → 表系（异姓旁系）
-  const prefix = branchIsMale ? '堂' : '表'
+  const prefix = isTang ? '堂' : '表'
 
   if (paternal) {
     // 父系
@@ -489,6 +505,10 @@ function siblingLabel(
   selfVsTarget: AgeOrder,
   relType?: RelType,
 ): string {
+  if (targetGender === 'other') {
+    const age = selfVsTarget === 'older' ? '年长的' : selfVsTarget === 'younger' ? '年幼的' : ''
+    return `${age}${relType === 'half' ? '半亲' : ''}兄弟姐妹`
+  }
   if (relType === 'half') {
     if (selfVsTarget === 'unknown') {
       return targetGender === 'female' ? '半亲姐妹' : '半亲兄弟'
@@ -530,6 +550,10 @@ function inLawByInner(
   targetGender: TargetGender,
   spouseType: RelType | undefined,
 ): string {
+  if (targetGender === 'other') return `${innerLabel}的${spouseType === 'divorced' ? '前' : ''}伴侣`
+  if (/父母|子女|兄弟姐妹|的/.test(innerLabel)) {
+    return `${innerLabel}的${spouseLabel(targetGender)}`
+  }
   // 兄弟姐妹的配偶
   if (innerLabel === '哥哥') return targetGender === 'female' ? '嫂子' : '哥哥'
   if (innerLabel === '弟弟') return targetGender === 'female' ? '弟媳' : '弟弟'
@@ -704,31 +728,39 @@ function ancestorSpouseLabel(
 
 function viaSpouseLabel(
   innerLabel: string,
-  targetGender: TargetGender,
-  selfGender: TargetGender,
+  spouseGender: TargetGender,
 ): string {
-  if (innerLabel === '父亲') return selfGender === 'female' ? '公公' : '岳父'
-  if (innerLabel === '母亲') return selfGender === 'female' ? '婆婆' : '岳母'
-  if (innerLabel === '儿子') return '继子'
-  if (innerLabel === '女儿') return '继女'
-  if (innerLabel === '养子') return '继子'
-  if (innerLabel === '养女') return '继女'
-  if (innerLabel === '继子') return '继子'
-  if (innerLabel === '继女') return '继女'
-  if (innerLabel === '哥哥' || innerLabel === '弟弟' || innerLabel === '兄弟' ||
-      innerLabel === '堂兄' || innerLabel === '堂弟' || innerLabel === '堂兄弟') {
-    return selfGender === 'female' ? '大伯子/小叔子' : '大舅子/小舅子'
+  if (innerLabel === '儿子' || innerLabel === '养子' || innerLabel === '继子') return '继子'
+  if (innerLabel === '女儿' || innerLabel === '养女' || innerLabel === '继女') return '继女'
+  if (innerLabel === '子女' || innerLabel === '养子女' || innerLabel === '继子女') return '继子女'
+  if (spouseGender === 'other' || /父母|子女|兄弟姐妹|的/.test(innerLabel)) {
+    return `${spouseLabel(spouseGender)}的${innerLabel}`
   }
-  if (innerLabel === '姐姐' || innerLabel === '妹妹' || innerLabel === '姐妹' ||
+  if (innerLabel === '父亲') return spouseGender === 'male' ? '公公' : '岳父'
+  if (innerLabel === '母亲') return spouseGender === 'male' ? '婆婆' : '岳母'
+  if (innerLabel === '哥哥') return spouseGender === 'male' ? '大伯子' : '大舅子'
+  if (innerLabel === '弟弟') return spouseGender === 'male' ? '小叔子' : '小舅子'
+  if (innerLabel === '姐姐') return spouseGender === 'male' ? '大姑子' : '大姨子'
+  if (innerLabel === '妹妹') return spouseGender === 'male' ? '小姑子' : '小姨子'
+  if (innerLabel === '兄弟' ||
+      innerLabel === '堂兄' || innerLabel === '堂弟' || innerLabel === '堂兄弟') {
+    return spouseGender === 'male' ? '大伯子/小叔子' : '大舅子/小舅子'
+  }
+  if (innerLabel === '姐妹' ||
       innerLabel === '堂姐' || innerLabel === '堂妹' || innerLabel === '堂姐妹') {
-    return selfGender === 'female' ? '大姑子/小姑子' : '大姨子/小姨子'
+    return spouseGender === 'male' ? '大姑子/小姑子' : '大姨子/小姨子'
   }
   return '远房亲戚'
 }
 
 // ==================== 多 spouse 路径：妯娌/连襟等 ====================
 
-function multiSpouseLabel(path: PathStep[]): string {
+function multiSpouseLabel(
+  path: PathStep[],
+  selfGender: TargetGender,
+  members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
+): string {
   const kinds = path.map((s) => s.kind)
 
   if (kinds[0] === 'spouse' && kinds[kinds.length - 1] === 'spouse') {
@@ -736,30 +768,60 @@ function multiSpouseLabel(path: PathStep[]): string {
     if (innerPath.length === 0) return '远房亲戚'
     const innerKinds = innerPath.map((s) => s.kind)
 
-    const noSpouseInner = !innerKinds.includes('spouse')
-    const firstChildIdx = innerKinds.indexOf('child')
-    const lastParentIdx = innerKinds.lastIndexOf('parent')
-
-    if (noSpouseInner && firstChildIdx > 0 && lastParentIdx < firstChildIdx &&
-        innerKinds.slice(0, firstChildIdx).every((k) => k === 'parent') &&
-        innerKinds.slice(firstChildIdx).every((k) => k === 'child')) {
-      const up = firstChildIdx
-      const down = innerKinds.length - firstChildIdx
-
-      if (up === 1 && down === 1) {
-        const innerTargetGender = innerPath[innerPath.length - 1].toGender
-        if (innerTargetGender === 'male') {
-          return '妯娌'
-        } else {
-          return '连襟'
-        }
+    const isSibling = (innerKinds.length === 1 && innerKinds[0] === 'sibling')
+      || (innerKinds.length === 2 && innerKinds[0] === 'parent' && innerKinds[1] === 'child')
+    if (isSibling) {
+      const spouseGender = path[0].toGender
+      const innerTargetGender = innerPath[innerPath.length - 1].toGender
+      const targetGender = path[path.length - 1].toGender
+      if (spouseGender === 'male' && innerTargetGender === 'male'
+        && selfGender === 'female' && targetGender === 'female') {
+        return '妯娌'
       }
+      if (spouseGender === 'female' && innerTargetGender === 'female'
+        && selfGender === 'male' && targetGender === 'male') {
+        return '连襟'
+      }
+      const innerLabel = describeRelation(innerPath, path[0].toId, targetId(innerPath), members, siblingOrders)
+      return `${spouseLabel(spouseGender)}的${innerLabel}的${spouseLabel(targetGender)}`
     }
 
     return '远房亲戚'
   }
 
   return '远房亲戚'
+}
+
+function spouseLabel(gender: TargetGender): string {
+  return gender === 'male' ? '丈夫' : gender === 'female' ? '妻子' : '伴侣'
+}
+
+/** 用已知边描述关系；parent → child 压缩成兄弟姐妹，不猜测性别。 */
+function descriptivePathLabel(
+  path: PathStep[],
+  selfId: string,
+  members: Record<string, Member>,
+  siblingOrders: SiblingOrders,
+): string {
+  const labels: string[] = []
+  let currentId = selfId
+  for (let index = 0; index < path.length; index += 1) {
+    let step = path[index]
+    if (step.kind === 'parent' && path[index + 1]?.kind === 'child') {
+      step = path[++index]
+      labels.push(siblingLabel(step.toGender, compareAgeById(step.toId, currentId, members, siblingOrders), step.relType))
+    } else if (step.kind === 'sibling') {
+      labels.push(siblingLabel(step.toGender, compareAgeById(step.toId, currentId, members, siblingOrders), step.relType))
+    } else if (step.kind === 'parent') {
+      labels.push(ancestorLabel([step], step.toGender, members))
+    } else if (step.kind === 'child') {
+      labels.push(descendantLabel([step], step.toGender, members))
+    } else {
+      labels.push(`${step.relType === 'divorced' ? '前' : ''}${spouseLabel(step.toGender)}`)
+    }
+    currentId = step.toId
+  }
+  return labels.join('的')
 }
 
 // ==================== sibling 未展开兜底 ====================
@@ -774,6 +836,24 @@ function siblingFallbackLabel(
   if (path.length === 1 && path[0].kind === 'sibling') {
     const selfVsTarget = compareAgeById(path[0].toId, selfId, members, siblingOrders)
     return siblingLabel(targetGender, selfVsTarget, path[0].relType)
+  }
+  // 一个明确的兄弟姐妹关系就能确定分支代差，无需杜撰共同父母。
+  // sibling 本身是下行支系的首位成员，之前只能上行、之后只能下行。
+  const siblingIndex = path.findIndex(step => step.kind === 'sibling')
+  if (siblingIndex >= 0
+    && path.slice(0, siblingIndex).every(step => step.kind === 'parent')
+    && path.slice(siblingIndex + 1).every(step => step.kind === 'child')) {
+    return collateralLabel(
+      siblingIndex + 1,
+      path.length - siblingIndex,
+      path[0].toGender === 'male',
+      targetGender,
+      path,
+      selfId,
+      members,
+      siblingOrders,
+      siblingIndex,
+    )
   }
   return '远房亲戚'
 }

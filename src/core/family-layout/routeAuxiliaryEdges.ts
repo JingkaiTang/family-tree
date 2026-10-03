@@ -205,7 +205,180 @@ function chooseCandidate(
     }
   }
 
+  const direct = candidates.sort(compareCandidates)[0]
+  if (direct) return direct
+
+  // A small set of elbows cannot escape every staggered family arrangement.
+  // Search only obstacle-boundary channels, and cap work across all four port pairs.
+  const budget = { remaining: 20_000 }
+  for (const start of sourceTerminals) {
+    for (const end of targetTerminals) {
+      const points = findChannelPath(start, end, obstacles, occupiedEdges, input.metrics.routeSubgrid, budget)
+      if (!points) continue
+      const candidate = { points, segments: toSegments(points), order: order++ }
+      if (candidateIsValid(candidate, start, end, obstacles, occupiedEdges)) candidates.push(candidate)
+    }
+  }
   return candidates.sort(compareCandidates)[0]
+}
+
+interface ChannelNode {
+  x: number
+  y: number
+  axis: 'horizontal' | 'vertical'
+  cost: number
+  estimate: number
+  previous?: ChannelNode
+}
+
+function findChannelPath(
+  start: Terminal,
+  end: Terminal,
+  obstacles: Obstacle[],
+  occupied: Edge[],
+  subgrid: number,
+  budget: { remaining: number },
+): Point[] | undefined {
+  const stubIsClear = (terminal: Terminal) => toSegments(simplifyPoints([
+    terminal.port, terminal.outside, terminal.grid,
+  ])).every((segment, index) => (
+    !occupied.some(edge => edgesConflict(segment.points as Edge, edge))
+    && obstacles.every(obstacle => !segmentIntersectsRect(segment, obstacle.rect)
+      || (index === 0 && (obstacle.type === 'card'
+        ? obstacle.id === terminal.card.id
+        : obstacle.id === terminal.card.unitId)))
+  ))
+  if (!stubIsClear(start) || !stubIsClear(end)) return undefined
+
+  const xs = new Set([start.grid.x, end.grid.x])
+  const ys = new Set([start.grid.y, end.grid.y])
+  for (const { rect } of obstacles) {
+    xs.add(snapDown(rect.x, subgrid) - subgrid)
+    xs.add(snapUp(rect.x + rect.width, subgrid) + subgrid)
+    ys.add(snapDown(rect.y, subgrid) - subgrid)
+    ys.add(snapUp(rect.y + rect.height, subgrid) + subgrid)
+  }
+  // Separate channels also let later auxiliary owners avoid sharing earlier ones.
+  for (const edge of occupied) {
+    for (const point of edge) {
+      xs.add(snapDown(point.x, subgrid) - subgrid)
+      xs.add(snapUp(point.x, subgrid) + subgrid)
+      ys.add(snapDown(point.y, subgrid) - subgrid)
+      ys.add(snapUp(point.y, subgrid) + subgrid)
+    }
+  }
+  const columns = [...xs].sort((a, b) => a - b)
+  const rows = [...ys].sort((a, b) => a - b)
+  // Index each channel once instead of rescanning the whole scene at every step.
+  const obstaclesByRow = rows.map(y => obstacles.filter(({ rect }) => y > rect.y && y < rect.y + rect.height))
+  const obstaclesByColumn = columns.map(x => obstacles.filter(({ rect }) => x > rect.x && x < rect.x + rect.width))
+  const occupiedByRow = rows.map(y => occupied.filter(([a, b]) => a.y === y || b.y === y))
+  const occupiedByColumn = columns.map(x => occupied.filter(([a, b]) => a.x === x || b.x === x))
+  const occupiedEndpoints = new Set(occupied.flatMap(edge => edge.map(pointKey)))
+  const forbiddenBends = new Set<string>()
+  for (const [a, b] of occupied) {
+    if (a.y === b.y) {
+      if (!ys.has(a.y)) continue
+      for (const x of columns) {
+        const point = { x, y: a.y }
+        if (pointStrictlyOnEdge(point, a, b)) forbiddenBends.add(pointKey(point))
+      }
+    } else {
+      for (const y of rows) {
+        const point = { x: a.x + (b.x - a.x) * (y - a.y) / (b.y - a.y), y }
+        if (xs.has(point.x) && pointStrictlyOnEdge(point, a, b)) forbiddenBends.add(pointKey(point))
+      }
+    }
+  }
+  const pointOf = (node: ChannelNode): Point => ({ x: columns[node.x], y: rows[node.y] })
+  const keyOf = (node: ChannelNode) => `${node.x},${node.y},${node.axis}`
+  const distanceToEnd = (point: Point) => Math.abs(point.x - end.grid.x) + Math.abs(point.y - end.grid.y)
+  const queue: ChannelNode[] = []
+  const initial: ChannelNode = {
+    x: columns.indexOf(start.grid.x),
+    y: rows.indexOf(start.grid.y),
+    axis: start.outside.y === start.grid.y ? 'horizontal' : 'vertical',
+    cost: 0,
+    estimate: distanceToEnd(start.grid),
+  }
+  const costs = new Map([[keyOf(initial), 0]])
+  pushChannelNode(queue, initial)
+  while (queue.length > 0 && budget.remaining > 0) {
+    const node = popChannelNode(queue)
+    if (node.cost !== costs.get(keyOf(node))) continue
+    budget.remaining--
+    const point = pointOf(node)
+    if (samePoint(point, end.grid)) {
+      const path: Point[] = []
+      for (let previous: ChannelNode | undefined = node; previous; previous = previous.previous) {
+        path.push(pointOf(previous))
+      }
+      return simplifyPoints([start.port, start.outside, ...path.reverse(), end.outside, end.port])
+    }
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const x = node.x + dx
+      const y = node.y + dy
+      if (x < 0 || x >= columns.length || y < 0 || y >= rows.length) continue
+      const axis = dx === 0 ? 'vertical' as const : 'horizontal' as const
+      // Grid subdivisions can cross another owner, but must not turn into a false T.
+      if (axis !== node.axis && forbiddenBends.has(pointKey(point))) continue
+      const nextPoint = { x: columns[x], y: rows[y] }
+      if (occupiedEndpoints.has(pointKey(nextPoint))) continue
+      const segment: RouteSegment = { orientation: axis, points: [point, nextPoint] }
+      const channelObstacles = axis === 'horizontal' ? obstaclesByRow[y] : obstaclesByColumn[x]
+      const channelEdges = axis === 'horizontal' ? occupiedByRow[y] : occupiedByColumn[x]
+      if (channelObstacles.some(obstacle => segmentIntersectsRect(segment, obstacle.rect))) continue
+      if (channelEdges.some(([a, b]) => (
+        (direction(point, nextPoint, a) === 0 && direction(point, nextPoint, b) === 0
+          && (axis === 'horizontal'
+            ? positiveOverlap(point.x, nextPoint.x, a.x, b.x)
+            : positiveOverlap(point.y, nextPoint.y, a.y, b.y)))
+        || pointStrictlyOnEdge(a, point, nextPoint)
+        || pointStrictlyOnEdge(b, point, nextPoint)
+      ))) continue
+      const cost = node.cost + Math.abs(point.x - nextPoint.x) + Math.abs(point.y - nextPoint.y)
+        + (axis === node.axis ? 0 : subgrid * 4)
+      const next: ChannelNode = { x, y, axis, cost, estimate: cost + distanceToEnd(nextPoint), previous: node }
+      const key = keyOf(next)
+      if (cost >= (costs.get(key) ?? Infinity)) continue
+      costs.set(key, cost)
+      pushChannelNode(queue, next)
+    }
+  }
+  return undefined
+}
+
+function compareChannelNodes(left: ChannelNode, right: ChannelNode): number {
+  return left.estimate - right.estimate || left.cost - right.cost
+    || left.x - right.x || left.y - right.y || left.axis.localeCompare(right.axis)
+}
+
+function pushChannelNode(queue: ChannelNode[], node: ChannelNode) {
+  queue.push(node)
+  let index = queue.length - 1
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2)
+    if (compareChannelNodes(queue[parent], node) <= 0) break
+    queue[index] = queue[parent]
+    index = parent
+  }
+  queue[index] = node
+}
+
+function popChannelNode(queue: ChannelNode[]): ChannelNode {
+  const first = queue[0]
+  const last = queue.pop()!
+  if (queue.length === 0) return first
+  let index = 0
+  while (index * 2 + 1 < queue.length) {
+    let child = index * 2 + 1
+    if (child + 1 < queue.length && compareChannelNodes(queue[child + 1], queue[child]) < 0) child++
+    if (compareChannelNodes(last, queue[child]) <= 0) break
+    queue[index] = queue[child]
+    index = child
+  }
+  queue[index] = last
+  return first
 }
 
 function sideTerminals(

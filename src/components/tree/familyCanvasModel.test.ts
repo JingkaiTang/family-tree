@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { multiUnionFamily } from '@/__tests__/fixtures/families'
+import { linkParent } from '@/core/family-layout/testHelpers'
 import type { LayoutScene } from '@/core/family-layout/types'
 import { createEmptyFamily, type Member } from '@/core/schema'
+import { layoutFamilyTreeSync } from '@/core/treeLayoutCore'
 import {
   affectedMemberIds,
   buildFamilyCanvasSceneModel,
@@ -67,6 +70,33 @@ describe('familyCanvasModel', () => {
   it('沿主亲子关系收集可拖动子树单元', () => {
     const model = buildFamilyCanvasSceneModel(scene, 40)
     expect(primarySubtreeUnitIds(scene, model, 'parents')).toEqual(['parents', 'children'])
+  })
+
+  it('拖动非根家庭时保留各段婚姻的全部子女及孙辈', () => {
+    const members = multiUnionFamily()
+    members.grandparent = member('grandparent')
+    members.grandchildAB = member('grandchildAB')
+    members.grandchildAC = member('grandchildAC')
+    linkParent(members.parentA, members.grandparent)
+    linkParent(members.grandchildAB, members.childAB1)
+    linkParent(members.grandchildAC, members.childAC)
+    const familyScene = layoutFamilyTreeSync(Object.values(members))
+    const parentUnitId = familyScene.cards.find(card => card.id === 'parentA')!.unitId
+
+    expect(familyScene.units.find(unit => unit.id === parentUnitId)?.isRootFamily).toBe(false)
+    for (const groups of [
+      familyScene.primaryParentageGroups,
+      [...familyScene.primaryParentageGroups!].reverse(),
+      [...familyScene.primaryParentageGroups!, ...familyScene.primaryParentageGroups!],
+    ]) {
+      const reordered = { ...familyScene, primaryParentageGroups: groups }
+      const model = buildFamilyCanvasSceneModel(reordered, 40)
+      const unitIds = primarySubtreeUnitIds(reordered, model, parentUnitId)
+      expect(new Set(unitIds).size).toBe(unitIds.length)
+      expect(familyScene.cards.filter(card => unitIds.includes(card.unitId))
+        .map(card => card.id).sort())
+        .toEqual(['childAB1', 'childAB2', 'childAC', 'grandchildAB', 'grandchildAC', 'parentA', 'parentB'])
+    }
   })
 
   it('识别布局偏好回写并扩展受影响成员', () => {
