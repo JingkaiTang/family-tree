@@ -314,8 +314,10 @@ test('a narrow desktop window reuses the client grid and preserves an explicit l
   await expect(page.getByTestId('focus-flow-view')).toBeVisible()
 
   await page.getByRole('button', { name: '详情', exact: true }).click()
+  await expect(page).toHaveURL(/#\/member\//)
   await expect(page.locator('main')).toHaveCSS('flex-direction', 'row')
   await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page).toHaveURL(/#\/tree$/)
   await layout.selectOption('auto')
   await expect(layout.locator('option:checked')).toHaveText('自动（网格）')
   await expect(page.locator('.pz-stage')).toBeVisible()

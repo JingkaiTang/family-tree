@@ -10,6 +10,7 @@ const props = defineProps<{ photoId?: string }>()
 const emit = defineEmits<{
   (e: 'change', photoId: string | undefined): void
   (e: 'stage', photoId: string): void
+  (e: 'pending', value: boolean): void
 }>()
 
 const family = useFamilyStore()
@@ -20,6 +21,12 @@ const pendingFile = ref<File | null>(null)
 const uploading = ref(false)
 let previewRequest = 0
 let uploadRequest = 0
+
+watch(
+  () => pendingFile.value !== null || uploading.value,
+  value => emit('pending', value),
+  { immediate: true, flush: 'sync' },
+)
 
 function replacePreviewUrl(next: string | null) {
   const previous = previewUrl.value
@@ -57,6 +64,7 @@ onBeforeUnmount(() => {
   previewRequest += 1
   uploadRequest += 1
   replacePreviewUrl(null)
+  emit('pending', false)
 })
 
 function onFileChange(e: Event) {
@@ -99,7 +107,14 @@ async function onCropConfirm(blob: Blob) {
 }
 
 function onCropCancel() {
+  uploadRequest += 1
+  uploading.value = false
   pendingFile.value = null
+}
+
+function onCropError(message: string) {
+  onCropCancel()
+  ui.showToast('error', message)
 }
 
 function onRemove() {
@@ -145,6 +160,7 @@ const hasPhoto = computed(() => !!previewUrl.value)
       :file="pendingFile"
       @confirm="onCropConfirm"
       @cancel="onCropCancel"
+      @error="onCropError"
     />
   </div>
 </template>

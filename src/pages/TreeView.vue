@@ -287,23 +287,7 @@ async function onGcMedia() {
 }
 
 function onAddMember() {
-  const id = uuidv4()
-  family.upsertMember({
-    id,
-    firstName: '新成员',
-    lastName: '',
-    gender: 'other',
-    parents: [],
-    children: [],
-    siblings: [],
-    spouses: [],
-    godparents: [],
-    godchildren: [],
-  })
-  if (!family.data.rootMemberId) {
-    family.setRootMember(id)
-  }
-  router.push({ name: 'member', params: { id } })
+  router.push({ name: 'member-new' })
 }
 
 // M3 验证用：快速添加一个祖孙三代 fixture

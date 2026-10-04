@@ -8,6 +8,7 @@ import { defineComponent, h } from 'vue'
 import PhotoPicker from '@/components/member/PhotoPicker.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
+import { useUiStore } from '@/stores/ui'
 
 const { importPhotoMock, resolvePhotoUrlMock, deletePhotoMock } = vi.hoisted(() => ({
   importPhotoMock: vi.fn(),
@@ -25,7 +26,7 @@ const project = { providerId: 'test-storage', id: 'opaque-project', displayName:
 
 const PhotoCropperStub = defineComponent({
   name: 'PhotoCropper',
-  emits: ['confirm', 'cancel'],
+  emits: ['confirm', 'cancel', 'error'],
   setup(_, { emit }) {
     return () => h('button', {
       'data-testid': 'confirm-crop',
@@ -51,6 +52,52 @@ describe('PhotoPicker media staging', () => {
     deletePhotoMock.mockResolvedValue(undefined)
   })
 
+  it('reports an unfinished crop synchronously and clears pending state when cancelled or unmounted', async () => {
+    const onPending = vi.fn()
+    const wrapper = mount(PhotoPicker, {
+      props: { onPending },
+      global: { stubs: { PhotoCropper: PhotoCropperStub } },
+    })
+    const input = wrapper.get<HTMLInputElement>('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [new File(['image'], 'portrait.png')] })
+
+    input.element.dispatchEvent(new Event('change'))
+
+    expect(onPending.mock.calls).toEqual([[false], [true]])
+    wrapper.getComponent(PhotoCropperStub).vm.$emit('cancel')
+    expect(onPending).toHaveBeenLastCalledWith(false)
+    input.element.dispatchEvent(new Event('change'))
+    expect(onPending).toHaveBeenLastCalledWith(true)
+    wrapper.unmount()
+    expect(onPending).toHaveBeenLastCalledWith(false)
+  })
+
+  it('clears pending on a read failure, preserves the photo reference and allows another file', async () => {
+    const onPending = vi.fn()
+    const wrapper = mount(PhotoPicker, {
+      props: { photoId: 'saved-photo', onPending },
+      global: { stubs: { PhotoCropper: PhotoCropperStub } },
+    })
+    const input = wrapper.get<HTMLInputElement>('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [new File(['image'], 'portrait.png')] })
+    input.element.dispatchEvent(new Event('change'))
+    expect(onPending).toHaveBeenLastCalledWith(true)
+
+    wrapper.getComponent(PhotoCropperStub).vm.$emit('error', '无法读取照片，请重新选择文件')
+
+    expect(onPending).toHaveBeenLastCalledWith(false)
+    expect(useUiStore().toast).toEqual({ type: 'error', text: '无法读取照片，请重新选择文件' })
+    expect(wrapper.emitted('change')).toBeUndefined()
+    expect(wrapper.props('photoId')).toBe('saved-photo')
+    input.element.dispatchEvent(new Event('change'))
+    expect(onPending).toHaveBeenLastCalledWith(true)
+    await wrapper.get('[data-testid="confirm-crop"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('change')).toEqual([['new-photo']])
+    expect(onPending).toHaveBeenLastCalledWith(false)
+    wrapper.unmount()
+  })
+
   it('stages an imported photo before changing the draft reference', async () => {
     const wrapper = mount(PhotoPicker, {
       global: { stubs: { PhotoCropper: PhotoCropperStub } },
@@ -63,6 +110,31 @@ describe('PhotoPicker media staging', () => {
     expect(importPhotoMock).toHaveBeenCalledWith(project, expect.any(Uint8Array), 'image/png')
     expect(wrapper.emitted('stage')).toEqual([['new-photo']])
     expect(wrapper.emitted('change')).toEqual([['new-photo']])
+    expect(wrapper.emitted('pending')).toEqual([[false], [true], [false]])
+  })
+
+  it('cancels an in-flight import and cleans its late media without changing the draft', async () => {
+    let finishImport!: (value: { photoId: string }) => void
+    importPhotoMock.mockImplementationOnce(() => new Promise(resolve => { finishImport = resolve }))
+    const onPending = vi.fn()
+    const wrapper = mount(PhotoPicker, {
+      props: { onPending },
+      global: { stubs: { PhotoCropper: PhotoCropperStub } },
+    })
+    await wrapper.get('[data-testid="confirm-crop"]').trigger('click')
+    await flushPromises()
+    expect(onPending).toHaveBeenLastCalledWith(true)
+
+    wrapper.getComponent(PhotoCropperStub).vm.$emit('cancel')
+
+    expect(onPending).toHaveBeenLastCalledWith(false)
+    finishImport({ photoId: 'cancelled-photo' })
+    await flushPromises()
+    expect(wrapper.emitted('stage')).toBeUndefined()
+    expect(wrapper.emitted('change')).toBeUndefined()
+    expect(deletePhotoMock).toHaveBeenCalledWith(project, 'cancelled-photo')
+    expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
   })
 
   it.each(['another-project', project.id])('does not apply an imported photo after switching to a new session (%s)', async (id) => {
@@ -119,7 +191,7 @@ describe('PhotoPicker media staging', () => {
     wrapper.unmount()
   })
 
-  it('does not import if the session changes while reading crop bytes', async () => {
+  it.each(['session-change', 'cancel'])('does not import after %s while reading crop bytes', async action => {
     let finishRead!: (value: ArrayBuffer) => void
     const blob = new Blob(['old crop'], { type: 'image/png' })
     vi.spyOn(blob, 'arrayBuffer').mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve }))
@@ -128,7 +200,8 @@ describe('PhotoPicker media staging', () => {
     })
 
     wrapper.getComponent(PhotoCropperStub).vm.$emit('confirm', blob)
-    useFamilyStore().setProject(project, createEmptyMeta('重新打开'), createEmptyFamily())
+    if (action === 'cancel') wrapper.getComponent(PhotoCropperStub).vm.$emit('cancel')
+    else useFamilyStore().setProject(project, createEmptyMeta('重新打开'), createEmptyFamily())
     finishRead(new ArrayBuffer(8))
     await flushPromises()
 

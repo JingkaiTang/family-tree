@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
 
@@ -11,30 +11,45 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'confirm', blob: Blob): void
   (e: 'cancel'): void
+  (e: 'error', message: string): void
 }>()
 
 const imageSrc = ref<string | null>(null)
 const cropperRef = ref<InstanceType<typeof Cropper> | null>(null)
 const processing = ref(false)
+let cropSession = 0
 
 watch(
   () => props.file,
   (f) => {
+    const session = ++cropSession
+    imageSrc.value = null
+    processing.value = false
     if (!f) {
-      imageSrc.value = null
       return
     }
     const reader = new FileReader()
+    const failRead = (message: string) => {
+      if (session !== cropSession) return
+      cropSession += 1
+      imageSrc.value = null
+      processing.value = false
+      emit('error', message)
+    }
     reader.onload = () => {
+      if (session !== cropSession) return
       imageSrc.value = typeof reader.result === 'string' ? reader.result : null
     }
+    reader.onerror = () => failRead('无法读取照片，请重新选择文件')
+    reader.onabort = () => failRead('照片读取已取消，请重新选择文件')
     reader.readAsDataURL(f)
   },
-  { immediate: true },
+  { immediate: true, flush: 'sync' },
 )
 
 async function onConfirm() {
-  if (!cropperRef.value) return
+  if (!cropperRef.value || !imageSrc.value || processing.value) return
+  const session = cropSession
   processing.value = true
   try {
     const { canvas } = cropperRef.value.getResult() as { canvas: HTMLCanvasElement | null }
@@ -42,15 +57,20 @@ async function onConfirm() {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob((b) => resolve(b), 'image/png', 1),
     )
-    if (blob) emit('confirm', blob)
+    if (blob && session === cropSession) emit('confirm', blob)
   } finally {
-    processing.value = false
+    if (session === cropSession) processing.value = false
   }
 }
 
 function onCancel() {
+  cropSession += 1
+  imageSrc.value = null
+  processing.value = false
   emit('cancel')
 }
+
+onBeforeUnmount(() => { cropSession += 1 })
 </script>
 
 <template>
@@ -79,12 +99,14 @@ function onCancel() {
         拖动调整位置和大小。比例锁定为 3:4（竖向）。
       </p>
       <button
+        type="button"
         class="rounded border border-slate-500 bg-transparent px-4 py-1 text-sm text-slate-200 hover:bg-slate-700"
         @click="onCancel"
       >
         取消
       </button>
       <button
+        type="button"
         class="rounded bg-emerald-600 px-4 py-1 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
         :disabled="processing"
         @click="onConfirm"

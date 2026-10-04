@@ -156,6 +156,31 @@ describe('TreeView row order integration', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
+  it.each([false, true])('opens an unsaved member draft without changing the family (existing members: %s)', async hasMembers => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const data = createEmptyFamily()
+    if (hasMembers) {
+      data.members.existing = mk('existing')
+      data.rootMemberId = 'existing'
+    }
+    family.setProject(project, createEmptyMeta('家族名称'), data)
+    const before = JSON.stringify(family.data)
+    const revision = family.revision
+    const wrapper = mount(TreeView, {
+      global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
+    })
+
+    await wrapper.findAll('button').find(button => button.text() === '+ 新建成员')!.trigger('click')
+
+    expect(routerPush).toHaveBeenCalledWith({ name: 'member-new' })
+    expect(JSON.stringify(family.data)).toBe(before)
+    expect(family.revision).toBe(revision)
+    expect(family.isDirty).toBe(false)
+    wrapper.unmount()
+  })
+
   it('persists the row order emitted by FamilyCanvas through the family store', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)

@@ -21,6 +21,14 @@ function makeTestMember() {
 }
 
 describe('MemberForm', () => {
+  it('hides deletion for a member that has not been created', () => {
+    const wrapper = mount(MemberForm, {
+      props: { modelValue: makeTestMember(), canDelete: false },
+      global: { stubs: { PhotoPicker: true } },
+    })
+    expect(wrapper.findAll('button').some(button => button.text() === '删除此成员')).toBe(false)
+  })
+
   // ========== 渲染 ==========
   it('渲染所有表单字段', () => {
     const member = makeTestMember()

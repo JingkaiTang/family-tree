@@ -16,6 +16,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/TreeView.vue'),
   },
   {
+    path: '/members/new',
+    name: 'member-new',
+    meta: { requiresProject: true },
+    component: () => import('@/pages/MemberDetail.vue'),
+  },
+  {
     path: '/member/:id',
     name: 'member',
     meta: { requiresProject: true },

@@ -21,6 +21,8 @@ const { deletePhotoMock, flushNowMock, routerBack, routerPush } = vi.hoisted(() 
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ back: routerBack, push: routerPush }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }))
 vi.mock('@/services/autosave', () => ({ flushNow: flushNowMock }))
 vi.mock('@/services/storage', () => ({ deletePhoto: deletePhotoMock }))
@@ -53,6 +55,33 @@ describe('MemberDetail photo transaction', () => {
     deletePhotoMock.mockResolvedValue(undefined)
     routerBack.mockReset()
     routerPush.mockReset()
+  })
+
+  it('saving basic details preserves a relationship removal on both members', async () => {
+    const { family, wrapper } = mountedMember()
+    family.data.members.parent = mk('parent')
+    family.linkRelation('a', 'parent', 'parent')
+    await flushPromises()
+
+    family.unlinkRelation('a', 'parent', 'parent')
+    await wrapper.get('[data-testid="save"]').trigger('click')
+    await flushPromises()
+
+    expect(family.data.members.a.parents).toEqual([])
+    expect(family.data.members.parent.children).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('shows unsaved basic details even when the project itself is already saved', async () => {
+    const { family, wrapper } = mountedMember()
+    const form = wrapper.getComponent(MemberFormStub)
+    form.vm.$emit('update:modelValue', { ...form.props('modelValue'), firstName: '修改后的名字' })
+    await flushPromises()
+
+    expect(family.isDirty).toBe(false)
+    expect(wrapper.get('header').text()).toContain('资料未保存')
+    expect(wrapper.get('header').text()).not.toContain('已保存')
+    wrapper.unmount()
   })
 
   it('discards staged media and preserves the persisted photo on cancel', async () => {
@@ -108,6 +137,21 @@ describe('MemberDetail photo transaction', () => {
 
     expect(deletePhotoMock).toHaveBeenCalledWith(project, 'new-photo-1')
     expect(deletePhotoMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not navigate a new project when an old cancel finishes cleaning its photo', async () => {
+    const { family, wrapper } = mountedMember()
+    let finishCleanup!: () => void
+    deletePhotoMock.mockImplementationOnce(() => new Promise<void>(resolve => { finishCleanup = resolve }))
+    await wrapper.get('[data-testid="stage-one"]').trigger('click')
+    await wrapper.get('[data-testid="cancel"]').trigger('click')
+    await flushPromises()
+    family.setProject({ ...project, id: 'next-project' }, createEmptyMeta('另一个家族'), createEmptyFamily())
+    finishCleanup()
+    await flushPromises()
+
+    expect(routerBack).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('keeps an original project photo referenced by a save that finishes after switching projects', async () => {

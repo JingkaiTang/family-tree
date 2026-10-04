@@ -30,7 +30,7 @@ beforeEach(() => {
 })
 
 describe('project route restoration', () => {
-  it.each(['/tree', '/member/member-1'])('redirects a fresh session at %s to Welcome', async (path) => {
+  it.each(['/tree', '/member/member-1', '/members/new'])('redirects a fresh session at %s to Welcome', async (path) => {
     const router = createAppRouter(createMemoryHistory())
     await router.push(path)
     await router.isReady()
@@ -39,6 +39,21 @@ describe('project route restoration', () => {
     expect(router.currentRoute.value.path).toBe('/')
     expect(router.currentRoute.value.redirectedFrom?.path).toBe(path)
     expect(useFamilyStore().projectRef).toBeNull()
+  })
+
+  it('opens the new-member page without an existing member id in a loaded project', async () => {
+    const family = useFamilyStore()
+    family.setProject(project, createEmptyMeta(project.displayName), createEmptyFamily())
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push({ name: 'member-new' })
+
+    expect(router.currentRoute.value.name).toBe('member-new')
+    expect(router.currentRoute.value.path).toBe('/members/new')
+    expect(router.currentRoute.value.params).toEqual({})
+    expect(router.currentRoute.value.meta.requiresProject).toBe(true)
+    expect(family.data.members).toEqual({})
+    expect(family.isDirty).toBe(false)
   })
 
   it('does not treat a persisted reference as an already loaded project', async () => {
