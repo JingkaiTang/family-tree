@@ -1,5 +1,28 @@
 import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type Point } from '@/core/family-layout/types'
 import type { FamilyData, LayoutRowPreferenceBatch, RowOrderPreference } from '@/core/schema'
+import type { FamilyFacts } from '@/core/family-graph/types'
+import type { LineageTrace } from '@/core/family-graph/lineage'
+
+export function highlightedLineagePaths(scene: LayoutScene, facts: FamilyFacts, trace: LineageTrace) {
+  const childrenByOwnerId = new Map(Object.entries(trace.parentageChildren))
+  const personIds = new Set(trace.personIds)
+  for (const parentage of facts.parentages) {
+    for (const childId of trace.parentageChildren[parentage.id] ?? []) {
+      for (const parentId of parentage.parentIds) {
+        if (!personIds.has(parentId)) continue
+        // Match projectView's exact owner key; person IDs can themselves contain colons.
+        childrenByOwnerId.set(`aux:${parentage.id}:${parentId}:${childId}`, [childId])
+      }
+    }
+  }
+  return scene.routes.flatMap(route => {
+    if (route.kind !== 'primary' && route.kind !== 'secondary-parentage') return []
+    if (route.sourceParentIds && !route.sourceParentIds.some(id => personIds.has(id))) return []
+    const children = childrenByOwnerId.get(route.parentageId ?? route.routeOwnerId)
+    const childPersonIds = children?.filter(id => route.childPaths?.some(path => path.childPersonId === id))
+    return childPersonIds?.length ? [{ routeId: route.id, childPersonIds }] : []
+  })
+}
 
 export interface RowDragState {
   mode: 'root-row' | 'bridge-row'
@@ -359,8 +382,11 @@ export function fadedRouteIds(scene: LayoutScene, state: FamilyDragState | null)
       y: card.rect.y,
     })),
   ]
+  const personIds = new Set(scene.cards.filter(card => unitIds.has(card.unitId)).map(card => card.id))
   return scene.routes.flatMap(route => (
-    route.segments.some(segment => {
+    (route.sourcePersonId !== undefined && personIds.has(route.sourcePersonId))
+    || route.childPaths?.some(path => personIds.has(path.childPersonId))
+    || route.segments.some(segment => {
       const endpoints = [segment.points[0], segment.points.at(-1)]
       return endpoints.some(point => point && contacts.some(contact => (
         Math.abs(point.x - contact.x) < 0.5 && Math.abs(point.y - contact.y) < 0.5

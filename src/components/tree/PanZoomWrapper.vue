@@ -26,6 +26,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'view-change', v: PanzoomView): void
+  (e: 'scale-change', scale: number): void
 }>()
 
 function onWheel(e: WheelEvent) {
@@ -156,6 +157,7 @@ function flushEmit() {
 }
 
 function onPanzoomChange() {
+  emit('scale-change', getScale())
   scheduleEmit()
 }
 

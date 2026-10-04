@@ -113,6 +113,9 @@ export function routeAuxiliaryEdges(input: RouteAuxiliaryEdgesInput): RoutedFami
       kind: relation.kind,
       accent: relation.kind === 'godparent' ? PURPLE : GRAY,
       segments: candidate.segments,
+      ...(relation.kind === 'secondary-parentage' ? {
+        childPaths: [{ childPersonId: relation.targetId, segments: candidate.segments }],
+      } : {}),
     })
     occupiedEdges.push(...routeEdgesFromSegments(candidate.segments))
   }

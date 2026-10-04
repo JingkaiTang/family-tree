@@ -7,9 +7,43 @@ const props = defineProps<{
   width: number
   height: number
   fadedRouteIds?: string[]
+  highlightedPaths?: Array<{ routeId: string; childPersonIds: string[] }>
+  scale?: number
 }>()
 
 const fadedRouteIdSet = computed(() => new Set(props.fadedRouteIds ?? []))
+// The canvas uses a CSS transform, so SVG non-scaling-stroke alone is insufficient.
+const strokeCompensation = computed(() => {
+  const scale = props.scale ?? 1
+  return 1 / Math.min(2, Math.max(0.4, Number.isFinite(scale) && scale > 0 ? scale : 1))
+})
+
+const highlightedSegments = computed(() => {
+  const requestedPaths = new Map(
+    (props.highlightedPaths ?? []).map(path => [path.routeId, new Set(path.childPersonIds)]),
+  )
+  return props.routes.flatMap(route => {
+    // Shared child-path trunks would accumulate opacity and cancel the drag fade.
+    if (fadedRouteIdSet.value.has(route.id)) return []
+    const children = requestedPaths.get(route.id)
+    if (!children) return []
+    // An owner can contain siblings: only route metadata identifies the exact branch.
+    return (route.childPaths ?? [])
+      .filter(path => children.has(path.childPersonId))
+      .flatMap(path => path.segments.map((segment, index) => ({
+        key: `${route.id}:${path.childPersonId}:${index}`,
+        route,
+        childPersonId: path.childPersonId,
+        segment,
+      })))
+  })
+})
+
+function routeOpacity(routeId: string): number | undefined {
+  if (fadedRouteIdSet.value.has(routeId)) return 0.25
+  if (props.highlightedPaths !== undefined) return 0.18
+  return undefined
+}
 
 const routeOwnerGroups = computed(() => {
   const routesByOwnerId = new Map<string, RoutedFamilyEdge[]>()
@@ -73,26 +107,62 @@ function pointValue(point: Point): string {
           <path
             v-if="segment.orientation === 'bridge'"
             data-testid="line-bridge-underlay"
-            :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
+            :style="{ opacity: routeOpacity(route.id) }"
             :d="pathData(segment)"
-            stroke="white"
-            stroke-width="7"
+            stroke="#f1f5f9"
+            :stroke-width="7 * strokeCompensation"
             stroke-linecap="round"
             stroke-linejoin="round"
             fill="none"
           />
           <path
             :data-route-id="route.id"
-            :style="fadedRouteIdSet.has(route.id) ? { opacity: 0.25 } : undefined"
+            :style="{ opacity: routeOpacity(route.id) }"
             :d="pathData(segment)"
             :stroke="route.accent"
             :stroke-dasharray="route.kind === 'primary' ? undefined : '8 6'"
-            stroke-width="2"
+            :stroke-width="2 * strokeCompensation"
             stroke-linecap="round"
             stroke-linejoin="round"
             fill="none"
           />
         </template>
+        <circle
+          v-for="(junction, index) in route.junctions ?? []"
+          :key="`${route.id}:junction:${index}`"
+          data-testid="line-junction"
+          :cx="junction.x"
+          :cy="junction.y"
+          :r="2.5 * strokeCompensation"
+          :fill="route.accent"
+          :style="{ opacity: routeOpacity(route.id) }"
+        />
+      </template>
+    </g>
+    <g v-if="highlightedPaths !== undefined" data-testid="lineage-route-overlay">
+      <template v-for="value in highlightedSegments" :key="value.key">
+        <path
+          v-if="value.segment.orientation === 'bridge'"
+          data-testid="lineage-bridge-underlay"
+          :d="pathData(value.segment)"
+          stroke="#f1f5f9"
+          :stroke-width="8 * strokeCompensation"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
+        <path
+          data-testid="lineage-route"
+          :data-route-id="value.route.id"
+          :data-child-person-id="value.childPersonId"
+          :d="pathData(value.segment)"
+          :stroke="value.route.accent"
+          :stroke-dasharray="value.route.kind === 'primary' ? undefined : '8 6'"
+          :stroke-width="3 * strokeCompensation"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+        />
       </template>
     </g>
   </svg>

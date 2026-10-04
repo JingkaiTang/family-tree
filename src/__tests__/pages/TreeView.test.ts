@@ -491,6 +491,28 @@ describe('TreeView row order integration', () => {
     expect(family.isDirty).toBe(false)
   })
 
+  it('opens focused reading for the selected grid member without changing the viewpoint or project', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    const ui = useUiStore()
+    family.data.members = { selected: mk('selected'), viewpoint: mk('viewpoint') }
+    ui.setSelected('selected')
+    ui.setViewpoint('viewpoint')
+    ui.setLayoutModePreference('family-grid')
+    const wrapper = mount(TreeView, {
+      global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
+    })
+    const focus = wrapper.findAll('button').find(button => button.text() === '聚焦选中')
+    expect(focus).toBeDefined()
+    await focus!.trigger('click')
+    expect(ui.resolvedLayoutMode).toBe('focus-flow')
+    expect(ui.layoutFocusId).toBe('selected')
+    expect(ui.viewpointId).toBe('viewpoint')
+    expect(family.isDirty).toBe(false)
+    wrapper.unmount()
+  })
+
   it('resets auxiliary visibility when closing the project', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)

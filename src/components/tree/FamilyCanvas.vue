@@ -14,6 +14,8 @@ import {
   withRootOrderPreference,
 } from '@/core/family-layout/reconcilePreferences'
 import { layoutFamilyTree } from '@/core/treeLayout'
+import { normalizeFacts } from '@/core/family-graph/normalizeFacts'
+import { buildLineageIndex, traceLineage } from '@/core/family-graph/lineage'
 import {
   affectedMemberIds,
   buildFamilyCanvasSceneModel,
@@ -23,6 +25,7 @@ import {
   dragOffsetForUnit as resolveDragOffsetForUnit,
   fadedRouteIds as resolveFadedRouteIds,
   hasExpectedLayoutPreference,
+  highlightedLineagePaths,
   insertionIndex,
   isUnitDragging as resolveIsUnitDragging,
   previewOffsetByUnitId as resolvePreviewOffsetByUnitId,
@@ -55,6 +58,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'select', id: string): void
+  (event: 'clear-selection'): void
   (event: 'open', id: string): void
   (event: 'view-change', value: PanzoomView): void
   (event: 'domain-row-order-change', preference: RowOrderPreference): void
@@ -96,6 +100,89 @@ let settleTimer: ReturnType<typeof setTimeout> | null = null
 let observedLayoutResetVersion = props.layoutResetVersion ?? 0
 const animatePositions = ref(false)
 const dismissedDiagnosticKey = ref<string | null>(null)
+const hoveredPersonId = ref<string | null>(null)
+const focusedPersonId = ref<string | null>(null)
+const lockedPersonId = ref(props.selectedId ?? null)
+const canvasScale = ref(props.initialView?.scale ?? 1)
+const familyFacts = computed(() => normalizeFacts(props.data).facts)
+const lineageIndex = computed(() => buildLineageIndex(familyFacts.value))
+const lineagePersonId = computed(() => {
+  const id = lockedPersonId.value ?? focusedPersonId.value ?? hoveredPersonId.value
+  return id && props.data.members[id] ? id : null
+})
+const lineage = computed(() => lineagePersonId.value
+  ? traceLineage(lineageIndex.value, lineagePersonId.value)
+  : undefined)
+const highlightedPaths = computed(() => {
+  if (!lineage.value) return undefined
+  return highlightedLineagePaths(scene.value, familyFacts.value, lineage.value)
+})
+const highlightedHubIds = computed(() => {
+  if (!lineage.value) return undefined
+  const highlightedRouteIds = new Set(highlightedPaths.value?.map(path => path.routeId))
+  const highlightedOwners = new Set(scene.value.routes
+    .filter(route => !route.sourcePersonId && highlightedRouteIds.has(route.id))
+    .map(route => route.routeOwnerId))
+  return (scene.value.primaryParentageGroups ?? []).flatMap(group => (
+    highlightedOwners.has(group.id)
+      ? [group.sourceHubId ?? `hub:${group.sourceUnitId}`]
+      : []
+  ))
+})
+const lineageName = computed(() => {
+  const person = lineagePersonId.value ? props.data.members[lineagePersonId.value] : undefined
+  return person ? `${person.lastName ?? ''}${person.firstName ?? ''}`.trim()
+    || person.nickname || '未命名' : ''
+})
+
+watch(() => props.selectedId, id => { lockedPersonId.value = id ?? null })
+
+function selectMember(id: string) {
+  lockedPersonId.value = id
+  emit('select', id)
+}
+
+function clearLineage() {
+  lockedPersonId.value = null
+  hoveredPersonId.value = null
+  focusedPersonId.value = null
+  emit('clear-selection')
+}
+
+function previewMember(id: string | null, kind: 'hover' | 'focus') {
+  if (dragState.value !== null && id !== null) return
+  if (kind === 'hover') hoveredPersonId.value = id
+  else focusedPersonId.value = id
+}
+
+let backgroundPointerStart: { x: number; y: number } | null = null
+let backgroundPointerMoved = false
+function onCanvasPointerDown(event: PointerEvent) {
+  backgroundPointerStart = { x: event.clientX, y: event.clientY }
+  backgroundPointerMoved = false
+}
+function onCanvasPointerMove(event: PointerEvent) {
+  if (backgroundPointerStart && Math.hypot(
+    event.clientX - backgroundPointerStart.x,
+    event.clientY - backgroundPointerStart.y,
+  ) > 3) backgroundPointerMoved = true
+}
+function onCanvasClick(event: MouseEvent) {
+  const target = event.target
+  if (backgroundPointerMoved || !(target instanceof Element)
+    || target.closest('button, input, select, a, [role="button"]')) return
+  clearLineage()
+}
+function onLineageKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || event.defaultPrevented) return
+  const target = event.target
+  if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]')) return
+  clearLineage()
+}
+function onViewChange(view: PanzoomView) {
+  canvasScale.value = view.scale
+  emit('view-change', view)
+}
 
 const diagnosticKey = computed(() => scene.value.diagnostics
   .map(value => `${value.code}:${value.ids.join(',')}:${value.message}`)
@@ -220,7 +307,9 @@ watch(
 
 watch(
   () => [props.showAuxiliaryRelations, props.selectedId] as const,
-  requestAuxiliaryRefresh,
+  ([show, selected], [previousShow, previousSelected]) => {
+    if (show !== previousShow || (show && selected !== previousSelected)) requestAuxiliaryRefresh()
+  },
 )
 
 const sceneModel = computed(() => buildFamilyCanvasSceneModel(scene.value, PADDING))
@@ -561,9 +650,13 @@ const fadedRouteIds = computed(() => resolveFadedRouteIds(scene.value, dragState
 onBeforeUnmount(() => {
   if (settleTimer !== null) clearTimeout(settleTimer)
   window.removeEventListener('blur', cancelActiveDragPreview)
+  window.removeEventListener('keydown', onLineageKeydown)
 })
 
-onMounted(() => window.addEventListener('blur', cancelActiveDragPreview))
+onMounted(() => {
+  window.addEventListener('blur', cancelActiveDragPreview)
+  window.addEventListener('keydown', onLineageKeydown)
+})
 
 function dismissDiagnostics() {
   dismissedDiagnosticKey.value = diagnosticKey.value
@@ -571,11 +664,18 @@ function dismissDiagnostics() {
 </script>
 
 <template>
-  <div class="relative h-full w-full">
+  <div
+    data-testid="family-canvas"
+    class="relative h-full w-full"
+    @pointerdown.capture="onCanvasPointerDown"
+    @pointermove.capture="onCanvasPointerMove"
+    @click="onCanvasClick"
+  >
     <PanZoomWrapper
       ref="panzoomRef"
       :initial-view="initialView ?? null"
-      @view-change="emit('view-change', $event)"
+      @view-change="onViewChange"
+      @scale-change="canvasScale = $event"
     >
       <div
         class="relative"
@@ -598,6 +698,8 @@ function dismissDiagnostics() {
             :width="sceneModel.canvasSize.width"
             :height="sceneModel.canvasSize.height"
             :faded-route-ids="fadedRouteIds"
+            :highlighted-paths="highlightedPaths"
+            :scale="canvasScale"
           />
 
           <div
@@ -641,10 +743,14 @@ function dismissDiagnostics() {
             :kinship-by-member-id="kinshipByMemberId"
             :root-accent-by-id="sceneModel.rootAccentById"
             :root-order="sceneModel.rootOrder"
+            :highlighted-person-ids="lineage?.personIds"
+            :highlighted-hub-ids="highlightedHubIds"
             @unit-drag="onUnitDrag"
             @unit-drop="onUnitDrop"
             @unit-cancel="onUnitCancel"
-            @select="emit('select', $event)"
+            @select="selectMember"
+            @hover="previewMember($event, 'hover')"
+            @focus="previewMember($event, 'focus')"
             @open="emit('open', $event)"
           />
         </div>
@@ -657,6 +763,26 @@ function dismissDiagnostics() {
         </div>
       </div>
     </PanZoomWrapper>
+
+    <div
+      v-if="lineage"
+      data-testid="lineage-summary"
+      class="absolute left-3 top-3 z-40 flex max-w-[calc(100%-1.5rem)] items-center gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm shadow-sm"
+      :style="{ pointerEvents: lockedPersonId ? undefined : 'none' }"
+      aria-live="polite"
+      @click.stop
+    >
+      <div class="min-w-0">
+        <p class="truncate font-medium text-slate-800">{{ lineageName }} · 直系关系</p>
+        <p class="mt-1 text-xs text-slate-600">祖先 {{ lineage.ancestorIds.length }} 人 · 后代 {{ lineage.descendantIds.length }} 人</p>
+        <p class="mt-1 text-xs text-slate-500">{{ lockedPersonId ? '已锁定 · Esc 或空白处退出' : '预览 · 点击人物锁定' }}</p>
+      </div>
+      <button
+        v-if="lockedPersonId"
+        class="shrink-0 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+        @click.stop="clearLineage"
+      >退出高亮</button>
+    </div>
 
     <LayoutDiagnostics
       v-if="visibleDiagnostics.length > 0"

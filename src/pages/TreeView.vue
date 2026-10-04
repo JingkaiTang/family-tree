@@ -69,6 +69,12 @@ function setLayoutFocus(id: string) {
   ui.setFocusFlowScrollTop(0)
 }
 
+function focusSelectedMember() {
+  if (!selectedId.value) return
+  setLayoutFocus(selectedId.value)
+  ui.setLayoutModePreference('focus-flow')
+}
+
 function ensureLayoutFocus() {
   if (layoutFocusId.value && family.getMember(layoutFocusId.value)) return
   const fallback = [
@@ -384,9 +390,9 @@ function seedFixture() {
           + 新建成员
         </button>
         <button
-          v-if="resolvedLayoutMode === 'focus-flow' && selectedId && layoutFocusId !== selectedId"
+          v-if="selectedId && (resolvedLayoutMode === 'family-grid' || layoutFocusId !== selectedId)"
           class="rounded border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm text-emerald-700 hover:bg-emerald-100"
-          @click="setLayoutFocus(selectedId)"
+          @click="focusSelectedMember"
         >
           聚焦选中
         </button>
@@ -485,6 +491,7 @@ function seedFixture() {
         :layout-reset-version="layoutResetVersion"
         :show-auxiliary-relations="showAuxiliaryRelations"
         @select="onSelect"
+        @clear-selection="ui.setSelected(null)"
         @open="onOpen"
         @grid-view-change="ui.setCanvasView"
         @focus-scroll-change="ui.setFocusFlowScrollTop"

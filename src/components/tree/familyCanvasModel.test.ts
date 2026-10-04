@@ -4,10 +4,14 @@ import { linkParent } from '@/core/family-layout/testHelpers'
 import type { LayoutScene } from '@/core/family-layout/types'
 import { createEmptyFamily, type Member } from '@/core/schema'
 import { layoutFamilyTreeSync } from '@/core/treeLayoutCore'
+import { normalizeFacts } from '@/core/family-graph/normalizeFacts'
+import { buildLineageIndex, traceLineage } from '@/core/family-graph/lineage'
 import {
   affectedMemberIds,
   buildFamilyCanvasSceneModel,
+  fadedRouteIds,
   hasExpectedLayoutPreference,
+  highlightedLineagePaths,
   primarySubtreeUnitIds,
 } from './familyCanvasModel'
 
@@ -57,6 +61,28 @@ function member(id: string): Member {
 }
 
 describe('familyCanvasModel', () => {
+  it('traces the correct source when a child has two parents in separate family units', () => {
+    const a = member('a')
+    const b = member('b')
+    const child = member('child')
+    linkParent(child, a)
+    linkParent(child, b)
+    const data = { ...createEmptyFamily(), members: { a, b, child } }
+    const scene = layoutFamilyTreeSync([a, b, child], { data })
+    const facts = normalizeFacts(data).facts
+    const trace = traceLineage(buildLineageIndex(facts), 'b')
+    const selected = highlightedLineagePaths(scene, facts, trace)
+    expect(selected).toHaveLength(1)
+    const route = scene.routes.find(route => route.id === selected[0].routeId)!
+    expect(route).toMatchObject({ sourceParentIds: ['b'] })
+    expect(selected[0].childPersonIds).toEqual(['child'])
+    for (const personId of ['b', 'child']) {
+      const unitId = scene.cards.find(card => card.id === personId)!.unitId
+      expect(fadedRouteIds(scene, { mode: 'subtree', unitId, unitIds: [unitId], dx: 24, dy: 0 }))
+        .toContain(route.id)
+    }
+  })
+
   it('一次构建画布尺寸、索引和根域展示数据', () => {
     const model = buildFamilyCanvasSceneModel(scene, 40)
 

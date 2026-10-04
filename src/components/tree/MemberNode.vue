@@ -21,6 +21,7 @@ const props = defineProps<{
   isViewpoint?: boolean
   rootAccent?: string
   showRootRail?: boolean
+  highlightState?: 'active' | 'muted'
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +29,8 @@ const emit = defineEmits<{
   (e: 'dblclick', id: string): void
   (e: 'drag', payload: MemberDragPayload): void
   (e: 'drop', payload: MemberDragPayload): void
+  (e: 'hover', id: string | null): void
+  (e: 'focus', id: string | null): void
 }>()
 
 export interface MemberDragPayload {
@@ -105,11 +108,24 @@ const lifeSpan = computed(() => {
   return ''
 })
 
+let suppressDragClick = false
+
 function onClick() {
+  if (suppressDragClick) {
+    suppressDragClick = false
+    return
+  }
   emit('click', props.member.id)
 }
 function onDblClick() {
   emit('dblclick', props.member.id)
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  event.stopPropagation()
+  if (!event.repeat) emit('click', props.member.id)
 }
 
 /**
@@ -134,6 +150,7 @@ function onPointerDown(e: PointerEvent) {
   // 只响应主键（鼠标左键 / 触摸 / 笔）
   if (e.button !== 0 && e.pointerType === 'mouse') return
   e.stopPropagation()
+  suppressDragClick = false
   dragStartX = e.clientX
   dragStartY = e.clientY
   dragging = false
@@ -176,6 +193,7 @@ function onPointerUp(e: PointerEvent) {
   dragCaptured = false
   groupDrag = false
   if (wasDragging) {
+    suppressDragClick = true
     emit('drop', { id: props.member.id, dx, dy, groupDrag: shouldGroupDrag })
   }
 }
@@ -199,21 +217,34 @@ function onPointerCancel(e: PointerEvent) {
 <template>
   <div
     data-testid="member-node"
-    class="absolute flex cursor-grab flex-col overflow-hidden rounded-xl border-2 shadow-sm transition-shadow select-none hover:shadow-md active:cursor-grabbing"
+    :data-member-id="member.id"
+    :data-lineage-state="highlightState"
+    role="button"
+    tabindex="0"
+    :aria-label="`${fullName}，查看直系关系`"
+    :aria-pressed="Boolean(selected)"
+    class="absolute flex cursor-grab flex-col overflow-hidden rounded-xl border-2 shadow-sm transition-[opacity,box-shadow,outline-color] select-none hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 active:cursor-grabbing motion-reduce:!transition-none"
     :class="[
       'bg-white',
       genderColor,
       selected ? 'ring-2 ring-amber-400' : '',
       isViewpoint ? 'ring-2 ring-emerald-500' : '',
+      highlightState === 'active' ? 'outline-2 outline-offset-2 outline-sky-600' : '',
     ]"
     :style="{
       left: `${left}px`,
       top: `${top}px`,
       width: `${width}px`,
       height: `${height}px`,
+      opacity: highlightState === 'muted' ? 0.5 : undefined,
     }"
     @click.stop="onClick"
     @dblclick.stop="onDblClick"
+    @keydown="onKeydown"
+    @pointerenter="emit('hover', member.id)"
+    @pointerleave="emit('hover', null)"
+    @focus="emit('focus', member.id)"
+    @blur="emit('focus', null)"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"

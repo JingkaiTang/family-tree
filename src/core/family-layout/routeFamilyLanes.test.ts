@@ -21,6 +21,41 @@ import {
 } from './types'
 
 describe('routeFamilyLanes', () => {
+  it('exposes one continuous parent-to-child path without the sibling branch', () => {
+    const parent = singleUnit('parent', 240, 0, 'parent')
+    const left = singleUnit('left-child', 0, 576, '')
+    const right = singleUnit('right-child', 480, 576, '')
+    const units = [parent, left, right]
+    const result = routeFamilyLanes({
+      geometry: geometryFor(units, [parent]),
+      units,
+      parentageGroups: [{
+        id: 'parentage:parent',
+        sourceUnitId: parent.id,
+        childPersonIds: ['right-child', 'left-child'],
+      }],
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.routes[0].junctions).toEqual([{ x: 324, y: 232 }])
+    expect(result.routes[0].childPaths).toEqual([{
+      childPersonId: 'left-child',
+      segments: [
+        { orientation: 'vertical', points: [{ x: 324, y: 216 }, { x: 324, y: 232 }] },
+        { orientation: 'horizontal', points: [{ x: 324, y: 232 }, { x: 84, y: 232 }] },
+        { orientation: 'vertical', points: [{ x: 84, y: 232 }, { x: 84, y: 576 }] },
+      ],
+    }, {
+      childPersonId: 'right-child',
+      segments: [
+        { orientation: 'vertical', points: [{ x: 324, y: 216 }, { x: 324, y: 232 }] },
+        { orientation: 'horizontal', points: [{ x: 324, y: 232 }, { x: 564, y: 232 }] },
+        { orientation: 'vertical', points: [{ x: 564, y: 232 }, { x: 564, y: 576 }] },
+      ],
+    }])
+  })
+
   it('allocates family-owned lanes without cross-owner segment sharing', () => {
     const fixture = overlappingFamilyFixture(5)
 
@@ -81,6 +116,20 @@ describe('routeFamilyLanes', () => {
     for (const gateway of result.gateways.filter(value => (
       value.routeOwnerId === ownerId
     ))) expect(endpoints).toContainEqual(gateway.point)
+    expect(route.childPaths?.map(path => path.childPersonId)).toEqual(['a2'])
+    expect(route.junctions).toEqual([])
+    const childPath = route.childPaths![0]
+    expect(childPath.segments[0].points[0]).toEqual(route.segments[0].points[0])
+    const child = geometry.cards.find(card => card.id === 'a2')!
+    expect(childPath.segments.at(-1)!.points.at(-1)).toEqual(topPort(child.rect))
+    for (let index = 1; index < childPath.segments.length; index += 1) {
+      expect(childPath.segments[index].points[0])
+        .toEqual(childPath.segments[index - 1].points.at(-1))
+    }
+    for (const gateway of result.gateways.filter(value => (
+      value.routeOwnerId === ownerId
+    ))) expect(childPath.segments.flatMap(segment => segment.points))
+      .toContainEqual(gateway.point)
     expect(validateScene({
       ...geometry,
       routes: result.routes,
@@ -290,6 +339,45 @@ describe('routeFamilyLanes', () => {
     }
   })
 
+  it('uses the same crossing bridges in child paths and the combined family route', () => {
+    const fixture = overlappingFamilyFixture(5)
+    const result = routeFamilyLanes({
+      ...fixture,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+
+    expect(result.diagnostics).toEqual([])
+    for (const route of result.routes) {
+      const baselineBridges = route.segments.filter(segment => segment.orientation === 'bridge')
+      const pathBridges = route.childPaths!.flatMap(path => path.segments)
+        .filter(segment => segment.orientation === 'bridge')
+      const pointsInXOrder = (segment: RouteSegment) => [...segment.points]
+        .sort((left, right) => left.x - right.x)
+      for (const bridge of baselineBridges) {
+        expect(pathBridges.map(pointsInXOrder)).toContainEqual(pointsInXOrder(bridge))
+      }
+      for (const bridge of pathBridges) {
+        expect(baselineBridges.map(pointsInXOrder)).toContainEqual(pointsInXOrder(bridge))
+      }
+      for (const path of route.childPaths!) {
+        const child = fixture.geometry.cards.find(card => card.id === path.childPersonId)!
+        expect(path.segments[0].points[0]).toEqual(route.segments[0].points[0])
+        expect(path.segments.at(-1)!.points.at(-1)).toEqual(topPort(child.rect))
+        for (let index = 1; index < path.segments.length; index += 1) {
+          expect(path.segments[index].points[0]).toEqual(path.segments[index - 1].points.at(-1))
+        }
+        for (const segment of path.segments.filter(value => value.orientation === 'horizontal')) {
+          for (const bridge of baselineBridges) {
+            expect(positiveCollinearOverlap(segment, {
+              orientation: 'horizontal',
+              points: [bridge.points[0], bridge.points.at(-1)!],
+            })).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
   it('shares one bus only within the same parentage owner', () => {
     const fixture = overlappingFamilyFixture(1)
 
@@ -453,6 +541,9 @@ describe('routeFamilyLanes', () => {
       const hub = geometry.hubs.find(value => value.id === group.sourceHubId)!
       const route = result.routes.find(value => value.routeOwnerId === group.id)!
       expect(route.segments[0].points[0]).toEqual(hub.point)
+      expect(route.childPaths?.map(path => path.childPersonId)).toEqual(group.childPersonIds)
+      expect(route.childPaths![0].segments[0].points[0]).toEqual(hub.point)
+      expect(route.junctions).toEqual([])
     }
     expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
@@ -493,8 +584,46 @@ describe('routeFamilyLanes', () => {
       segment.orientation === 'bridge'
       && segment.points.some(point => point.x === 566)
     ))).toBe(true)
+    const childBridge = firstRoute.childPaths!.find(path => (
+      path.childPersonId === 'first-child-left'
+    ))!.segments.find(segment => segment.orientation === 'bridge')!
+    expect(childBridge.points).toEqual([{ x: 568, y: 232 }, { x: 566, y: 230 }, { x: 564, y: 232 }])
     expect(validateScene({ ...geometry, routes: result.routes, gateways: result.gateways, diagnostics: [] }, DEFAULT_LAYOUT_METRICS))
       .toEqual([])
+  })
+
+  it('keeps single-parent child paths separate from the displayed couple parentage', () => {
+    const source = coupleUnit('source', 240, 0, 'source')
+    const jointChild = singleUnit('joint-child', 0, 576, '')
+    const singleParentChild = singleUnit('single-parent-child', 720, 576, '')
+    const units = [source, jointChild, singleParentChild]
+    const parentageGroups: ParentageGroup[] = [{
+      id: 'parentage:couple',
+      sourceUnitId: source.id,
+      childPersonIds: ['joint-child'],
+    }, {
+      id: 'parentage:single-parent',
+      sourceUnitId: source.id,
+      sourceHubId: 'hub:single-parent',
+      sourceAnchorPersonId: 'source-left',
+      childPersonIds: ['single-parent-child'],
+    }]
+    const geometry = materializeSceneGeometry({
+      placedUnits: units.map((unit, order) => ({ ...unit, order })),
+      placedDomains: [rootDomainFor(units)],
+      rows: [],
+      parentageGroups,
+      metrics: DEFAULT_LAYOUT_METRICS,
+    })
+    const result = routeFamilyLanes({ geometry, units, parentageGroups, metrics: DEFAULT_LAYOUT_METRICS })
+
+    expect(result.diagnostics).toEqual([])
+    const jointPath = result.routes.find(route => route.routeOwnerId === 'parentage:couple')!.childPaths!
+    const singlePath = result.routes.find(route => route.routeOwnerId === 'parentage:single-parent')!.childPaths!
+    expect(jointPath.map(path => path.childPersonId)).toEqual(['joint-child'])
+    expect(jointPath[0].segments[0].points[0]).toEqual({ x: 420, y: 108 })
+    expect(singlePath.map(path => path.childPersonId)).toEqual(['single-parent-child'])
+    expect(singlePath[0].segments[0].points[0]).toEqual({ x: 324, y: 216 })
   })
 
   it('omits an owner and reports an unroutable primary edge when no lane fits', () => {

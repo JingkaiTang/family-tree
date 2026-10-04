@@ -44,8 +44,16 @@ describe('layoutFamilyTree routing regressions', () => {
       && hub.point.x < aCard.rect.x + aCard.rect.width
       && hub.point.y === aCard.rect.y + aCard.rect.height
     ))).toBe(true)
-    expect(scene.routes.filter(route => route.kind === 'primary').map(route => route.routeOwnerId))
+    const primaryRoutes = scene.routes.filter(route => route.kind === 'primary')
+    expect(primaryRoutes.filter(route => !route.sourcePersonId).map(route => route.routeOwnerId))
       .toEqual(['parentage:a+c', 'parentage:a+d'])
+    expect(primaryRoutes.filter(route => route.sourcePersonId).map(route => ({
+      parent: route.sourcePersonId,
+      children: route.childPaths?.map(path => path.childPersonId),
+    }))).toEqual([
+      { parent: 'c', children: ['child-ac'] },
+      { parent: 'd', children: ['child-ad'] },
+    ])
     expect(scene.diagnostics.filter(diagnostic => (
       HARD_DIAGNOSTIC_CODES.has(diagnostic.code)
     ))).toEqual([])

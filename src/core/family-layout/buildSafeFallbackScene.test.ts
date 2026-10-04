@@ -101,6 +101,17 @@ describe('buildSafeFallbackScene', () => {
     expect(first.units.every(unit => unit.domainId === 'domain:test')).toBe(true)
     expect(first.rootDomains[0].rect).toEqual(first.bounds)
     expect(first.routes.map(route => route.routeOwnerId)).toEqual(['parentage:parents'])
+    expect(first.routes[0].childPaths?.map(path => path.childPersonId))
+      .toEqual(['child-a-person', 'child-b-person'])
+    const sourceHub = first.hubs.find(hub => hub.unitId === 'parents')!
+    for (const path of first.routes[0].childPaths!) {
+      const childCard = first.cards.find(card => card.id === path.childPersonId)!
+      expect(path.segments[0].points[0]).toEqual(sourceHub.point)
+      expect(path.segments.at(-1)!.points.at(-1)).toEqual({
+        x: childCard.rect.x + childCard.rect.width / 2,
+        y: childCard.rect.y,
+      })
+    }
     expect(first.diagnostics).toEqual([])
   })
 
@@ -155,6 +166,8 @@ describe('buildSafeFallbackScene', () => {
     )
 
     expect(scene.routes.map(route => route.routeOwnerId)).toEqual(['parentage:valid'])
+    expect(scene.routes.flatMap(route => route.childPaths ?? [])
+      .map(path => path.childPersonId)).toEqual(['valid-child-person'])
     expect(scene.diagnostics.filter(value => (
       value.code === 'UNROUTABLE_PRIMARY_EDGE'
     )).map(value => value.ids)).toEqual([['parentage:broken']])

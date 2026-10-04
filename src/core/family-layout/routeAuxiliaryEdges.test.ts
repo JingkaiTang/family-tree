@@ -17,6 +17,32 @@ import type {
 } from './types'
 
 describe('routeAuxiliaryEdges', () => {
+  it('exposes a child path only for auxiliary parentage when tracing direct lineage', () => {
+    const kinds: AuxiliaryRelation['kind'][] = [
+      'secondary-parentage', 'godparent', 'historical-partnership', 'secondary-partnership',
+    ]
+    for (const kind of kinds) {
+      const [route] = routeAuxiliaryEdges({
+        geometry: rowGeometry(['parent', 'child']),
+        auxiliaryRelations: [{
+          id: `aux:${kind}`, kind, sourceId: 'parent', targetId: 'child',
+        }],
+        primaryRoutes: [],
+        metrics: DEFAULT_LAYOUT_METRICS,
+      })
+
+      expect(route).toBeDefined()
+      if (kind === 'secondary-parentage') {
+        expect(route.childPaths).toEqual([{
+          childPersonId: 'child',
+          segments: route.segments,
+        }])
+      } else {
+        expect(route).not.toHaveProperty('childPaths')
+      }
+    }
+  })
+
   it('routes a godparent connection around an unrelated three-generation family', () => {
     const normalized = normalizeFacts(staggeredFamily())
     const hidden = layoutFamilyScene(layoutRequest(normalized, false))

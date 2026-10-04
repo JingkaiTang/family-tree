@@ -41,6 +41,45 @@ describe('FamilyUnit root identity', () => {
       .map(node => node.attributes('data-root-accent')))
       .toEqual([LEFT_ACCENT, RIGHT_ACCENT])
   })
+
+  it('highlights only the direct member and the half-axis leading to a required hub', async () => {
+    const wrapper = mountFamilyUnit(crossRootFamilyUnit())
+    await wrapper.setProps({
+      highlightedPersonIds: ['A'],
+      highlightedHubIds: ['hub:unit:cross-root-family'],
+    })
+
+    expect(wrapper.get('[data-member-id="A"][data-testid="member-node"]')
+      .attributes('data-lineage-state')).toBe('active')
+    expect(wrapper.get('[data-member-id="B"][data-testid="member-node"]')
+      .attributes('data-lineage-state')).toBe('muted')
+    const axes = wrapper.findAll('[data-testid="lineage-spouse-axis"]')
+    expect(axes).toHaveLength(1)
+    expect(axes[0].attributes('data-member-id')).toBe('A')
+    expect(axes[0].attributes('style')).toContain('left: 168px')
+    expect(axes[0].attributes('style')).toContain('width: 12px')
+    expect(wrapper.get('[data-testid="union-hub"]').attributes('data-lineage-state'))
+      .toBe('active')
+
+    await wrapper.setProps({ highlightedHubIds: [] })
+    expect(wrapper.find('[data-testid="lineage-spouse-axis"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="union-hub"]').attributes('data-lineage-state'))
+      .toBe('muted')
+  })
+
+  it('forwards member preview, focus, and keyboard selection without selecting the spouse', async () => {
+    const wrapper = mountFamilyUnit(rootFamilyUnit())
+    const node = wrapper.get('[data-testid="member-node"][data-member-id="A"]')
+    await node.trigger('pointerenter')
+    await node.trigger('focus')
+    await node.trigger('keydown', { key: 'Enter' })
+    await node.trigger('pointerleave')
+    await node.trigger('blur')
+
+    expect(wrapper.emitted('hover')).toEqual([['A'], [null]])
+    expect(wrapper.emitted('focus')).toEqual([['A'], [null]])
+    expect(wrapper.emitted('select')).toEqual([['A']])
+  })
 })
 
 function mountFamilyUnit(

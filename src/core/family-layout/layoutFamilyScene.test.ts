@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { normalizeFacts } from './normalizeFacts'
 import { familyData, linkParent, linkSpouse, member } from './testHelpers'
 import { layoutFamilyScene } from './layoutFamilyScene'
+import { validateScene } from './validateScene'
 import {
   DEFAULT_FAMILY_VIEW_POLICY,
   DEFAULT_LAYOUT_METRICS,
@@ -62,6 +63,58 @@ describe('layoutFamilyScene', () => {
     expect(scene.rootDomains).toHaveLength(1)
     expect(unsafeDiagnostics(scene)).toEqual([])
     expectNoOverlap(scene)
+  })
+
+  it('routes each unmarried parent from their own card to the shared child', () => {
+    const first = member('a')
+    const second = member('b')
+    const child = member('child')
+    linkParent(child, first)
+    linkParent(child, second)
+
+    const scene = layoutFamilyScene(requestFromMembers([first, second, child]))
+    const routes = scene.routes.filter(route => route.kind === 'primary')
+
+    expect(routes).toHaveLength(2)
+    expect(routes.map(route => route.sourceParentIds)).toEqual([['a'], ['b']])
+    expect(routes.map(route => route.parentageId)).toEqual(['parentage:a+b', 'parentage:a+b'])
+    const secondRoute = routes.find(route => route.sourcePersonId === 'b')!
+    expect(secondRoute.childPaths?.map(path => path.childPersonId)).toEqual(['child'])
+    const secondCard = scene.cards.find(card => card.id === 'b')!
+    const sourcePoint = secondRoute.childPaths![0].segments[0].points[0]
+    expect([secondCard.rect.x, secondCard.rect.x + secondCard.rect.width]).toContain(sourcePoint.x)
+    expect(sourcePoint.y).toBeGreaterThan(secondCard.rect.y)
+    expect(sourcePoint.y).toBeLessThan(secondCard.rect.y + secondCard.rect.height)
+    expect(unsafeDiagnostics(scene)).toEqual([])
+    expect(validateScene(scene, DEFAULT_LAYOUT_METRICS)).toEqual([])
+  })
+
+  it('routes both divorced parents without attributing children to their new spouses', () => {
+    const first = member('a')
+    const second = member('b')
+    const firstSpouse = member('c')
+    const secondSpouse = member('d')
+    const children = [member('child-1'), member('child-2')]
+    linkSpouse(first, second, 'divorced')
+    linkSpouse(first, firstSpouse)
+    linkSpouse(second, secondSpouse)
+    children.forEach(child => {
+      linkParent(child, first)
+      linkParent(child, second)
+    })
+
+    const scene = layoutFamilyScene(requestFromMembers([
+      first, second, firstSpouse, secondSpouse, ...children,
+    ]))
+    const routes = scene.routes.filter(route => route.kind === 'primary')
+
+    expect(routes).toHaveLength(3)
+    expect(routes.map(route => route.sourceParentIds)).toEqual([['a'], ['b'], ['b']])
+    expect(routes.filter(route => route.sourcePersonId === 'b')
+      .flatMap(route => route.childPaths ?? []).map(path => path.childPersonId))
+      .toEqual(['child-1', 'child-2'])
+    expect(validateScene(scene, DEFAULT_LAYOUT_METRICS)).toEqual([])
+    expect(unsafeDiagnostics(scene)).toEqual([])
   })
 
   it('packs two disconnected families without losing either component', () => {

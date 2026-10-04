@@ -23,6 +23,8 @@ const props = defineProps<{
   kinshipByMemberId?: Record<string, string>
   rootAccentById?: Record<string, string>
   rootOrder?: string[]
+  highlightedPersonIds?: string[]
+  highlightedHubIds?: string[]
 }>()
 
 export interface FamilyUnitDragPayload {
@@ -39,6 +41,8 @@ const emit = defineEmits<{
   (event: 'unit-cancel', payload: FamilyUnitDragPayload): void
   (event: 'select', id: string): void
   (event: 'open', id: string): void
+  (event: 'hover', id: string | null): void
+  (event: 'focus', id: string | null): void
 }>()
 
 const renderedCards = computed(() => {
@@ -58,6 +62,19 @@ const localHubs = computed(() => props.hubs
     },
   })))
 
+const highlightedPersonIdSet = computed(() => new Set(props.highlightedPersonIds ?? []))
+const highlightedHubIdSet = computed(() => new Set(props.highlightedHubIds ?? []))
+
+function memberHighlightState(id: string): 'active' | 'muted' | undefined {
+  if (props.highlightedPersonIds === undefined) return undefined
+  return highlightedPersonIdSet.value.has(id) ? 'active' : 'muted'
+}
+
+function hubHighlightState(id: string): 'active' | 'muted' | undefined {
+  if (props.highlightedPersonIds === undefined) return undefined
+  return highlightedHubIdSet.value.has(id) ? 'active' : 'muted'
+}
+
 const spouseAxis = computed(() => {
   if (props.unit.kind !== 'couple' || renderedCards.value.length !== 2) return null
   const cards = renderedCards.value
@@ -75,6 +92,26 @@ const spouseAxis = computed(() => {
     rootAccents,
     background: segmentedBackground(rootAccents),
   }
+})
+
+const highlightedSpouseAxes = computed(() => {
+  const axis = spouseAxis.value
+  const hub = localHubs.value[0]
+  if (!axis || !hub || props.highlightedPersonIds === undefined
+    || !highlightedHubIdSet.value.has(hub.id)) return []
+  return renderedCards.value
+    .filter(({ card }) => highlightedPersonIdSet.value.has(card.id))
+    .map(({ card }) => {
+      const cardLeft = card.rect.x - props.unit.rect.x
+      const endpoint = cardLeft < hub.point.x ? cardLeft + card.rect.width : cardLeft
+      return {
+        memberId: card.id,
+        left: Math.min(endpoint, hub.point.x),
+        top: axis.top,
+        width: Math.abs(endpoint - hub.point.x),
+        accent: rootAccentForMember(card.id),
+      }
+    })
 })
 
 const orderedRootIds = computed(() => {
@@ -190,6 +227,22 @@ function onMemberDrop(payload: MemberDragPayload) {
         top: `${spouseAxis.top}px`,
         width: `${spouseAxis.width}px`,
         background: spouseAxis.background,
+        opacity: highlightedPersonIds === undefined ? undefined : 0.18,
+      }"
+    />
+
+    <div
+      v-for="axis in highlightedSpouseAxes"
+      :key="axis.memberId"
+      data-testid="lineage-spouse-axis"
+      :data-member-id="axis.memberId"
+      class="pointer-events-none absolute z-10 -translate-y-1/2"
+      :style="{
+        left: `${axis.left}px`,
+        top: `${axis.top}px`,
+        width: `${axis.width}px`,
+        height: '3px',
+        background: axis.accent,
       }"
     />
 
@@ -197,11 +250,13 @@ function onMemberDrop(payload: MemberDragPayload) {
       v-for="hub in localHubs"
       :key="hub.id"
       data-testid="union-hub"
+      :data-lineage-state="hubHighlightState(hub.id)"
       class="pointer-events-none absolute z-20 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
       :style="{
         left: `${hub.point.x}px`,
         top: `${hub.point.y}px`,
         background: spouseAxis?.background ?? unit.accent,
+        opacity: hubHighlightState(hub.id) === 'muted' ? 0.18 : undefined,
       }"
     />
 
@@ -218,9 +273,12 @@ function onMemberDrop(payload: MemberDragPayload) {
       :kinship="kinshipByMemberId?.[value.card.id]"
       :root-accent="rootAccentForMember(value.card.id)"
       :show-root-rail="true"
+      :highlight-state="memberHighlightState(value.card.id)"
       class="z-10"
       @click="emit('select', value.card.id)"
       @dblclick="emit('open', value.card.id)"
+      @hover="emit('hover', $event)"
+      @focus="emit('focus', $event)"
       @drag="onMemberDrag"
       @drop="onMemberDrop"
     />

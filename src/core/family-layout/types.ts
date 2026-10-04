@@ -273,6 +273,16 @@ export interface RoutedFamilyEdge {
   kind: 'primary' | 'historical-partnership' | 'secondary-partnership' | 'secondary-parentage' | 'godparent'
   accent: string
   segments: RouteSegment[]
+  /** Original parentage fact; multiple routes can represent its separate parents. */
+  parentageId?: string
+  /** Only parents actually represented by this route's source. */
+  sourceParentIds?: string[]
+  /** A direct person-side source, used when the other parent occupies a separate unit. */
+  sourcePersonId?: string
+  /** Exact represented-parent-source-to-child paths, without sibling branches. */
+  childPaths?: Array<{ childPersonId: string; segments: RouteSegment[] }>
+  /** True branching points within this route; crossings and corners are excluded. */
+  junctions?: Point[]
   gatewayIds?: string[]
 }
 export interface RouteGateway {

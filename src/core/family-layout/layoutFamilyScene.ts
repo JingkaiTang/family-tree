@@ -3,6 +3,7 @@ import { assignRootAccents } from './assignRootAccents'
 import { buildFamilyUnits } from './buildFamilyUnits'
 import { buildRootDomains } from './buildRootDomains'
 import { buildSafeFallbackScene } from './buildSafeFallbackScene'
+import { completePrimaryParentageRoutes } from './completePrimaryParentageRoutes'
 import { decorateRootedUnits } from './decorateRootedUnits'
 import { discoverRootFamilies } from './discoverRootFamilies'
 import { placeRootDomains } from './placeRootDomains'
@@ -112,7 +113,10 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
           retainedDiagnostics,
         )
       : first.scene
-    return withPrimaryParentageGroups(scene, built.parentageGroups)
+    return withPrimaryParentageGroups(
+      completePrimaryParentageRoutes(scene, projected.primaryParentages, built.parentageGroups, request.metrics),
+      built.parentageGroups,
+    )
   }
 
   const retryMetrics = withExpandedGenerationGap(
@@ -138,7 +142,10 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
         retainedDiagnostics,
       )
     : retry.scene
-  return withPrimaryParentageGroups(scene, built.parentageGroups)
+  return withPrimaryParentageGroups(
+    completePrimaryParentageRoutes(scene, projected.primaryParentages, built.parentageGroups, retryMetrics),
+    built.parentageGroups,
+  )
 }
 
 function withPrimaryParentageGroups(

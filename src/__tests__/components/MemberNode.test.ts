@@ -204,6 +204,55 @@ describe('MemberNode', () => {
   })
 
   // ========== 事件 ==========
+  it('emphasizes a lineage card and keeps unrelated cards legible', async () => {
+    const wrapper = mountNode({ highlightState: 'active' })
+
+    expect(wrapper.attributes('data-member-id')).toBe('test')
+    expect(wrapper.attributes('data-lineage-state')).toBe('active')
+    expect(wrapper.classes()).toContain('outline-sky-600')
+    await wrapper.setProps({ highlightState: 'muted' })
+    expect(wrapper.attributes('data-lineage-state')).toBe('muted')
+    expect(wrapper.element.style.opacity).toBe('0.5')
+    await wrapper.setProps({ highlightState: undefined })
+    expect(wrapper.attributes('data-lineage-state')).toBeUndefined()
+    expect(wrapper.element.style.opacity).toBe('')
+  })
+
+  it('supports hover preview and keyboard focus/selection for the member lineage', async () => {
+    const wrapper = mountNode()
+
+    expect(wrapper.attributes('role')).toBe('button')
+    expect(wrapper.attributes('tabindex')).toBe('0')
+    expect(wrapper.attributes('aria-label')).toContain('唐靖凯')
+    await wrapper.trigger('pointerenter')
+    await wrapper.trigger('pointerleave')
+    await wrapper.trigger('focus')
+    await wrapper.trigger('keydown', { key: 'Enter' })
+    await wrapper.trigger('keydown', { key: ' ' })
+    await wrapper.trigger('blur')
+
+    expect(wrapper.emitted('hover')).toEqual([['test'], [null]])
+    expect(wrapper.emitted('focus')).toEqual([['test'], [null]])
+    expect(wrapper.emitted('click')).toEqual([['test'], ['test']])
+  })
+
+  it('does not select after dragging, and keeps the next deliberate click usable', async () => {
+    const wrapper = mountNode()
+    await wrapper.trigger('pointerdown', {
+      pointerId: 1, pointerType: 'mouse', button: 0, clientX: 20, clientY: 30,
+    })
+    await wrapper.trigger('pointermove', { pointerId: 1, clientX: 40, clientY: 50 })
+    await wrapper.trigger('pointerup', { pointerId: 1, clientX: 40, clientY: 50 })
+    await wrapper.trigger('click')
+
+    expect(wrapper.emitted('drop')).toEqual([[{
+      id: 'test', dx: 20, dy: 20, groupDrag: false,
+    }]])
+    expect(wrapper.emitted('click')).toBeUndefined()
+    await wrapper.trigger('click')
+    expect(wrapper.emitted('click')).toEqual([['test']])
+  })
+
   it('点击节点触发 click 事件并传递 member.id', async () => {
     const wrapper = mountNode({
       member: mk('member-1', { gender: 'male' }),

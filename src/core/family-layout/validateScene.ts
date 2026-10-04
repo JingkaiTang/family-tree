@@ -191,7 +191,19 @@ function validateRouteTerminals(
     ids: [route.routeOwnerId],
     message: `Route ${route.routeOwnerId} is disconnected`,
   })
-  const hasMismatchedTerminals = route.kind === 'primary'
+  const directParent = route.sourcePersonId === undefined
+    ? undefined
+    : scene.cards.find(card => card.id === route.sourcePersonId)
+  const directChildIds = new Set(route.childPaths?.map(path => path.childPersonId) ?? [])
+  const hasMismatchedTerminals = route.kind === 'primary' && route.sourcePersonId !== undefined
+    ? leaves.length !== 2
+      || directParent === undefined
+      || !leaves.some(point => pointOnCardSide(point, directParent.rect))
+      || directChildIds.size !== 1
+      || !scene.cards.some(card => directChildIds.has(card.id) && leaves.some(point => (
+        pointOnCardSide(point, card.rect)
+      )))
+    : route.kind === 'primary'
     ? hubLeaves.length !== 1
       || cardLeaves.length === 0
       || leaves.some(point => (
@@ -218,7 +230,7 @@ function validateRouteObstacles(
   const leaves = routeLeaves(route)
   const terminalCardIds = new Set<string>()
   const terminalUnitIds = new Set<string>()
-  if (route.kind === 'primary') {
+  if (route.kind === 'primary' && route.sourcePersonId === undefined) {
     const sourceUnitIds = new Set(scene.hubs
       .filter(hub => leaves.some(point => samePoint(point, hub.point)))
       .map(hub => hub.unitId))

@@ -27,6 +27,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'select', id: string): void
+  (event: 'clear-selection'): void
   (event: 'open', id: string): void
   (event: 'grid-view-change', value: PanzoomView): void
   (event: 'focus-scroll-change', value: number): void
@@ -51,6 +52,7 @@ const emit = defineEmits<{
     :layout-reset-version="layoutResetVersion"
     :show-auxiliary-relations="showAuxiliaryRelations"
     @select="emit('select', $event)"
+    @clear-selection="emit('clear-selection')"
     @open="emit('open', $event)"
     @view-change="emit('grid-view-change', $event)"
     @domain-row-order-change="emit('domain-row-order-change', $event)"

@@ -425,6 +425,14 @@ function buildRoute(
     kind: 'primary',
     accent: request.sourceUnit.accent,
     segments: segments.filter(segment => !zeroLength(segment)),
+    childPaths: childVerticals.map((childVertical, index) => ({
+      childPersonId: request.children[index].id,
+      segments: [
+        ...sourceVertical.segments,
+        horizontal(sourceVertical.x, childVertical.x, laneY),
+        ...childVertical.segments,
+      ].filter(segment => !zeroLength(segment)),
+    })),
     gatewayIds: [],
   }
 }
@@ -478,6 +486,7 @@ function buildCrossDomainRoute(
   if (sourceGateway.point.x !== targetGateway.point.x) {
     segments.push(horizontal(sourceGateway.point.x, targetGateway.point.x, laneY))
   }
+  const sourcePath = [...segments]
   const childVerticals = request.childPorts.map(childPort => allocateVertical(
     { x: childPort.x, y: laneY },
     childPort,
@@ -513,6 +522,14 @@ function buildCrossDomainRoute(
       kind: 'primary',
       accent: request.sourceUnit.accent,
       segments: segments.filter(segment => !zeroLength(segment)),
+      childPaths: childVerticals.map((childVertical, index) => ({
+        childPersonId: request.children[index].id,
+        segments: [
+          ...sourcePath,
+          horizontal(targetGateway.point.x, childVertical.x, laneY),
+          ...childVertical.segments,
+        ].filter(segment => !zeroLength(segment)),
+      })),
       gatewayIds,
     },
     gateways: [sourceGateway, targetGateway],
@@ -599,48 +616,86 @@ function allocateVerticalX(
   return desiredX + offsets.find(offset => !conflictsAt(desiredX + offset))!
 }
 
-function addCrossingBridges(
+export function addCrossingBridges(
   routes: RoutedFamilyEdge[],
   routeSubgrid: number,
 ): RoutedFamilyEdge[] {
-  return routes.map(route => ({
-    ...route,
-    segments: route.segments.flatMap(segment => {
+  return routes.map(route => {
+    const contextByY = new Map<number, { crossingXs: number[]; protectedXs: number[] }>()
+    const withBridges = (segments: RouteSegment[]): RouteSegment[] => segments.flatMap(segment => {
       if (segment.orientation !== 'horizontal') return [segment]
       const [start, end] = segment.points
-      const crossingXs = routes.flatMap(other => (
-        other.routeOwnerId === route.routeOwnerId
-          ? []
-          : other.segments.flatMap(otherSegment => {
-              if (otherSegment.orientation !== 'vertical') return []
-              const [verticalStart, verticalEnd] = otherSegment.points
-              return pointStrictlyInsideSegment(
-                { x: verticalStart.x, y: start.y },
-                start,
-                end,
-              ) && pointStrictlyInsideSegment(
-                { x: verticalStart.x, y: start.y },
-                verticalStart,
-                verticalEnd,
-              ) ? [verticalStart.x] : []
-            })
-      ))
-      const protectedXs = route.segments
-        .filter(otherSegment => otherSegment !== segment)
-        .flatMap(otherSegment => [
+      let context = contextByY.get(start.y)
+      if (context === undefined) {
+        const crossingXs = routes.flatMap(other => (
+          other.routeOwnerId === route.routeOwnerId
+            ? []
+            : other.segments.flatMap(otherSegment => {
+                if (otherSegment.orientation !== 'vertical') return []
+                const [verticalStart, verticalEnd] = otherSegment.points
+                return pointStrictlyInsideSegment(
+                  { x: verticalStart.x, y: start.y },
+                  verticalStart,
+                  verticalEnd,
+                ) ? [verticalStart.x] : []
+              })
+        ))
+        // A child path must preserve every connection in the full family bus,
+        // so its bridge radius agrees with the underlying combined route.
+        const protectedXs = route.segments.flatMap(otherSegment => [
           otherSegment.points[0],
           otherSegment.points.at(-1)!,
-        ])
-        .filter(point => point.y === start.y && pointStrictlyInsideSegment(point, start, end))
-        .map(point => point.x)
+        ]).filter(point => point.y === start.y).map(point => point.x)
+        context = {
+          crossingXs: [...new Set(crossingXs)],
+          protectedXs: [...new Set(protectedXs)],
+        }
+        contextByY.set(start.y, context)
+      }
       return bridgeHorizontal(
         segment,
-        [...new Set(crossingXs)],
-        [...new Set(protectedXs)],
+        context.crossingXs,
+        context.protectedXs.filter(x => pointStrictlyInsideSegment({ x, y: start.y }, start, end)),
         routeSubgrid,
       )
-    }),
-  }))
+    })
+    return {
+      ...route,
+      junctions: route.junctions ?? routeJunctions(route.segments),
+      segments: withBridges(route.segments),
+      childPaths: route.childPaths?.map(path => ({
+        ...path,
+        segments: withBridges(path.segments),
+      })),
+    }
+  })
+}
+
+function routeJunctions(segments: RouteSegment[]): Point[] {
+  const endpoints = new Map(segments.flatMap(segment => (
+    [segment.points[0], segment.points.at(-1)!]
+      .map(point => [`${point.x}:${point.y}`, point] as const)
+  )))
+  return [...endpoints.values()].filter(point => {
+    const directions = new Set<string>()
+    for (const segment of segments) {
+      const [start, end] = segment.points
+      if (segment.orientation === 'horizontal' && point.y === start.y) {
+        const minX = Math.min(start.x, end.x)
+        const maxX = Math.max(start.x, end.x)
+        if (point.x < minX || point.x > maxX) continue
+        if (point.x > minX) directions.add('left')
+        if (point.x < maxX) directions.add('right')
+      } else if (segment.orientation === 'vertical' && point.x === start.x) {
+        const minY = Math.min(start.y, end.y)
+        const maxY = Math.max(start.y, end.y)
+        if (point.y < minY || point.y > maxY) continue
+        if (point.y > minY) directions.add('up')
+        if (point.y < maxY) directions.add('down')
+      }
+    }
+    return directions.size >= 3
+  }).sort((left, right) => left.y - right.y || left.x - right.x)
 }
 
 function bridgeHorizontal(

@@ -24,6 +24,13 @@ const { panzoom } = vi.hoisted(() => ({
 vi.mock('@panzoom/panzoom', () => ({ default: panzoom }))
 
 describe('PanZoomWrapper', () => {
+  it('reports scale immediately so line widths can stay legible during zoom', async () => {
+    const wrapper = mount(PanZoomWrapper)
+    await wrapper.get('.pz-stage').trigger('panzoomchange')
+    expect(wrapper.emitted('scale-change')).toEqual([[0.5]])
+    wrapper.unmount()
+  })
+
   it('keeps the stage anchored to its top-left corner when restoring a zoomed view', () => {
     const wrapper = mount(PanZoomWrapper, {
       attachTo: document.body,

@@ -574,7 +574,7 @@ describe('FamilyCanvas', () => {
       'M 228 300 Q 240 288 252 300',
     )
     const bridgeUnderlay = parentRoute.get('[data-testid="line-bridge-underlay"]')
-    expect(bridgeUnderlay.attributes('stroke')).toBe('white')
+    expect(bridgeUnderlay.attributes('stroke')).toBe('#f1f5f9')
     expect(bridgeUnderlay.attributes('stroke-width')).toBe('7')
   })
 
