@@ -22,6 +22,12 @@ class MemoryDrive implements DriveApi {
     if (!file) throw new Error('not found')
     return structuredClone(file)
   }
+  async renameFile(id: string, name: string): Promise<DriveFile> {
+    const file = await this.getFile(id)
+    file.name = name
+    this.files.set(id, file)
+    return structuredClone(file)
+  }
   async listFiles(query: string): Promise<DriveFile[]> {
     await this.beforeList?.(query)
     const properties = [...query.matchAll(/key='([^']+)' and value='([^']+)'/g)]
@@ -322,5 +328,104 @@ describe('Google Drive private media', () => {
     await api.createFile({ ...original, id: await api.generateId() }, new Blob(['duplicate']))
     await expect(provider.readPhoto(projectId, photoId, false)).rejects.toThrow('多个文件')
     await expect(provider.readPhoto(projectId, "invalid'photo", false)).rejects.toThrow()
+  })
+})
+
+
+describe('project renaming', () => {
+  it('persists the title and folder name without changing members or old revisions', async () => {
+    const { api, provider, projectId } = await fixture()
+    const oldHead = (await provider.listVersions(projectId))[0].id
+    const result = await provider.renameProject!(projectId, '  新家族  ')
+    expect(result.meta.name).toBe('新家族')
+    expect(result.displayName).toBe('新家族')
+    const reopened = await createGoogleDriveStorage('google-drive:account-one', api).loadProject(projectId)
+    expect(reopened.meta).toMatchObject({ name: '新家族' })
+    expect(reopened.family).toEqual(family('initial'))
+    expect((await revision(api, oldHead)).meta.name).toBe('测试家族')
+    await provider.saveProject(projectId, family('later edit'))
+    expect((await provider.loadProject(projectId)).meta).toMatchObject({ name: '新家族' })
+  })
+
+  it('renames a supported older snapshot immediately after opening and preserves its members', async () => {
+    const { api, projectId } = await fixture()
+    const revisionFile = [...api.files.values()].find(file => file.appProperties?.kind === 'revision')!
+    const legacy = await revision(api, revisionFile.id)
+    legacy.family.schemaVersion = 3
+    legacy.meta.schemaVersion = 3
+    api.contents.set(revisionFile.id, new Blob([JSON.stringify(legacy)]))
+    const reopened = createGoogleDriveStorage('google-drive:account-one', api)
+    await reopened.loadProject(projectId)
+    const renamed = await reopened.renameProject!(projectId, '旧家谱的新标题')
+    expect(renamed.meta).toMatchObject({ name: '旧家谱的新标题', schemaVersion: 4 })
+    const loaded = await reopened.loadProject(projectId)
+    expect(loaded.family).toEqual(family('initial'))
+  })
+
+  it('rejects stale or historical renames before touching the folder', async () => {
+    const { api, provider, projectId } = await fixture()
+    const other = createGoogleDriveStorage('google-drive:account-one', api)
+    await other.loadProject(projectId)
+    await provider.saveProject(projectId, family('newer'))
+    const rename = vi.spyOn(api, 'renameFile')
+    await expect(other.renameProject!(projectId, '过期')).rejects.toBeInstanceOf(GoogleDriveConflictError)
+    const head = (await provider.listVersions(projectId)).find(v => v.isHead)!
+    await provider.loadVersion(projectId, head.id)
+    await expect(provider.renameProject!(projectId, '历史')).rejects.toBeInstanceOf(GoogleDriveConflictError)
+    expect(rename).not.toHaveBeenCalled()
+  })
+
+  it('reports a folder sync failure and retries it without duplicating the title revision', async () => {
+    const { api, provider, projectId } = await fixture()
+    vi.spyOn(api, 'renameFile').mockRejectedValueOnce(new Error('offline'))
+    const partial = await provider.renameProject!(projectId, '新家族')
+    expect(partial.meta.name).toBe('新家族')
+    expect(partial.warning).toContain('文件夹')
+    const count = api.files.size
+    const retried = await provider.renameProject!(projectId, '新家族')
+    expect(retried.warning).toBeUndefined()
+    expect(retried.displayName).toBe('新家族')
+    expect(api.files.size).toBe(count)
+  })
+
+  it('requires explicit rename recovery before autosave can confirm an uncertain title write', async () => {
+    const { api, provider, projectId } = await fixture()
+    api.beforeCreate = async () => { throw new Error('offline') }
+    await expect(provider.renameProject!(projectId, '新家族')).rejects.toThrow('offline')
+    api.beforeCreate = undefined
+    const count = api.files.size
+    await expect(provider.saveProject(projectId, family('later edit'))).rejects.toThrow('重命名尚未确认')
+    expect(api.files.size).toBe(count)
+    expect(api.files.get(projectId)?.name).toBe('测试家族')
+    await provider.renameProject!(projectId, '新家族')
+    await provider.saveProject(projectId, family('later edit'))
+    expect(api.files.get(projectId)?.name).toBe('新家族')
+    expect((await provider.loadProject(projectId)).meta).toMatchObject({ name: '新家族' })
+  })
+
+  it('keeps autosave blocked if rename recovery confirms the upload but the next graph read fails', async () => {
+    const { api, provider, projectId } = await fixture()
+    api.beforeCreate = async () => { throw new Error('offline upload') }
+    await expect(provider.renameProject!(projectId, '新家族')).rejects.toThrow('offline upload')
+    api.beforeCreate = undefined
+    let lists = 0
+    api.beforeList = async () => { if (++lists === 2) throw new Error('offline graph') }
+    await expect(provider.renameProject!(projectId, '新家族')).rejects.toThrow('offline graph')
+    api.beforeList = undefined
+    await expect(provider.saveProject(projectId, family('later edit'))).rejects.toThrow('重命名尚未确认')
+    const heads = (await provider.listVersions(projectId)).filter(v => v.isHead).map(v => v.id)
+    await expect(provider.resolveConflict(projectId, family('later edit'), heads)).rejects.toThrow('重命名尚未确认')
+    expect(api.files.get(projectId)?.name).toBe('测试家族')
+    await provider.renameProject!(projectId, '新家族')
+    await provider.saveProject(projectId, family('later edit'))
+    expect(api.files.get(projectId)?.name).toBe('新家族')
+    expect((await provider.loadProject(projectId)).meta).toMatchObject({ name: '新家族' })
+  })
+
+  it.each(['', '   ', '长'.repeat(101)])('rejects invalid name %s without writing', async name => {
+    const { api, provider, projectId } = await fixture()
+    const count = api.files.size
+    await expect(provider.renameProject!(projectId, name)).rejects.toThrow('1 到 100')
+    expect(api.files.size).toBe(count)
   })
 })

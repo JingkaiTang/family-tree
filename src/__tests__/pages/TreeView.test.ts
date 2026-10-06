@@ -11,7 +11,7 @@ import { useUiStore } from '@/stores/ui'
 import { mk } from '@/__tests__/fixtures/families'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 
-const { exportProjectBundleMock, prepareExportMock, authorizeProjectMock, flushNowMock, routerPush, gcMediaMock, supportsMediaGcMock } = vi.hoisted(() => ({
+const { exportProjectBundleMock, prepareExportMock, authorizeProjectMock, flushNowMock, routerPush, gcMediaMock, supportsMediaGcMock, renameProjectMock } = vi.hoisted(() => ({
   exportProjectBundleMock: vi.fn(),
   prepareExportMock: vi.fn(),
   authorizeProjectMock: vi.fn(),
@@ -19,6 +19,7 @@ const { exportProjectBundleMock, prepareExportMock, authorizeProjectMock, flushN
   routerPush: vi.fn(),
   gcMediaMock: vi.fn(),
   supportsMediaGcMock: vi.fn(),
+  renameProjectMock: vi.fn(),
 }))
 const { copyProjectMock, connectDriveMock, prepareDriveMock, startAutosaveMock, driveState } = vi.hoisted(() => ({
   copyProjectMock: vi.fn(), connectDriveMock: vi.fn(), prepareDriveMock: vi.fn(), startAutosaveMock: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock('@/services/projectTransfer', () => ({
 }))
 vi.mock('@/services/storage', () => ({
   gcMedia: gcMediaMock,
+  renameProject: renameProjectMock,
   authorizeProject: authorizeProjectMock,
   supportsMediaGc: supportsMediaGcMock,
 }))
@@ -151,6 +153,7 @@ describe('TreeView row order integration', () => {
     prepareDriveMock.mockReset().mockResolvedValue(undefined)
     connectDriveMock.mockReset().mockResolvedValue('google-drive:account')
     copyProjectMock.mockReset()
+    renameProjectMock.mockReset()
     startAutosaveMock.mockReset()
   })
 
@@ -740,18 +743,20 @@ describe('TreeView row order integration', () => {
     const source = { ...project, providerId: 'browser-directory' }
     family.setProject(source, createEmptyMeta('原家族'), createEmptyFamily())
     family.upsertMember(mk('draft'))
-    const copied = { project: { providerId: 'google-drive:account', id: 'new-folder', displayName: '原家族（副本）' }, meta: createEmptyMeta('原家族（副本）'), family: JSON.parse(JSON.stringify(family.data)) }
+    const copied = { project: { providerId: 'google-drive:account', id: 'new-folder', displayName: '原家族' }, meta: createEmptyMeta('原家族'), family: JSON.parse(JSON.stringify(family.data)) }
     copyProjectMock.mockResolvedValue(copied)
     const wrapper = mount(TreeView, {
       global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
     })
     await wrapper.get('[data-testid="copy-to-drive"]').trigger('click')
+    expect(copyProjectMock).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="project-name-form"]').trigger('submit')
     await flushPromises()
 
     expect(connectDriveMock).toHaveBeenCalledOnce()
     expect(flushNowMock).not.toHaveBeenCalled()
     expect(copyProjectMock).toHaveBeenCalledWith(source,
-      { providerId: 'google-drive:account', id: 'root', displayName: '原家族（副本）' },
+      { providerId: 'google-drive:account', id: 'root', displayName: '原家族' },
       { meta: expect.objectContaining({ name: '原家族' }), family: expect.objectContaining({ members: { draft: mk('draft') } }) })
     expect(family.projectRef).toEqual(copied.project)
     expect(family.data.members.draft).toEqual(mk('draft'))
@@ -807,6 +812,8 @@ describe('TreeView row order integration', () => {
       global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
     })
     await wrapper.get('[data-testid="copy-to-drive"]').trigger('click')
+    expect(copyProjectMock).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="project-name-form"]').trigger('submit')
     expect(copyProjectMock).toHaveBeenCalledOnce()
     if (mode === 'failure') reject(new Error('照片上传失败'))
     else {
@@ -850,5 +857,90 @@ describe('TreeView row order integration', () => {
     await flushPromises()
     expect(wrapper.findAll('button').some(button => button.text() === '清理未用照片')).toBe(false)
     expect(gcMediaMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+describe('project name dialog', () => {
+  function setup() {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.setProject(project, createEmptyMeta('原家族'), createEmptyFamily())
+    const wrapper = mount(TreeView, {
+      global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
+    })
+    return { family, wrapper }
+  }
+
+  beforeEach(() => {
+    Object.assign(driveState, { configured: true, ready: true, busy: false })
+    connectDriveMock.mockReset().mockResolvedValue('google-drive:account')
+    copyProjectMock.mockReset()
+    renameProjectMock.mockReset()
+    authorizeProjectMock.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('prefills the existing name, allows cancellation, and validates empty/long names', async () => {
+    const { wrapper } = setup()
+    await wrapper.get('[data-testid="copy-to-drive"]').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('#project-name').element.value).toBe('原家族')
+    for (const invalid of ['   ', '长'.repeat(101)]) {
+      await wrapper.get('#project-name').setValue(invalid)
+      await wrapper.get('form').trigger('submit')
+      expect(wrapper.get('[role="alert"]').text()).toContain('1 到 100')
+    }
+    await wrapper.get('button[type="button"]').trigger('click')
+    expect(wrapper.find('dialog').exists()).toBe(false)
+    expect(connectDriveMock).not.toHaveBeenCalled()
+    expect(copyProjectMock).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('uses the chosen copy name and preserves the source when upload fails', async () => {
+    const { family, wrapper } = setup()
+    copyProjectMock.mockRejectedValueOnce(new Error('网络中断'))
+    await wrapper.get('[data-testid="copy-to-drive"]').trigger('click')
+    await wrapper.get('#project-name').setValue('  新家谱  ')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(copyProjectMock).toHaveBeenCalledWith(project,
+      expect.objectContaining({ displayName: '新家谱' }), expect.anything())
+    expect(family.projectMeta?.name).toBe('原家族')
+    expect(wrapper.get('[role="alert"]').text()).toContain('网络中断')
+    wrapper.unmount()
+  })
+
+  it.each(['success', 'failure', 'session', 'partial'] as const)('handles rename %s without losing concurrent edits', async mode => {
+    const { family, wrapper } = setup()
+    let finish!: (value: unknown) => void
+    let reject!: (error: Error) => void
+    renameProjectMock.mockImplementationOnce(() => new Promise((resolve, fail) => { finish = resolve; reject = fail }))
+    await wrapper.get('[data-testid="rename-project"]').trigger('click')
+    await wrapper.get('#project-name').setValue('  新家族  ')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(renameProjectMock).toHaveBeenCalledWith(project, '新家族')
+    const token = family.projectToken
+    family.upsertMember(mk('during-rename'))
+    const revision = family.revision
+    if (mode === 'session') family.setProject({ ...project, id: 'other' }, createEmptyMeta('其他家族'), createEmptyFamily())
+    if (mode === 'failure') reject(new Error('无法保存'))
+    else finish({ project: { ...project, displayName: '新家族' }, meta: createEmptyMeta('新家族'),
+      warning: mode === 'partial' ? '文件夹同步失败，请重试' : undefined })
+    await flushPromises()
+    if (mode === 'session') {
+      expect(family.projectMeta?.name).toBe('其他家族')
+      expect(wrapper.find('dialog').exists()).toBe(false)
+    } else {
+      expect(family.projectToken).toBe(token)
+      expect(family.revision).toBe(revision)
+      expect(family.isDirty).toBe(true)
+      expect(family.data.members['during-rename']).toBeDefined()
+      expect(family.projectMeta?.name).toBe(mode === 'failure' ? '原家族' : '新家族')
+      expect(wrapper.find('dialog').exists()).toBe(mode !== 'success')
+      if (mode === 'partial') expect(wrapper.get('[role="alert"]').text()).toContain('文件夹')
+    }
+    wrapper.unmount()
   })
 })

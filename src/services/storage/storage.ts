@@ -70,6 +70,16 @@ export function createStorage(
     async saveProject(ref: ProjectRef, family: FamilyData): Promise<void> {
       await getProvider(ref.providerId).saveProject(ref.id, family)
     },
+    async renameProject(ref: ProjectRef, name: string) {
+      const provider = getProvider(ref.providerId)
+      if (!provider.renameProject) throw new Error('此存储不支持重命名')
+      const result = await provider.renameProject(ref.id, name)
+      return {
+        project: { providerId: ref.providerId, id: result.id, displayName: result.displayName },
+        meta: result.meta,
+        warning: result.warning,
+      }
+    },
     async importPhoto(ref: ProjectRef, bytes: Uint8Array, mime: string) {
       return getProvider(ref.providerId).importPhoto(ref.id, bytes, mime)
     },

@@ -7,6 +7,7 @@ import { assertFamilyIntegrity } from '@/core/familyIntegrity'
 import { validateLoadedProject } from './projectValidation'
 import * as api from './storage'
 import type { ProjectRef } from './storage'
+import { normalizeProjectName } from './storage/types'
 
 export interface OpenResult {
   project: ProjectRef
@@ -42,7 +43,7 @@ export async function copyProject(
 ): Promise<OpenResult> {
   const validated = validateLoadedProject({ ref: source, ...snapshot })
   const family = FamilyData.parse(JSON.parse(JSON.stringify(validated.family)))
-  const name = target.displayName || `${validated.meta.name}（副本）`
+  const name = normalizeProjectName(target.displayName || validated.meta.name)
   const created = await api.createProject(target, name)
   try {
     const ids = new Map<string, string>()

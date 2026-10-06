@@ -414,3 +414,19 @@ test('real Chromium decodes PNG, JPEG and WebP and generates correctly sized Web
     expect(result.thumbnail.size).toBeGreaterThan(0)
   }
 })
+
+
+test('renaming a local family persists its title without moving its directory or changing members', async ({ page }) => {
+  await createAndSaveMember(page)
+  const before = await readFamily(page)
+  await page.getByTestId('rename-project').click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('家族名称', { exact: true }).fill('本地新名称')
+  await dialog.getByLabel('家族名称', { exact: true }).press('Enter')
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '本地新名称', exact: true })).toBeVisible()
+  expect(await readFamily(page)).toEqual(before)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '本地新名称', exact: true })).toBeVisible()
+  expect(await readFamily(page)).toEqual(before)
+})

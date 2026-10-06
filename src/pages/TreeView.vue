@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
@@ -8,7 +8,8 @@ import { flushNow, startAutosave } from '@/services/autosave'
 import TreeLayoutHost from '@/components/tree/TreeLayoutHost.vue'
 import SearchBar from '@/components/search/SearchBar.vue'
 import { getKinship } from '@/core/kinship'
-import { authorizeProject, gcMedia, supportsMediaGc } from '@/services/storage'
+import { authorizeProject, gcMedia, renameProject, supportsMediaGc } from '@/services/storage'
+import { normalizeProjectName } from '@/services/storage/types'
 import { v4 as uuidv4 } from 'uuid'
 import type { LayoutModePreference } from '@/core/layoutMode'
 import { prepareProjectBundleExport } from '@/services/projectTransfer'
@@ -42,6 +43,13 @@ const canGcMedia = computed(() => !!projectRef.value && supportsMediaGc(projectR
 const layoutResetVersion = ref(0)
 const exporting = ref(false)
 const copyingToDrive = ref(false)
+const renaming = ref(false)
+const nameMode = ref<'rename' | 'copy' | null>(null)
+const nameDialog = ref<HTMLDialogElement | null>(null)
+const nameInput = ref<HTMLInputElement | null>(null)
+const projectName = ref('')
+const nameError = ref('')
+const nameBusy = computed(() => renaming.value || copyingToDrive.value)
 const retryingDrive = ref(false)
 const bundleDownload = ref<{ url: string; filename: string } | null>(null)
 let disposed = false
@@ -162,7 +170,63 @@ onBeforeUnmount(() => {
   clearBundleDownload()
 })
 
-async function onCopyToDrive() {
+function openNameDialog(mode: 'rename' | 'copy') {
+  if (!family.projectMeta || nameBusy.value) return
+  projectName.value = family.projectMeta.name
+  nameError.value = ''
+  nameMode.value = mode
+  void nextTick(() => {
+    nameDialog.value?.showModal()
+    nameInput.value?.focus()
+    nameInput.value?.select()
+  })
+}
+
+function closeNameDialog() {
+  if (nameBusy.value) return
+  nameMode.value = null
+}
+
+watch(() => family.projectToken, () => { nameMode.value = null })
+
+async function submitProjectName() {
+  if (nameBusy.value) return
+  let name: string
+  try { name = normalizeProjectName(projectName.value) } catch (error) {
+    nameError.value = error instanceof Error ? error.message : String(error)
+    return
+  }
+  nameError.value = ''
+  if (nameMode.value === 'copy') await onCopyToDrive(name)
+  else if (nameMode.value === 'rename') await onRenameProject(name)
+}
+
+async function onRenameProject(name: string) {
+  const project = family.projectRef
+  const token = family.projectToken
+  if (!project) return
+  renaming.value = true
+  try {
+    await authorizeProject(project)
+    if (disposed || family.projectToken !== token) return
+    const result = await renameProject(project, name)
+    if (disposed || !family.updateProjectName(token, result.project, result.meta)) return
+    if (result.warning) {
+      nameError.value = result.warning
+      ui.showToast('info', result.warning)
+    } else {
+      nameMode.value = null
+      ui.showToast('success', '家族名称已更新')
+    }
+  } catch (error) {
+    if (disposed || family.projectToken !== token) return
+    nameError.value = '重命名未完成：' + (error instanceof Error ? error.message : String(error))
+  } finally {
+    renaming.value = false
+  }
+}
+
+async function onCopyToDrive(name: string) {
   const source = family.projectRef
   if (!source || copyingToDrive.value) return
   const projectToken = family.projectToken
@@ -176,11 +240,12 @@ async function onCopyToDrive() {
       family: JSON.parse(JSON.stringify(family.data)),
     }
     const result = await copyProject(source, {
-      providerId, id: 'root', displayName: `${snapshot.meta.name}（副本）`,
+      providerId, id: 'root', displayName: name,
     }, snapshot)
     if (disposed || family.projectToken !== projectToken) return
     // Keep edits made during a large upload in the original editor session.
     if (family.revision !== revision) {
+      nameMode.value = null
       ui.showToast('info', 'Google Drive 副本已创建。上传期间又有修改，当前项目保持打开；可在首页打开副本。')
       return
     }
@@ -189,6 +254,7 @@ async function onCopyToDrive() {
     ui.showToast('success', '已另存到 Google Drive，并打开副本')
   } catch (error) {
     if (disposed || family.projectToken !== projectToken) return
+    nameError.value = '另存失败：' + (error instanceof Error ? error.message : String(error))
     ui.showToast('error', '另存失败，当前项目保持打开：' + (error instanceof Error ? error.message : String(error)))
   } finally {
     copyingToDrive.value = false
@@ -337,7 +403,16 @@ function seedFixture() {
     <header class="flex flex-col gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
       <div class="flex min-w-0 items-center justify-between gap-3">
         <div class="min-w-0">
-          <h2 class="truncate text-lg font-semibold">{{ projectMeta?.name ?? '（未打开项目）' }}</h2>
+          <div class="flex min-w-0 items-center gap-2">
+            <h2 class="truncate text-lg font-semibold">{{ projectMeta?.name ?? '（未打开项目）' }}</h2>
+            <button
+              v-if="projectMeta"
+              data-testid="rename-project"
+              class="shrink-0 rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              :disabled="nameBusy"
+              @click="openNameDialog('rename')"
+            >重命名</button>
+          </div>
           <p class="hidden truncate text-xs text-slate-400 md:block">{{ projectRef?.displayName }}</p>
         </div>
         <button class="shrink-0 text-sm text-slate-500 hover:text-slate-900 sm:hidden" @click="onBack">返回</button>
@@ -438,8 +513,8 @@ function seedFixture() {
           v-if="googleDriveState.configured"
           data-testid="copy-to-drive"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50"
-          :disabled="copyingToDrive || !googleDriveState.ready || googleDriveState.busy"
-          @click="onCopyToDrive"
+          :disabled="nameBusy || !googleDriveState.ready || googleDriveState.busy"
+          @click="openNameDialog('copy')"
         >{{ copyingToDrive ? '正在另存…' : '另存到 Google Drive' }}</button>
         <button
           v-if="googleDriveState.configured && !googleDriveState.ready && googleDriveState.error"
@@ -487,6 +562,42 @@ function seedFixture() {
         @subtree-order-change="family.setLayoutRowPreferenceBatch"
       />
     </main>
+
+    <dialog
+      v-if="nameMode"
+      ref="nameDialog"
+      aria-labelledby="project-name-title"
+      aria-describedby="project-name-description"
+      class="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border-0 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-900/40"
+      @cancel.prevent="closeNameDialog"
+    >
+      <form data-testid="project-name-form" @submit.prevent="submitProjectName">
+        <h3 id="project-name-title" class="text-lg font-semibold">{{ nameMode === 'copy' ? '另存到 Google Drive' : '重命名家族' }}</h3>
+        <p id="project-name-description" class="mt-2 text-sm text-slate-600">
+          {{ nameMode === 'copy' ? '创建独立的新项目，可保留原名称。'
+            : projectRef?.providerId === 'browser-directory' ? '更新家族标题。本地文件夹名称需在文件管理器中修改。'
+              : '更新家族标题，并同步 Google Drive 文件夹名称。' }}
+        </p>
+        <label for="project-name" class="mt-4 block text-sm font-medium">家族名称</label>
+        <input
+          id="project-name"
+          ref="nameInput"
+          v-model="projectName"
+          autofocus
+          :disabled="nameBusy"
+          :aria-invalid="Boolean(nameError)"
+          :aria-describedby="nameError ? 'project-name-error' : undefined"
+          class="mt-2 w-full rounded border border-slate-300 px-3 py-2"
+        >
+        <p v-if="nameError" id="project-name-error" role="alert" class="mt-2 text-sm text-rose-700">{{ nameError }}</p>
+        <div class="mt-5 flex justify-end gap-2">
+          <button type="button" :disabled="nameBusy" class="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50" @click="closeNameDialog">取消</button>
+          <button type="submit" :disabled="nameBusy" class="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50">
+            {{ nameBusy ? '正在保存…' : nameMode === 'copy' ? '另存' : '保存名称' }}
+          </button>
+        </div>
+      </form>
+    </dialog>
 
     <div
       v-if="ui.toast"

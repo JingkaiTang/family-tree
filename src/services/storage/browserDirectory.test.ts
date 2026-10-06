@@ -706,3 +706,34 @@ describe('directory capability detection', () => {
     expect(error.code).toBe('conflict')
   })
 })
+
+
+describe('local project renaming', () => {
+  it('persists the title, keeps the directory and members, and allows subsequent saves', async () => {
+    const { storage, root, id } = await created()
+    const before = await root.text('family.json')
+    const result = await storage.renameProject!(id, '  新家族  ')
+    expect(result.meta.name).toBe('新家族')
+    expect(result.displayName).toBe(root.name)
+    expect(await root.text('family.json')).toBe(before)
+    await storage.saveProject(id, { ...createEmptyFamily(), testLabel: 'edit' })
+    expect((await storage.loadProject(id)).meta).toMatchObject({ name: '新家族' })
+  })
+
+  it('keeps the old title on failed writes and permits retry', async () => {
+    const { storage, root, id } = await created()
+    const metaFile = root.files.get('meta.json')!
+    metaFile.failure = 'close'
+    await expect(storage.renameProject!(id, '新家族')).rejects.toThrow()
+    expect(JSON.parse((await root.text('meta.json'))!).name).toBe('测试家族')
+    metaFile.failure = undefined
+    await expect(storage.renameProject!(id, '新家族')).resolves.toMatchObject({ meta: { name: '新家族' } })
+  })
+
+  it('rejects externally modified metadata', async () => {
+    const { storage, root, id } = await created()
+    root.put('meta.json', createEmptyMeta('外部改名'))
+    await expect(storage.renameProject!(id, '新家族')).rejects.toMatchObject({ code: 'conflict' })
+    expect(JSON.parse((await root.text('meta.json'))!).name).toBe('外部改名')
+  })
+})

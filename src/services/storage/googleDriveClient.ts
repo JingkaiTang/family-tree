@@ -32,6 +32,7 @@ export interface DriveApi {
   readFile(id: string, maxBytes: number): Promise<Blob>
   generateId(): Promise<string>
   createFile(metadata: DriveFile, content?: Blob): Promise<DriveFile>
+  renameFile(id: string, name: string): Promise<DriveFile>
 }
 
 type DriveErrorCode = 'auth-required' | 'auth-failed' | 'account-mismatch' | 'cancelled'
@@ -334,6 +335,26 @@ export function createDriveApi(options: DriveApiOptions): DriveApi {
       return [...files.values()]
     },
     getFile: id => getFile(options.getToken(), id),
+    async renameFile(id, name) {
+      const token = options.getToken()
+      try {
+        return await request(token, endpoint(`files/${encodeURIComponent(id)}`, { fields: FILE_FIELDS }), {
+          method: 'PATCH', body: JSON.stringify({ name }),
+          headers: { 'Content-Type': 'application/json' },
+        }, async response => {
+          const file = parseFile(await readJson(response))
+          if (file.id !== id || file.name !== name || file.trashed) invalidResponse()
+          return file
+        })
+      } catch (error) {
+        // A lost PATCH response may still represent a completed rename.
+        try {
+          const file = await getFile(token, id)
+          if (file.name === name && !file.trashed) return file
+        } catch { /* Preserve the original failure. */ }
+        throw error
+      }
+    },
     readFile: (id, maxBytes) => readFile(options.getToken(), id, maxBytes),
     async generateId() {
       const data = await request(options.getToken(), endpoint('files/generateIds', { count: '1', space: 'drive', type: 'files' }), {}, readJson)

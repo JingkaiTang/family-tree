@@ -1,7 +1,7 @@
 import { createStore, entries, get, set } from 'idb-keyval'
 import { v4 as uuidv4 } from 'uuid'
 import { createEmptyFamily, createEmptyMeta, PhotoId, ProjectMeta, SCHEMA_VERSION } from '@/core/schema'
-import type { ProjectPicker, ProjectStorageProvider } from './types'
+import { normalizeProjectName, type ProjectPicker, type ProjectStorageProvider } from './types'
 import { prepareBrowserPhoto } from './browserPhotos'
 import { openProjectBundle } from './projectBundle'
 import type { CreatedProject } from './types'
@@ -372,6 +372,19 @@ export function createBrowserDirectoryStorage(options: BrowserDirectoryOptions):
         }
         await writeFile(root, 'family.json', next)
         baseline.family = next
+      })
+    },
+    renameProject(id, input) {
+      return run(async () => {
+        const name = normalizeProjectName(input)
+        const root = await handleFor(id)
+        const { meta } = await markers(root, id)
+        const baseline = baselines.get(id)
+        if (!baseline) invalid('请先打开项目，再重命名。')
+        const updated = { ...meta, name, updatedAt: new Date().toISOString() }
+        await writeFile(root, 'meta.json', JSON.stringify(updated, null, 2))
+        baseline.name = name
+        return { id, displayName: root.name, meta: updated }
       })
     },
     importPhoto(id, bytes, mime) {

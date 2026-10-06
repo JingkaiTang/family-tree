@@ -20,6 +20,29 @@ function transport(handler: (url: string, init?: RequestInit) => Promise<Respons
 afterEach(() => vi.useRealTimers())
 
 describe('Drive REST transport', () => {
+  it('renames only metadata using an authenticated PATCH', async () => {
+    const test = transport(() => json({ ...file, name: '新家族' }))
+    expect(await test.api.renameFile(file.id, '新家族')).toMatchObject({ id: file.id, name: '新家族' })
+    const [url, init] = test.fetch.mock.calls[0]
+    expect(String(url)).toContain(`/drive/v3/files/${file.id}?`)
+    expect(init?.method).toBe('PATCH')
+    expect(JSON.parse(String(init?.body))).toEqual({ name: '新家族' })
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer access-token')
+  })
+
+  it('verifies a rename whose PATCH response was lost', async () => {
+    const test = transport((_url, init) => {
+      if (init?.method === 'PATCH') throw new Error('lost response')
+      return json({ ...file, name: '新家族' })
+    })
+    await expect(test.api.renameFile(file.id, '新家族')).resolves.toMatchObject({ name: '新家族' })
+  })
+
+  it('does not confirm a rename when readback disagrees', async () => {
+    const test = transport((_url, init) => init?.method === 'PATCH' ? failure(403) : json(file))
+    await expect(test.api.renameFile(file.id, '新家族')).rejects.toMatchObject({ code: 'permission-denied' })
+  })
+
   it('identifies the account through Drive about without a userinfo request', async () => {
     const test = transport(() => json({ user: account }))
     expect(await test.api.getAccount()).toEqual(account)

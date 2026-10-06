@@ -73,7 +73,7 @@ export async function installGoogleDrive(page: Page) {
     const headers = {
       'access-control-allow-origin': '*',
       'access-control-allow-headers': 'authorization,content-type',
-      'access-control-allow-methods': 'GET,POST,OPTIONS',
+      'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
     }
     const json = (body: unknown, status = 200) => route.fulfill({
       status, headers, contentType: 'application/json', body: JSON.stringify(body),
@@ -139,6 +139,14 @@ export async function installGoogleDrive(page: Page) {
         return
       }
       const id = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/)?.[1]
+      if (request.method() === 'PATCH' && id) {
+        const file = files.get(decodeURIComponent(id))
+        if (!file) { await json({ error: { code: 404 } }, 404); return }
+        const body = request.postDataJSON() as { name: string }
+        file.metadata.name = body.name
+        await json(file.metadata)
+        return
+      }
       if (request.method() === 'GET' && id) {
         const file = files.get(decodeURIComponent(id))
         if (!file) { await json({ error: { code: 404 } }, 404); return }

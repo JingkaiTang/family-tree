@@ -24,6 +24,7 @@ export const {
   createProject,
   loadProject,
   saveProject,
+  renameProject,
   importPhoto,
   readPhoto,
   resolvePhotoUrl,

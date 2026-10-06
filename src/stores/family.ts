@@ -66,6 +66,15 @@ export const useFamilyStore = defineStore('family', () => {
     setLastProjectRef(projectRef.value)
   }
 
+  function updateProjectName(token: number, project: ProjectRef, meta: ProjectMeta): boolean {
+    if (projectToken.value !== token || projectRef.value?.id !== project.id
+      || projectRef.value.providerId !== project.providerId) return false
+    projectRef.value = { ...project }
+    projectMeta.value = { ...meta }
+    setLastProjectRef(projectRef.value)
+    return true
+  }
+
   function closeProject() {
     projectToken.value += 1
     isDirty.value = false
@@ -433,6 +442,7 @@ export const useFamilyStore = defineStore('family', () => {
     memberCount,
     // actions
     setProject,
+    updateProjectName,
     closeProject,
     markClean,
     markSaved,

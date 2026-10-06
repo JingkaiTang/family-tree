@@ -1,8 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import { createEmptyMeta, PhotoId, ProjectMeta, SCHEMA_VERSION, type FamilyData } from '@/core/schema'
 import { prepareBrowserPhoto } from './browserPhotos'
+import { validateLoadedProject } from '../projectValidation'
 import type { DriveApi, DriveFile } from './googleDriveClient'
 import type { ProjectStorageProvider, StoredProject } from './types'
+import { normalizeProjectName } from './types'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 const JSON_MIME = 'application/json'
@@ -43,6 +45,8 @@ interface ProjectState {
   meta: ProjectMeta
   historical: boolean
   pending?: PendingRevision
+  /** Retained until the rename caller receives confirmed metadata, even after upload recovery. */
+  unconfirmedRename?: boolean
 }
 
 export interface GoogleDriveStorage extends ProjectStorageProvider {
@@ -236,12 +240,18 @@ export function createGoogleDriveStorage(
     return pending.familyText
   }
 
-  async function append(projectId: string, state: ProjectState, family: FamilyData, parents: string[]): Promise<void> {
+  function requireConfirmedName(state: ProjectState) {
+    if (state.unconfirmedRename) {
+      throw new Error('上次重命名尚未确认，请点击标题旁的“重命名”并重新保存名称；如有版本冲突，请重新打开并选择要保留的版本。')
+    }
+  }
+
+  async function append(projectId: string, state: ProjectState, family: FamilyData, parents: string[], projectMeta = state.meta): Promise<void> {
     const familyText = JSON.stringify(family)
     if (new Blob([familyText]).size > FAMILY_LIMIT) invalid('家族数据超过 50 MiB 限制')
     const id = await api.generateId()
     checkId(id)
-    const meta = { ...state.meta, schemaVersion: SCHEMA_VERSION, updatedAt: new Date().toISOString() }
+    const meta = { ...projectMeta, schemaVersion: SCHEMA_VERSION, updatedAt: new Date().toISOString() }
     if (new Blob([JSON.stringify(meta)]).size > META_LIMIT) invalid('项目元数据超过 1 MiB 限制')
     const revision: Revision = {
       formatVersion: 1, projectId, revisionId: id, parents: [...parents], meta,
@@ -303,6 +313,7 @@ export function createGoogleDriveStorage(
       return serial(projectId, async () => {
         const state = states.get(projectId)
         if (!state) throw new Error('请先打开 Google Drive 项目，再保存修改')
+        requireConfirmedName(state)
         const completed = await finishPending(projectId, state)
         if (completed !== undefined && completed === JSON.stringify(family)) return
         const current = await graph(projectId)
@@ -310,6 +321,40 @@ export function createGoogleDriveStorage(
           throw new GoogleDriveConflictError(current.heads)
         }
         await append(projectId, state, family, [...current.heads])
+      })
+    },
+    renameProject(projectId, input) {
+      return serial(projectId, async () => {
+        const name = normalizeProjectName(input)
+        const state = states.get(projectId)
+        if (!state) throw new Error('请先打开 Google Drive 项目，再重命名')
+        await finishPending(projectId, state)
+        const current = await graph(projectId)
+        if (state.historical || state.base === null || !sameIds(current.heads, [state.base])) {
+          throw new GoogleDriveConflictError(current.heads)
+        }
+        if (state.meta.name !== name) {
+          const node = current.nodes.get(state.base)!
+          const revision = node.revision ?? await readRevision(node.file, projectId)
+          const validated = validateLoadedProject({
+            ref: { providerId, id: projectId, displayName: current.folder.name },
+            meta: revision.meta, family: revision.family,
+          })
+          state.unconfirmedRename = true
+          await append(projectId, state, validated.family, [...current.heads], { ...state.meta, name })
+        }
+        try {
+          const folder = await api.renameFile(projectId, name)
+          state.unconfirmedRename = false
+          return { id: projectId, displayName: folder.name, meta: state.meta }
+        } catch (error) {
+          state.unconfirmedRename = false
+          return {
+            id: projectId, displayName: current.folder.name, meta: state.meta,
+            warning: '家族名称已保存，但 Google Drive 文件夹名称未确认同步；请再次保存名称以重试。'
+              + (error instanceof Error ? error.message : String(error)),
+          }
+        }
       })
     },
     async listVersions(projectId) {
@@ -333,6 +378,7 @@ export function createGoogleDriveStorage(
       return serial(projectId, async () => {
         const state = states.get(projectId)
         if (!state) throw new Error('请先打开要保留的版本')
+        requireConfirmedName(state)
         const current = await graph(projectId)
         if (expectedHeads.length === 0 || new Set(expectedHeads).size !== expectedHeads.length ||
             !sameIds(current.heads, expectedHeads)) throw new GoogleDriveConflictError(current.heads, '远端版本再次发生变化，请重新查看并确认。')

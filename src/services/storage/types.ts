@@ -21,6 +21,17 @@ export interface CreatedProject {
   meta: ProjectMeta
 }
 
+export interface RenamedProject extends CreatedProject {
+  /** The title is durable, but a secondary display name could not be synchronized. */
+  warning?: string
+}
+
+export function normalizeProjectName(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed || [...trimmed].length > 100) throw new Error('家族名称须为 1 到 100 个字符')
+  return trimmed
+}
+
 /**
  * 一个提供商实例绑定一个存储连接（云盘实现还应绑定账号）。
  * 成功保存必须表示内容已持久化，不能仅表示加入内存上传队列。
@@ -32,6 +43,7 @@ export interface ProjectStorageProvider {
   createProject(targetId: string, name: string): Promise<CreatedProject>
   loadProject(projectId: string): Promise<StoredProject>
   saveProject(projectId: string, family: FamilyData): Promise<void>
+  renameProject?(projectId: string, name: string): Promise<RenamedProject>
   importPhoto(projectId: string, bytes: Uint8Array, mime: string): Promise<{ photoId: string }>
   /** 返回私有文件内容，不能要求调用者使用公开图片 URL。 */
   readPhoto(projectId: string, photoId: string, thumb: boolean): Promise<Blob>
