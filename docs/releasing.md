@@ -13,7 +13,7 @@
 ## 构建与部署
 
 1. 使用 Node.js 24 LTS 和锁文件执行 `npm ci`。
-2. 执行 CI 的类型检查、单元测试、生产构建、浏览器测试、布局性能和 npm 依赖审计。浏览器自动化不能替代目标设备的系统目录授权验收。
+2. 执行 CI 的类型检查、单元测试、生产构建、浏览器测试、布局性能和 npm 依赖审计。正式发布要求同一提交的 `Web frontend`、`Web E2E`、`Production PWA`、`Layout performance` 四个 job 全部通过；失败、取消或跳过均不算通过。浏览器自动化不能替代目标设备的系统目录授权验收。
 3. 更新 `package.json` 及锁文件中的版本，从 `CHANGELOG.md` 的 Unreleased 生成发布说明。
 4. 将 `npm run build` 生成的完整 `dist/` 发布到 HTTPS 静态主机。记录构建提交、Node 版本与依赖锁文件；生产产物来自可信构建环境。
 5. 配置资源路径、MIME 类型和缓存响应头，并验证根目录或实际子目录部署，具体要求见 [Web 部署说明](web-deployment.md)。

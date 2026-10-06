@@ -24,6 +24,10 @@
 
 涉及目录的浏览器测试替换无法在无头环境操作的系统选择器，返回真实目录句柄，继续执行浏览器 IO。OPFS 仅是测试替身，应用不会把用户项目存入 OPFS。目录授权持久性、磁盘不足和 Android 文档提供程序仍需目标设备验收。
 
+目录 E2E 和生产 PWA 使用 `e2e/helpers/persistentBrowser.ts`：每项测试创建独立的临时持久化浏览器配置目录，结束后由 Playwright 清理；不会共用用户配置或跨测试复用数据。这样使用普通 Web/PWA 会话的磁盘 IndexedDB，避开 Chromium M153 隐身上下文读取文件系统句柄的[上游问题](https://issues.chromium.org/issues/562119515)。真实句柄的结构化克隆、刷新恢复、文件 IO 和原有断言均保留，不替换 IndexedDB、不关闭权限检查。Drive 和成员编辑测试继续使用默认隔离上下文。每项持久化上下文测试附加浏览器版本，便于区分本机 Chromium 与 CI 的 Playwright 浏览器。
+
+这是测试运行环境的兼容处理，不是应用层的隐身模式修复。上述通过结果只覆盖普通持久化会话，不能据此声称 M153 隐身模式可用。更换浏览器版本或恢复隐身测试前，应在对应版本复验真实句柄的 IndexedDB 写入、读取和刷新恢复；上游问题未解决时仍须记录该兼容限制。
+
 `e2e/member-editing.spec.ts` 验证人物资料与关系的保存边界、草稿离开对话框、键盘与浏览器后退，以及新建取消不产生记录、首次保存创建成员和设置根成员。组件集成测试补充保存失败、跨项目异步结果隔离和媒体任务的取消、读取失败等边界。
 
 ## Google Drive 回归与真实验收
@@ -48,8 +52,8 @@ PWA 的离线项目与照片回归使用本地目录。Drive 没有离线数据�
 
 ## CI 与排错
 
-CI 在执行单元测试、生产构建后运行开发 E2E、生产 PWA 和独立性能检查。Playwright 在 CI 禁止 `test.only`；Vitest 默认也会拒绝 focused tests，防止误留下局部测试导致全套被跳过。
+CI 分为四个没有 `needs` 依赖的 job：`Web frontend`（依赖审计、单元测试、类型检查和生产构建）、`Web E2E`、`Production PWA`、`Layout performance`。E2E 失败不会跳过 PWA 或性能检查；任一 job 失败仍使整个工作流失败，不使用 `continue-on-error`。正式发布要求同一提交的全部检查通过，拆分 job 不降低发布门槛。Playwright 在 CI 禁止 `test.only`；Vitest 默认也会拒绝 focused tests，防止误留下局部测试导致全套被跳过。
 
-浏览器失败时保留 trace 和截图。CI 上传 `browser-test-failures` 附件，保留 7 天。本地可通过 `PLAYWRIGHT_OUTPUT_DIR` 和 `PLAYWRIGHT_PWA_OUTPUT_DIR` 指定各套件输出位置；默认写入系统临时目录，不提交生成文件。
+浏览器失败时保留 trace 和截图。CI 的 E2E 和 PWA job 分别上传 `e2e-test-failures`、`pwa-test-failures` 附件，保留 7 天。本地可通过 `PLAYWRIGHT_OUTPUT_DIR` 和 `PLAYWRIGHT_PWA_OUTPUT_DIR` 指定各套件输出位置；默认写入系统临时目录，不提交生成文件。
 
 用 `npx playwright show-trace <trace.zip>` 查看失败步骤。先检查具体断言、浏览器异常和网络请求，再决定是否重跑；不要用重复运行代替故障定位。性能门禁应在没有其他重型任务时单独运行；它验证布局核心，不代替大项目的浏览器交互帧率与 Worker 传输成本验收。

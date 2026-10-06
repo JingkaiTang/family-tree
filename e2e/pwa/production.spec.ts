@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import type { APIRequestContext, Page } from '@playwright/test'
+import { expect, test } from '../helpers/persistentBrowser'
 import type { LayoutWorkerResponse } from '../../src/core/treeLayoutProtocol'
 
 const directoryName = 'pwa-test-family'

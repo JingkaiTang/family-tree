@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './helpers/persistentBrowser'
 import { installGoogleIdentity } from './helpers/googleDrive'
 
 const directoryName = 'browser-test-family'
