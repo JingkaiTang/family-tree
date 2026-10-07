@@ -54,7 +54,7 @@ async function editMember(page: Page, withPhoto: boolean) {
   await page.getByRole('button', { name: '保存', exact: true }).click()
 }
 
-test('mobile Web creates a Drive family with private WebP photos and explicitly reconnects after reload without directory APIs', async ({ page }) => {
+test('mobile Web creates a Drive family with private WebP photos and restores its connection after reload', async ({ page }) => {
   const drive = await installGoogleDrive(page)
   await createDriveProject(page)
   expect(await drive.oauthRequests()).toBe(1)
@@ -76,10 +76,10 @@ test('mobile Web creates a Drive family with private WebP photos and explicitly 
   const readCount = drive.mediaReads
   await page.reload()
   await expect(page.getByRole('heading', { name: '家族树', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '连接 Google Drive', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '断开连接', exact: true })).toBeVisible()
   expect(await drive.oauthRequests()).toBe(0)
-  // A recent project never opens an OAuth popup until the user asks for it.
-  await page.getByRole('button', { name: projectName, exact: true }).click()
+  // Restored credentials open the recent project without another OAuth popup.
+  await page.getByRole('button', { name: projectName, exact: true }).first().click()
   await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible()
   await expect(page.getByText('林云端', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '详情', exact: true }).click()
@@ -88,13 +88,14 @@ test('mobile Web creates a Drive family with private WebP photos and explicitly 
     image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true)
   expect(drive.mediaReads).toBeGreaterThan(readCount)
   expect(drive.latestRevision()!.family).toEqual(saved)
-  expect(await drive.oauthRequests()).toBe(1)
+  expect(await drive.oauthRequests()).toBe(0)
   const stored = await page.evaluate(() => ({
     project: JSON.parse(localStorage.getItem('family-tree:lastProjectRef')!),
     browserStorage: JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]),
   }))
   expect(stored.project.providerId).toBe('google-drive:e2e-public.apps.googleusercontent.com:e2e-account')
-  expect(stored.browserStorage).not.toContain('e2e-access-token-')
+  expect(JSON.stringify(stored.project)).not.toContain('e2e-access-token-')
+  expect(stored.browserStorage).toContain('e2e-access-token-')
   expect(drive.errors).toEqual([])
 })
 
@@ -155,5 +156,39 @@ test('mobile Web names independent Drive copies and persists a renamed title and
   await page.getByRole('button', { name: '新的家族标题', exact: true }).click()
   await expect(page.getByRole('heading', { name: '新的家族标题', exact: true })).toBeVisible()
   await expect(page.getByText('林云端', { exact: true })).toBeVisible()
+  expect(drive.errors).toEqual([])
+})
+
+
+test('closing and reopening a tab restores Drive; disconnect clears the remembered session', async ({ page, context }) => {
+  const drive = await installGoogleDrive(page)
+  await createDriveProject(page)
+  const reopened = await context.newPage()
+  await page.close()
+  await reopened.goto('/')
+  await expect(reopened.getByRole('button', { name: '断开连接', exact: true })).toBeVisible()
+  await reopened.getByRole('button', { name: projectName, exact: true }).first().click()
+  await expect(reopened.getByRole('heading', { name: projectName, exact: true })).toBeVisible()
+  expect(await drive.oauthRequests(reopened)).toBe(0)
+  await reopened.goto('/#/')
+  await reopened.getByRole('button', { name: '断开连接', exact: true }).click()
+  await reopened.reload()
+  await expect(reopened.getByRole('button', { name: '连接 Google Drive', exact: true })).toBeEnabled()
+  expect(await drive.oauthRequests(reopened)).toBe(0)
+  expect(await reopened.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('family-tree:googleDriveSession:')))).toEqual([])
+  expect(drive.errors).toEqual([])
+})
+
+test('a revoked remembered token falls back to a user-driven connection', async ({ page }) => {
+  const drive = await installGoogleDrive(page)
+  await createDriveProject(page)
+  drive.expireAccessTokens()
+  await page.reload()
+  await expect(page.getByRole('button', { name: '连接 Google Drive', exact: true })).toBeEnabled()
+  expect(await drive.oauthRequests()).toBe(0)
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('family-tree:googleDriveSession:')))).toEqual([])
+  await page.getByRole('button', { name: projectName, exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible()
+  expect(await drive.oauthRequests()).toBe(1)
   expect(drive.errors).toEqual([])
 })

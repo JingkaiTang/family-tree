@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createDriveApi, createGoogleDriveAuth, GOOGLE_DRIVE_SCOPE,
-  type DriveFile, type GoogleIdentityOAuth, type GoogleTokenResponse,
+  type DriveFile, type GoogleIdentityOAuth, type GoogleTokenResponse, type GoogleDriveAuthOptions,
 } from './googleDriveClient'
 
 const account = { permissionId: 'account-1', displayName: '用户一', emailAddress: 'one@example.com' }
@@ -378,13 +378,13 @@ describe('Drive REST transport', () => {
   })
 })
 
-function authFixture(overrides: { now?: () => number; response?: unknown; timeoutMs?: number } = {}) {
+function authFixture(overrides: GoogleDriveAuthOptions & { response?: unknown; clientId?: string } = {}) {
   let callbacks: Parameters<GoogleIdentityOAuth['initTokenClient']>[0] | undefined
   const requestAccessToken = vi.fn()
   const identity: GoogleIdentityOAuth = { initTokenClient(config) { callbacks = config; return { requestAccessToken } } }
   const loadIdentity = vi.fn(async () => identity)
   const fetch = vi.fn<typeof globalThis.fetch>(async () => json(overrides.response ?? { user: account }))
-  const auth = createGoogleDriveAuth('web-client.apps.googleusercontent.com', { loadIdentity, fetch, now: overrides.now, timeoutMs: overrides.timeoutMs })
+  const auth = createGoogleDriveAuth(overrides.clientId ?? 'web-client.apps.googleusercontent.com', { ...overrides, loadIdentity, fetch: overrides.fetch ?? fetch })
   return {
     auth, loadIdentity, fetch, requestAccessToken,
     callback(response: GoogleTokenResponse = { access_token: 'secret-token', expires_in: 3600, scope: GOOGLE_DRIVE_SCOPE }) {
@@ -508,5 +508,111 @@ describe('Google Drive authorization', () => {
     await expect(auth.prepare()).rejects.toThrow('offline')
     await expect(auth.prepare()).resolves.toBeUndefined()
     expect(loadIdentity).toHaveBeenCalledTimes(2)
+  })
+})
+
+
+function sessionStorageFixture() {
+  const data = new Map<string, string>()
+  const storage = {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => { data.set(key, value) },
+    removeItem: (key: string) => { data.delete(key) },
+  }
+  return { storage, data }
+}
+
+async function saveSession(storage: GoogleDriveAuthOptions['storage'], now = () => 1000) {
+  const test = authFixture({ storage, now })
+  await test.auth.prepare()
+  const connected = test.auth.authorize()
+  test.callback()
+  await connected
+  return test
+}
+
+describe('Google Drive remembered connection', () => {
+  it('restores a verified account in a new instance without OAuth or extending the deadline', async () => {
+    const { storage, data } = sessionStorageFixture()
+    await saveSession(storage)
+    const saved = [...data.values()][0]
+    const reopened = authFixture({ storage, now: () => 2000 })
+    expect(reopened.auth.getAccount()).toBeNull()
+    await reopened.auth.prepare()
+    expect(reopened.auth.getAccount()).toEqual(account)
+    expect(reopened.auth.getToken()).toBe('secret-token')
+    expect(reopened.fetch).toHaveBeenCalledOnce()
+    expect(reopened.requestAccessToken).not.toHaveBeenCalled()
+    expect([...data.values()][0]).toBe(saved)
+  })
+
+  it('removes expired credentials without contacting Drive or opening OAuth', async () => {
+    const { storage, data } = sessionStorageFixture()
+    await saveSession(storage)
+    const reopened = authFixture({ storage, now: () => 3_571_000 })
+    await reopened.auth.prepare()
+    expect(reopened.auth.getAccount()).toBeNull()
+    expect(() => reopened.auth.getToken()).toThrow()
+    expect(reopened.fetch).not.toHaveBeenCalled()
+    expect(reopened.requestAccessToken).not.toHaveBeenCalled()
+    expect(data.size).toBe(0)
+  })
+
+  it.each(['invalid', 'wrong-account', 'revoked'])('clears a %s session without publishing credentials', async mode => {
+    const { storage, data } = sessionStorageFixture()
+    await saveSession(storage)
+    if (mode === 'invalid') storage.setItem([...data.keys()][0], '{broken')
+    const reopened = authFixture({ storage, now: () => 2000,
+      response: { user: { ...account, permissionId: 'other' } },
+      ...(mode === 'revoked' ? { fetch: async () => failure(401) } : {}),
+    })
+    await reopened.auth.prepare()
+    expect(reopened.auth.getAccount()).toBeNull()
+    expect(() => reopened.auth.getToken()).toThrow()
+    expect(reopened.requestAccessToken).not.toHaveBeenCalled()
+    expect(data.size).toBe(0)
+  })
+
+  it('does not reuse credentials from a different OAuth client', async () => {
+    const { storage } = sessionStorageFixture()
+    await saveSession(storage)
+    const reopened = authFixture({ storage, now: () => 2000, clientId: 'another-client' })
+    await reopened.auth.prepare()
+    expect(reopened.auth.getAccount()).toBeNull()
+    expect(reopened.fetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['invalidate', 'disconnect'] as const)('%s prevents a later instance from restoring', async action => {
+    const { storage, data } = sessionStorageFixture()
+    const test = await saveSession(storage)
+    test.auth[action]()
+    expect(data.size).toBe(0)
+    const reopened = authFixture({ storage, now: () => 2000 })
+    await reopened.auth.prepare()
+    expect(reopened.auth.getAccount()).toBeNull()
+  })
+
+  it('ignores a pending restore result after disconnect', async () => {
+    const { storage, data } = sessionStorageFixture()
+    await saveSession(storage)
+    let respond: (response: Response) => void = () => { throw new Error('request not started') }
+    const fetch = vi.fn<typeof globalThis.fetch>(() => new Promise(resolve => { respond = resolve }))
+    const reopened = authFixture({ storage, now: () => 2000, fetch })
+    const preparing = reopened.auth.prepare()
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    reopened.auth.disconnect()
+    respond(json({ user: account }))
+    await preparing
+    expect(reopened.auth.getAccount()).toBeNull()
+    expect(() => reopened.auth.getToken()).toThrow()
+    expect(data.size).toBe(0)
+  })
+
+  it('keeps a live connection usable when browser storage is blocked', async () => {
+    const blocked = () => { throw new Error('Storage blocked') }
+    const test = await saveSession({ getItem: blocked, setItem: blocked, removeItem: blocked })
+    expect(test.auth.getToken()).toBe('secret-token')
+    expect(test.auth.getAccount()).toEqual(account)
+    expect(() => test.auth.disconnect()).not.toThrow()
   })
 })

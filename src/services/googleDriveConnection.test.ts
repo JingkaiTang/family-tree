@@ -78,6 +78,22 @@ describe('Google Drive application connection', () => {
     expect(JSON.stringify(connection.state)).not.toContain('token-')
   })
 
+  it('registers a restored session during preparation without requesting OAuth again', async () => {
+    const { auth, connection } = fixture()
+    vi.mocked(auth.prepare).mockImplementation(async () => {
+      await auth.authorize('account-A')
+      vi.mocked(auth.authorize).mockClear()
+    })
+    const register = vi.fn()
+    connection.registerWith(register)
+    await connection.prepare()
+    expect(connection.state.providerId).toBe('google-drive:public-client:account-A')
+    expect(connection.state.account?.permissionId).toBe('account-A')
+    await connection.connect('google-drive:public-client:account-A')
+    expect(auth.authorize).not.toHaveBeenCalled()
+    expect(register).toHaveBeenCalledOnce()
+  })
+
   it('preserves a recoverable account reference while rejecting another deployment identity', async () => {
     const { connection, auth } = fixture()
     expect(connection.isProvider('google-drive:public-client:account-A')).toBe(true)

@@ -7,7 +7,7 @@ import { validateLoadedProject } from './projectValidation'
 
 const PREFIX = 'google-drive:'
 
-/** Application connection lifecycle. Credentials stay inside the auth closure. */
+/** Application connection lifecycle. Credentials are managed privately by auth. */
 export function createGoogleDriveConnection(clientId: string, authOverride?: GoogleDriveAuth) {
   const state = reactive({
     configured: !!clientId, ready: false, busy: false,
@@ -45,9 +45,58 @@ export function createGoogleDriveConnection(clientId: string, authOverride?: Goo
     return found
   }
 
+  function adoptAccount(account: DriveAccount): string {
+    if (!auth) throw new Error('请先配置 Google Drive')
+    const id = `${PREFIX}${encodeURIComponent(clientId)}:${encodeURIComponent(account.permissionId)}`
+    if (!providers.has(id)) {
+      const api = createDriveApi({
+        getToken: () => requireAccount(id),
+        invalidateToken: () => {
+          auth.invalidate()
+          state.error = 'Google Drive 授权已过期，请重新连接后保存；当前修改仍在此页面中。'
+        },
+      })
+      const raw = createGoogleDriveStorage(id, api)
+      // Expose failures persistently, including background saves and private photo reads.
+      const wrapped = new Proxy(raw, {
+        get(target, key, receiver) {
+          const value: unknown = Reflect.get(target, key, receiver)
+          if (typeof value !== 'function') return value
+          return async (...args: unknown[]) => {
+            try {
+              const result: unknown = await Reflect.apply(value, target, args)
+              if (state.providerId === id && (key === 'saveProject' || key === 'resolveConflict')) state.error = null
+              return result
+            } catch (error) {
+              // An old account's late response must not change the new connection's UI.
+              if (state.providerId === id) return report(error)
+              throw error
+            }
+          }
+        },
+      })
+      register?.(wrapped)
+      providers.set(id, wrapped)
+    }
+    state.account = account
+    state.providerId = id
+    state.error = null
+    state.mediaEpoch++
+    return id
+  }
+
   async function prepare() {
     if (!auth || state.ready) return
-    try { await auth.prepare(); state.ready = true; state.error = null }
+    try {
+      await auth.prepare()
+      const restored = auth.getAccount()
+      if (restored && !state.providerId) {
+        auth.getToken()
+        adoptAccount(restored)
+      }
+      state.ready = true
+      state.error = null
+    }
     catch (error) { report(error) }
   }
 
@@ -69,42 +118,7 @@ export function createGoogleDriveConnection(clientId: string, authOverride?: Goo
     try {
       // authorize calls GIS synchronously before its first await: preserve this click's activation.
       const account = await auth.authorize(expected)
-      const id = `${PREFIX}${encodeURIComponent(clientId)}:${encodeURIComponent(account.permissionId)}`
-      if (!providers.has(id)) {
-        const api = createDriveApi({
-          getToken: () => requireAccount(id),
-          invalidateToken: () => {
-            auth.invalidate()
-            state.error = 'Google Drive 授权已过期，请重新连接后保存；当前修改仍在此页面中。'
-          },
-        })
-        const raw = createGoogleDriveStorage(id, api)
-        // Expose failures persistently, including background saves and private photo reads.
-        const wrapped = new Proxy(raw, {
-          get(target, key, receiver) {
-            const value: unknown = Reflect.get(target, key, receiver)
-            if (typeof value !== 'function') return value
-            return async (...args: unknown[]) => {
-              try {
-                const result: unknown = await Reflect.apply(value, target, args)
-                if (state.providerId === id && (key === 'saveProject' || key === 'resolveConflict')) state.error = null
-                return result
-              } catch (error) {
-                // An old account's late response must not change the new connection's UI.
-                if (state.providerId === id) return report(error)
-                throw error
-              }
-            }
-          },
-        })
-        register?.(wrapped)
-        providers.set(id, wrapped)
-      }
-      state.account = account
-      state.providerId = id
-      state.error = null
-      state.mediaEpoch++
-      return id
+      return adoptAccount(account)
     } catch (error) {
       state.account = auth.getAccount()
       state.providerId = null

@@ -127,6 +127,18 @@ describe('Welcome Google Drive connections', () => {
     expect(mocks.pickProject).not.toHaveBeenCalled()
   })
 
+  it('lists projects after restoring a remembered connection without a connect click', async () => {
+    mocks.prepareGoogleDrive.mockImplementationOnce(async () => {
+      await Promise.resolve()
+      mocks.driveState.providerId = driveProject.providerId
+      mocks.driveState.account = { permissionId: 'account', displayName: '我的账号' }
+    })
+    const { wrapper } = await mountedWelcome()
+    expect(mocks.connectGoogleDrive).not.toHaveBeenCalled()
+    expect(mocks.listGoogleDriveProjects).toHaveBeenCalledExactlyOnceWith(driveProject.providerId)
+    expect(wrapper.text()).toContain(driveProject.displayName)
+  })
+
   it('creates a named project in the connected account and adopts the returned folder ID', async () => {
     const { wrapper, family } = await mountedWelcome()
     await wrapper.findAll('button').find(button => button.text() === '连接 Google Drive')!.trigger('click')

@@ -34,7 +34,7 @@ browser-directory       google-drive（每个 OAuth 应用/账号独立）
 - `src/services/autosave.ts` 对不可变快照串行保存。只有保存结果仍匹配同一 `projectToken` 和 `revision` 时才清除脏状态；应用内关闭项目等待保存，浏览器关闭页面仅能提示和尽力刷新，不能保证页面销毁后继续写入。
 - `src/services/storage` 是项目和媒体 IO 入口，使用 `{ providerId, id, displayName }` 路由到存储提供商，当前实现为 `browser-directory` 和 Google Drive。上层不解释目录路径、浏览器句柄或云盘文件 ID；接口与扩展契约见 [storage.md](storage.md)。
 - `src/services/projectTransfer.ts` 编排跨提供商备份导出与本地空目录导入。导出优先使用文件流，无保存选择器时返回有界 Blob 下载；完整归档要求所有引用照片可读。
-- `src/services/googleDriveConnection.ts` 管理 Google 连接与按账号注册的提供商；令牌留在认证闭包，UI 只读取连接状态。`googleDriveClient.ts` 负责 GIS/REST，`googleDrive.ts` 负责项目、媒体和追加式版本协议。Drive 专属历史/冲突操作不侵入核心家谱 schema。
+- `src/services/googleDriveConnection.ts` 管理 Google 连接与按账号注册的提供商；令牌与短期连接缓存由认证模块管理，UI 只读取连接状态。`googleDriveClient.ts` 负责 GIS/REST，`googleDrive.ts` 负责项目、媒体和追加式版本协议。Drive 专属历史/冲突操作不侵入核心家谱 schema。
 - `src/services/projectService.ts` 是项目格式边界：打开时迁移并验证，保存前再次进行 Zod 和跨成员图校验。
 - `src/core` 不依赖 Vue 或具体存储实现，承载 schema、迁移、关系完整性、称谓与布局算法。
 - `npm run build` 是唯一生产构建入口，输出 `dist/` 静态网页与 PWA 资源；不包含原生宿主、桥接层或平台工具链。
@@ -118,8 +118,8 @@ Worker 客户端在发送前对 JSON 领域数据与上一布局场景取独立�
 - 备份包限制压缩包大小、条目数、解压总量和单文件大小，拒绝路径穿越、符号链接、重复或未知条目。
 - 照片 ID 只允许 ASCII 字母、数字、`_`、`-`；图片组件接收 Blob 并创建临时 URL，用后释放。
 - 项目没有应用层加密。PWA 按静态资源更新流程发布；静态主机不存储用户项目，部署凭据不进入网页产物。
-- Drive 仅申请 `drive.file`，连接身份绑定公开 Client ID 与账号 `permissionId`；令牌只保留在内存，重新授权核对账号。Drive 项目及照片直接上传至用户账号，不进入应用后端。
-- PWA 不缓存云端数据、照片或令牌，也不维护离线上传队列。网络或授权失败时仍保留脏状态；JSON 草稿下载不包含照片，不等于完整备份。
+- Drive 仅申请 `drive.file`，连接身份绑定公开 Client ID 与账号 `permissionId`；短期令牌与原到期时间在当前站点的 localStorage 按 Client ID 隔离保存，恢复时核验账号，过期/401/断开时清除；不存刷新令牌。Drive 项目及照片直接上传至用户账号，不进入应用后端。
+- PWA 的 Service Worker 不缓存云端数据、照片或令牌（短期连接由认证模块独立保存），也不维护离线上传队列。网络或授权失败时仍保留脏状态；JSON 草稿下载不包含照片，不等于完整备份。
 
 ## 测试层次
 

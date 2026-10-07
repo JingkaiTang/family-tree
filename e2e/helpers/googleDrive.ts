@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
 
 interface RemoteFile {
   id: string
@@ -42,7 +42,7 @@ const identityScript = `
 `
 
 /** Prepare GIS without external network access; no token is issued without a click. */
-export async function installGoogleIdentity(page: Page) {
+export async function installGoogleIdentity(page: Page | BrowserContext) {
   await page.route('https://accounts.google.com/gsi/client', route => route.fulfill({
     contentType: 'application/javascript', body: identityScript,
   }))
@@ -62,12 +62,12 @@ export async function installGoogleDrive(page: Page) {
   let unauthorizedRequests = 0
   let mediaReads = 0
 
-  await page.addInitScript(() => {
+  await page.context().addInitScript(() => {
     Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: undefined })
     Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: undefined })
   })
-  await installGoogleIdentity(page)
-  await page.route('https://www.googleapis.com/**', async route => {
+  await installGoogleIdentity(page.context())
+  await page.context().route('https://www.googleapis.com/**', async route => {
     const request = route.request()
     const url = new URL(request.url())
     const headers = {
@@ -172,7 +172,7 @@ export async function installGoogleDrive(page: Page) {
     expireAccessTokens() { for (const token of observedTokens) expiredTokens.add(token) },
     get unauthorizedRequests() { return unauthorizedRequests },
     get mediaReads() { return mediaReads },
-    oauthRequests: () => page.evaluate(() => Reflect.get(window, '__driveOAuthRequests') as number),
+    oauthRequests: (target = page) => target.evaluate(() => Reflect.get(window, '__driveOAuthRequests') as number),
     oauthActivations: () => page.evaluate(() => Reflect.get(window, '__driveOAuthActivations') as boolean[]),
   }
 }

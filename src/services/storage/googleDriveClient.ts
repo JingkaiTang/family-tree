@@ -1,4 +1,4 @@
-/** Browser-only Google Drive transport. Credentials never leave this module's closures. */
+/** Browser-only Google Drive transport. Auth owns the short-lived credential cache. */
 export const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const API_ROOT = 'https://www.googleapis.com/drive/v3/'
 const UPLOAD_ROOT = 'https://www.googleapis.com/upload/drive/v3/files'
@@ -419,6 +419,7 @@ export interface GoogleDriveAuthOptions {
   fetch?: typeof fetch
   now?: () => number
   timeoutMs?: number
+  storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
 }
 
 function readIdentity(): GoogleIdentityOAuth | undefined {
@@ -459,17 +460,68 @@ function loadIdentity(): Promise<GoogleIdentityOAuth> {
 
 export function createGoogleDriveAuth(clientId: string, options: GoogleDriveAuthOptions = {}): GoogleDriveAuth {
   const now = options.now ?? Date.now
+  const storageKey = `family-tree:googleDriveSession:${encodeURIComponent(clientId)}`
+  const storage = () => options.storage !== undefined ? options.storage : globalThis.localStorage
+  const clearCache = () => {
+    try { storage()?.removeItem(storageKey) } catch { /* Storage may be unavailable. */ }
+  }
   let identity: GoogleIdentityOAuth | undefined
   let preparation: Promise<void> | undefined
   let accessToken = ''
   let expiresAt = 0
   let account: DriveAccount | null = null
   let pending: { cancel: () => void } | undefined
-  const invalidate = () => { accessToken = ''; expiresAt = 0 }
+  let generation = 0
+  const invalidate = () => { generation++; accessToken = ''; expiresAt = 0; clearCache() }
+
+  async function restore() {
+    const restoringGeneration = generation
+    try {
+      const raw = storage()?.getItem(storageKey)
+      if (!raw) return
+      const saved: unknown = JSON.parse(raw)
+      if (!record(saved) || saved.version !== 1 || saved.clientId !== clientId
+        || saved.scope !== GOOGLE_DRIVE_SCOPE || typeof saved.accessToken !== 'string' || !saved.accessToken
+        || typeof saved.expiresAt !== 'number' || !Number.isFinite(saved.expiresAt) || saved.expiresAt <= now()
+        || typeof saved.permissionId !== 'string' || !saved.permissionId) {
+        clearCache()
+        return
+      }
+      const token = saved.accessToken
+      const api = createDriveApi({ getToken: () => token, invalidateToken: () => {}, fetch: options.fetch })
+      const verified = await api.getAccount()
+      // A disconnect or a new authorization must supersede an in-flight restore.
+      if (generation !== restoringGeneration) return
+      if (verified.permissionId !== saved.permissionId || now() >= saved.expiresAt) {
+        clearCache()
+        return
+      }
+      accessToken = token
+      expiresAt = saved.expiresAt
+      account = verified
+    } catch {
+      // Never open OAuth during restoration; a later user click can reconnect.
+      if (generation === restoringGeneration) clearCache()
+    }
+  }
+
+  function persist() {
+    if (!account) return
+    try {
+      storage()?.setItem(storageKey, JSON.stringify({
+        version: 1, clientId, scope: GOOGLE_DRIVE_SCOPE,
+        accessToken, expiresAt, permissionId: account.permissionId,
+      }))
+    } catch { /* Keep this page usable even when browser storage is blocked. */ }
+  }
+
   return {
     prepare() {
       if (!clientId.trim()) return Promise.reject(new DriveError('configuration', '请先配置 Google OAuth Web Client ID'))
-      if (!preparation) preparation = (options.loadIdentity ?? loadIdentity)().then(value => { identity = value }).catch(error => {
+      if (!preparation) preparation = (options.loadIdentity ?? loadIdentity)().then(async value => {
+        identity = value
+        await restore()
+      }).catch(error => {
         preparation = undefined
         throw error
       })
@@ -494,6 +546,7 @@ export function createGoogleDriveAuth(clientId: string, options: GoogleDriveAuth
             accessToken = token
             expiresAt = deadline
             account = result
+            persist()
             resolve({ ...result })
           }
         }

@@ -65,7 +65,7 @@ interface ProjectRef {
 - `projectService` 负责创建、迁移、校验和保存；创建后的初始家谱保存到提供商返回的新项目引用。
 - Store 和自动保存快照持有完整引用。切换项目后，旧保存结果仍必须通过 `projectToken` 与 `revision` 校验才可清除脏状态。
 - 图片读取统一创建 Blob URL，组件在替换、丢弃过期结果与卸载时释放它。异步导入结果也检查项目会话，避免赋给另一个项目。
-- 最近项目在 `family-tree:lastProjectRef` 保存三个引用字段，Drive 引用保留账号/应用标识但不保留令牌，恢复前须显式连接对应账号；目录访问依赖浏览器授权句柄，旧版本的绝对路径或托管 ID 无法直接获得网页权限，需要重新选择目录或导入备份。自动恢复失败保留记录供重试；手动忘记或关闭项目清除记录，避免返回欢迎页时自动重开。
+- 最近项目在 `family-tree:lastProjectRef` 保存三个引用字段，Drive 引用保留账号/应用标识但不保留令牌，有效的短期连接可在启动时核验恢复，否则须显式连接对应账号；目录访问依赖浏览器授权句柄，旧版本的绝对路径或托管 ID 无法直接获得网页权限，需要重新选择目录或导入备份。自动恢复失败保留记录供重试；手动忘记或关闭项目清除记录，避免返回欢迎页时自动重开。
 - 移动端后台/页面隐藏时仍立即刷新同一保存队列；聚焦纵流和网格图片均使用统一接口。
 - `.family` 与 `.familybundle` 数据格式保持兼容；存储提供商的移除不会改写家谱 schema。
 
@@ -83,7 +83,7 @@ interface ProjectRef {
 
 ## Google Drive 与可靠性
 
-- `googleDriveClient.ts` 封装 GIS token 授权与 Drive v3 REST；只申请 `drive.file`，通过 `about.get` 的 `permissionId` 确认账号。Access token 仅在内存中，过期/401 后由用户点击重连；无 Client Secret、刷新令牌或后台授权弹窗。
+- `googleDriveClient.ts` 封装 GIS token 授权与 Drive v3 REST；只申请 `drive.file`，通过 `about.get` 的 `permissionId` 确认账号。Access token 与原到期时间、账号标识由认证模块单独写入按 Client ID 隔离的 localStorage；启动时通过 Drive 核验账号后恢复，过期/401/断开时清除，存储不可用时退回仅内存连接。过期后由用户点击重连；无 Client Secret、刷新令牌或后台授权弹窗。
 - `googleDriveConnection.ts` 将连接状态、账号隔离、项目列表和版本操作接入 UI。REST 客户端校验响应与大小，处理分页、超时和有限重试；上传使用预生成文件 ID，遇到结果不确定时检查同一 ID 的内容，避免盲目追加重复文件。
 - 超过 5 MiB 的文件使用 resumable 上传，每片最多 1 MiB；响应丢失时先查询进度再续传。有进展不会消耗连续失败预算，连续八次失败或无进展会停止，并保留待保存状态。
 - `googleDrive.ts` 使用本应用的 `appProperties` 标记识别项目、快照和照片，不按可重名的文件名识别。项目只列出本 OAuth 应用可访问的项目文件夹，不提供全盘 Picker 或亲友共享流程。

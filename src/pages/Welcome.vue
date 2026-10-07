@@ -56,6 +56,7 @@ async function onPrepareDrive() {
   error.value = null
   try {
     await prepareGoogleDrive()
+    if (googleDriveState.providerId) await onRefreshDrive()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -274,9 +275,8 @@ function onForgetLast() {
 }
 
 onMounted(async () => {
-  // 只准备授权脚本；OAuth 弹窗始终由用户点击触发。本地功能不等待网络。
+  // 准备授权脚本并恢复有效连接；OAuth 弹窗始终由用户点击触发。本地功能不等待网络。
   void onPrepareDrive()
-  if (googleDriveState.providerId) void onRefreshDrive()
   // 布局默认值由 UI store 在会话开始时检测一次，返回首页不改变用户的选择。
   const stored = getLastProjectRef()
   lastProject.value = stored && (hasProvider(stored.providerId) || isGoogleDriveProvider(stored.providerId)) ? stored : null
@@ -347,7 +347,8 @@ onMounted(async () => {
             >{{ googleDriveState.account ? '重新连接 Google Drive' : '连接 Google Drive' }}</button>
             <button v-if="googleDriveState.account" type="button" class="text-sm text-slate-500 disabled:opacity-50" :disabled="busy" @click="onDisconnectDrive">断开连接</button>
           </div>
-          <p v-if="!googleDriveState.ready && !googleDriveState.error" class="text-xs text-slate-500">正在准备 Google 授权…</p>
+          <p class="text-xs text-slate-500">此浏览器会记住短期连接，过期后需重新连接；断开连接可清除记录。</p>
+          <p v-if="!googleDriveState.ready && !googleDriveState.error" class="text-xs text-slate-500">正在准备 Google Drive 连接…</p>
           <p v-if="googleDriveState.error" class="text-sm text-rose-700">{{ googleDriveState.error }}</p>
           <button v-if="!googleDriveState.ready && googleDriveState.error" type="button" class="self-start text-sm text-sky-800 disabled:opacity-50" :disabled="preparingDrive" @click="onPrepareDrive">重试加载 Google 授权</button>
           <template v-if="googleDriveState.providerId">
