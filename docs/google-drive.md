@@ -30,6 +30,10 @@ Google Drive 是可选存储。用户在网页中授权自己的 Google 账号�
 
 隐私说明应准确交代：选择 Drive 后会上传家谱与处理后的照片；没有应用层加密；项目归用户 Drive 管理；历史版本和照片不自动物理删除。不要把本地目录的“不上传”说明直接用于云端项目。
 
+仓库的 [privacy.html](../public/privacy.html) 是 `family.t-d.fun` 部署的公开隐私政策，构建后位于站点根目录的 `privacy.html`，首页提供入口，阅读本页不需要 JavaScript 或 Google 登录。其他维护者自行部署时，须先核对并修改站点域名、维护者联系方式和日志处理说明，不能直接沿用与其部署不符的声明。Google OAuth 品牌配置中的隐私政策地址应与首页链接一致。
+
+[about.html](../public/about.html) 提供公开的应用介绍，品牌配置的应用首页可指向此页，便于审核工具直接读取应用名称、用途与隐私链接，不依赖 Vue 渲染或 Google 登录。
+
 ## 使用流程
 
 1. 在欢迎页加载并连接 Google Drive，完成 Google 授权。

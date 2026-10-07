@@ -26,6 +26,8 @@ import {
 } from '@/services/googleDriveConnection'
 
 const router = useRouter()
+const privacyUrl = `${import.meta.env.BASE_URL}privacy.html`
+const aboutUrl = `${import.meta.env.BASE_URL}about.html`
 const family = useFamilyStore()
 const ui = useUiStore()
 
@@ -297,7 +299,7 @@ onMounted(async () => {
   <div class="app-safe-area-padded flex h-full flex-col items-center gap-6 overflow-auto py-8">
     <div class="text-center">
       <h1 class="text-4xl font-bold tracking-tight">家族树</h1>
-      <p class="mt-3 text-slate-500">记录家族成员、关系与故事</p>
+      <p class="mt-3 text-slate-500">Family Tree · 记录家族成员、关系与故事</p>
     </div>
 
     <p v-if="autoRestoring" class="text-sm text-slate-400">正在恢复上次打开的家族…</p>
@@ -452,5 +454,9 @@ onMounted(async () => {
     <p class="text-center text-xs text-slate-400">
       数据直接保存在你授权的本地目录，或你连接的 Google Drive；本站不托管家族资料。权限失效时需要重新授权，请定期导出备份。
     </p>
+    <nav aria-label="关于本站" class="flex gap-4 text-sm text-sky-700 underline underline-offset-4">
+      <a :href="aboutUrl" target="_blank" rel="noopener">关于家族树（新窗口）</a>
+      <a :href="privacyUrl" target="_blank" rel="noopener">隐私政策（新窗口）</a>
+    </nav>
   </div>
 </template>

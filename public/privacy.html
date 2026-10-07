@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Family Tree 家族树的隐私政策：Google Drive 权限、数据存储、保留、删除与撤销授权。">
+  <title>隐私政策 · Family Tree 家族树</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #0f172a; background: #f8fafc; }
+    body { margin: 0; line-height: 1.8; }
+    main { max-width: 760px; margin: 0 auto; padding: 40px 24px 64px; }
+    h1 { font-size: 2rem; line-height: 1.3; margin-top: 32px; }
+    h2 { font-size: 1.15rem; margin-top: 32px; }
+    a { color: #0369a1; text-underline-offset: 3px; overflow-wrap: anywhere; }
+    .muted { color: #475569; font-size: .9rem; }
+    .summary { padding: 16px 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; }
+    li { margin: 8px 0; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <main>
+    <a href="./">返回家族树</a>
+    <h1>Family Tree 家族树<br>隐私政策</h1>
+    <p class="muted">生效日期：2026 年 10 月 6 日；更新日期：2026 年 10 月 7 日</p>
+    <p>本政策适用于 <a href="https://family.t-d.fun/">family.t-d.fun</a> 上的 Family Tree 家族树，由 Jingkai Tang 维护。隐私与支持联系邮箱：<a href="mailto:jingkaitang@gmail.com">jingkaitang@gmail.com</a>。其他人自行部署本开源项目时，其服务器处理方式可能不同。</p>
+    <p class="summary">家族树帮助你记录成员、关系、故事和照片。你可选择本地目录或自己的 Google Drive 保存资料。本站服务器提供应用静态文件，不接收或托管你的家谱、照片或 Google Drive 访问令牌。</p>
+
+    <h2>我们访问哪些数据，以及为什么</h2>
+    <ul>
+      <li><strong>本地目录：</strong>仅在你选择并授权目录后，浏览器读取和保存该目录中的家谱、项目元数据与照片，用于展示、编辑、导入和导出。</li>
+      <li><strong>Google Drive：</strong>你主动连接并授权后，应用使用 <code>https://www.googleapis.com/auth/drive.file</code> 权限，创建、读取和更新该应用可访问的项目文件、版本与照片，并可更新项目文件夹名称。该权限仅覆盖应用创建或你明确向应用授权的文件，不允许任意读取整个云盘。</li>
+      <li><strong>Google 账号信息：</strong>通过 Drive API 获取账号标识、显示名称和邮箱，用于展示当前连接账号，并防止把项目写入错误的账号。</li>
+    </ul>
+
+    <h2>数据流向与共享</h2>
+    <p>Google 授权在 Google 的页面中完成，本站不获取你的 Google 密码。家谱和照片由你的浏览器通过 HTTPS 直接与 Google Drive 通信，保存在你所连接的账号中。应用不会在保存前对家谱和照片进行额外的应用层加密；请保护存储账号与文件访问权限。导出备份会将资料下载到你选择的位置；请自行决定备份或云盘文件的分享对象。网页公开访问不会自动公开你的家谱。</p>
+    <p>本站不出售 Google 用户数据，不将其用于广告、用户画像或训练通用人工智能模型，也不把家谱或照片传给广告商、数据经纪商或分析服务。对 Google API 所获信息的使用和向其他应用的传输遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>，包括 Limited Use 要求。</p>
+    <p>启用 Drive 的页面会加载 Google 登录服务；加载时 Google 会收到连接所需的网络信息，例如 IP 地址和浏览器信息。Google 的处理方式见 <a href="https://policies.google.com/privacy">Google 隐私政策</a>。使用本地目录不要求授权 Google Drive。</p>
+
+    <h2>浏览器存储和令牌</h2>
+    <p>为在刷新或重新打开页面后恢复连接，应用会将短期 Google Drive 访问令牌、原到期时间与账号标识保存在当前站点的浏览器 localStorage 中，按 OAuth Client ID 隔离，不上传本站服务器。恢复时会向 Google Drive 核验账号；打开最近项目仍需你主动点击。令牌期限由 Google 决定，通常约一小时，应用提前 30 秒停止使用，不会延长授权期限，也不使用刷新令牌。</p>
+    <p>令牌过期、服务返回 401、恢复核验失败或主动断开连接时，应用会清除缓存。若未再次打开应用，过期记录可能仍留在浏览器存储中，但不会被继续使用。浏览器禁止存储时，仅维持当前页面连接；清除网站数据、结束隐私模式、换浏览器或换站点后需重新连接。这些凭证可被同源脚本访问，不是加密保险箱；共用设备使用完后请点击“断开连接”。</p>
+    <p>浏览器会保存布局偏好、最近项目的名称和定位信息（含 Drive 账号标识与项目标识），以及你授权的本地目录句柄，便于再次打开。PWA 缓存只保存应用静态资源，不保存 Drive 家谱、照片或访问令牌。编辑中的内容存在页面内存中；网络中断时未保存的编辑不会成为后台上传队列。</p>
+
+    <h2>服务器访问日志</h2>
+    <p>访问本站静态文件时，服务器记录 IP 地址、请求时间、请求地址、响应状态、浏览器信息及来源页面等常规访问与错误日志，用于故障排查和服务安全。它们不包含经 Drive API 直接传输的家谱、照片或令牌。当前服务器容器日志按大小轮转，每份最多约 10 MB、最多保留 3 份，旧日志随轮转覆盖；这不是固定天数的保留期限。维护者及其基础设施服务商可能在提供托管和运维服务时处理这些日志。</p>
+
+    <h2>保留、删除与撤销授权</h2>
+    <ul>
+      <li><strong>家谱与照片：</strong>保留在你的本地目录或 Google Drive，直到你自行删除。对于 Drive 项目，在应用内移除成员或照片只更新当前家谱中的引用，历史版本和对应照片文件不会自动物理删除。要删除整个 Drive 项目及其历史版本和照片，请在 Google Drive 中删除对应的项目文件夹，并按需清空回收站；回收站和备份的保留规则由相应存储服务决定。导出的备份需要另行删除。</li>
+      <li><strong>浏览器记录：</strong>点击首页最近项目旁的清除按钮可移除该条最近记录；清除该站点的浏览器数据可移除偏好、目录句柄和应用缓存。这不会删除本地目录或 Drive 中的资料。</li>
+      <li><strong>断开与撤销：</strong>本站“断开连接”清除当前页面的连接状态及此 OAuth 应用在当前站点保存的短期连接凭证，但不会撤销 Google 端已有授权，也不会删除云盘文件。要完全撤销，请前往 <a href="https://myaccount.google.com/connections">Google 账号的第三方连接</a>，找到 Family Tree 或对应的 t-d.fun 应用并移除访问权限。</li>
+    </ul>
+    <p>你可以通过上述邮箱提出隐私问题或关于本站持有的访问日志的请求。请勿在邮件中发送访问令牌、密码或完整家谱。本站不持有你的 Drive 文件副本，无法代替你删除云盘或本地目录中的资料。</p>
+
+    <h2>保护家人信息与政策更新</h2>
+    <p>添加他人的姓名、生日、关系、故事或照片前，请确保有权处理这些资料，并谨慎对待未成年人的信息。请保护自己的设备和 Google 账号，并定期导出备份。</p>
+    <p>如果应用的数据处理方式改变，我们会更新本页及更新日期，并同步必要的应用内说明和 Google 授权配置。</p>
+  </main>
+</body>
+</html>
