@@ -54,6 +54,49 @@ async function editMember(page: Page, withPhoto: boolean) {
   await page.getByRole('button', { name: '保存', exact: true }).click()
 }
 
+test('a recipient opens the shared family in the same list and browses photos without writing', async ({ page }) => {
+  const drive = await installGoogleDrive(page)
+  await createDriveProject(page)
+  await editMember(page, true)
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page).toHaveURL(/#\/tree$/)
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await page.getByRole('button', { name: '断开连接', exact: true }).click()
+  drive.useRecipientAccount()
+  await page.getByRole('button', { name: '连接 Google Drive', exact: true }).click()
+  await expect(page.getByText('recipient@example.invalid', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: projectName, exact: true }).click()
+  await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible()
+  await expect(page.getByText('仅查看', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '+ 新建成员', exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('rename-project')).toHaveCount(0)
+  const writes = drive.writes
+  const snapshot = JSON.stringify(drive.latestRevision())
+  const memberId = Object.keys(drive.latestRevision()!.family.members)[0]
+  await page.getByText('林云端', { exact: true }).click()
+  await page.getByRole('button', { name: '以选中为视角', exact: true }).click()
+  await expect(page.getByRole('button', { name: '清除视角', exact: true })).toBeVisible()
+  // The desktop grid must also remain a browsing surface: dragging cannot edit layout.
+  await page.getByRole('combobox', { name: '布局', exact: true }).selectOption('family-grid')
+  const node = page.locator(`[data-testid="member-node"][data-member-id="${memberId}"]`)
+  await expect(node).toBeVisible()
+  const bounds = (await node.boundingBox())!
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bounds.x + bounds.width / 2 + 80, bounds.y + bounds.height / 2 + 40, { steps: 10 })
+  await page.mouse.up()
+  await page.goto(`/#/member/${memberId}`)
+  await expect(page.getByLabel('名', { exact: true })).toBeDisabled()
+  await expect(page.getByRole('img', { name: '头像', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page).toHaveURL(/#\/tree$/)
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  expect(drive.writes).toBe(writes)
+  expect(JSON.stringify(drive.latestRevision())).toBe(snapshot)
+  expect(drive.errors).toEqual([])
+})
+
 test('mobile Web creates a Drive family with private WebP photos and restores its connection after reload', async ({ page }) => {
   const drive = await installGoogleDrive(page)
   await createDriveProject(page)

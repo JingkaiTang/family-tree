@@ -49,11 +49,11 @@ MyFamily.family/
 | `manualPositions` | 已废弃的旧手工坐标，仅为兼容保留 |
 | `gridLayoutOverrides` | 已废弃的旧网格偏好，仅为兼容保留 |
 | `rootMemberId` | 可选根成员引用 |
-| `defaultViewpointId` | 可选的上次视角成员引用 |
+| `defaultViewpointId` | 可选的项目默认视角成员引用（个人浏览视角另存本机） |
 
 未知字段会被保留，以便渐进兼容；核心字段仍必须通过 Zod 和关系图校验。
 
-布局模式选择、网格 pan/zoom、纵流聚焦点、展开分支和滚动位置属于设备本地 UI 状态，不写入 `family.json`。纵流布局复用 `siblingOrders` 的语义顺序，但不会读取或修改网格专用的 `layoutPreferences`，因此本次双布局能力不需要提升 schema 版本。
+个人浏览视角（按连接及项目隔离）、布局模式选择、网格 pan/zoom、纵流聚焦点、展开分支和滚动位置属于设备本地 UI 状态，不写入 `family.json`。纵流布局复用 `siblingOrders` 的语义顺序，但不会读取或修改网格专用的 `layoutPreferences`，因此本次双布局能力不需要提升 schema 版本。
 
 ## 关系图不变量
 

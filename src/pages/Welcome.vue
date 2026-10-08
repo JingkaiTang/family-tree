@@ -110,7 +110,7 @@ async function onCreateDrive() {
   error.value = null
   try {
     const result = await createProject({ providerId, id: 'root', displayName: name }, name)
-    family.setProject(result.project, result.meta, result.family)
+    family.setProject(result.project, result.meta, result.family, result.access)
     startAutosave()
     ui.showToast('success', `已新建家族：${name}`)
     await router.push('/tree')
@@ -128,7 +128,7 @@ async function onChooseDriveVersion(revisionId: string) {
   error.value = null
   try {
     const result = await selectGoogleDriveVersion(project, revisionId)
-    family.setProject(result.project, result.meta, result.family)
+    family.setProject(result.project, result.meta, result.family, result.access)
     startAutosave()
     ui.showToast('info', '已打开所选版本；其他版本仍保留在 Google Drive。')
     await router.push('/tree')
@@ -151,7 +151,7 @@ async function tryOpen(project: ProjectRef, restoring = false): Promise<boolean>
     conflictingProject.value = null
     driveVersions.value = []
     const result = await openProject(project)
-    family.setProject(result.project, result.meta, result.family)
+    family.setProject(result.project, result.meta, result.family, result.access)
     startAutosave()
     if (!restoring) ui.showToast('success', `已打开家族：${result.meta.name}`)
     await router.push('/tree')
@@ -183,7 +183,7 @@ async function onCreateExternal() {
     if (!project) return
     const name = project.displayName || '未命名家族'
     const result = await createProject(project, name)
-    family.setProject(result.project, result.meta, result.family)
+    family.setProject(result.project, result.meta, result.family, result.access)
     startAutosave()
     ui.showToast('success', `已新建家族：${name}`)
     await router.push('/tree')
@@ -335,7 +335,7 @@ onMounted(async () => {
       <section class="flex w-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4" aria-label="Google Drive 存储">
         <div>
           <h2 class="font-semibold text-slate-900">Google Drive</h2>
-          <p class="mt-1 text-xs text-slate-500">使用自己的 Google 账号保存家族资料与照片，可在不同设备打开。</p>
+          <p class="mt-1 text-xs text-slate-500">连接自己的 Google 账号，统一打开自己创建或他人共享的家谱。</p>
         </div>
         <p v-if="!googleDriveState.configured" class="text-xs text-slate-500">此站点尚未配置 Google Drive 连接。</p>
         <template v-else>
@@ -362,7 +362,8 @@ onMounted(async () => {
               <span class="text-slate-600">此应用可访问的家族</span>
               <button type="button" class="text-sky-700 disabled:opacity-50" :disabled="busy" @click="onRefreshDrive">刷新列表</button>
             </div>
-            <p v-if="!driveProjects.length" class="text-xs text-slate-500">暂无家族，可先新建一个。</p>
+            <p class="text-sm font-medium">可访问的家谱</p>
+            <p v-if="!driveProjects.length" class="text-xs text-slate-500">未找到可访问的家谱。可新建家谱，或确认共享账号后刷新列表。</p>
             <ul v-else class="flex max-h-48 flex-col gap-2 overflow-auto">
               <li v-for="project in driveProjects" :key="project.id">
                 <button type="button" class="w-full rounded border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:opacity-50" :disabled="busy" @click="onOpenDrive(project)">{{ project.displayName }}</button>

@@ -16,6 +16,7 @@ defineProps<{
   rootId?: string
   selectedId?: string | null
   viewpointId?: string | null
+  readOnly?: boolean
   layoutFocusId?: string | null
   getKinship?: (fromId: string, toId: string) => string | null
   initialGridView?: PanzoomView | null
@@ -47,6 +48,7 @@ const emit = defineEmits<{
     :root-id="rootId"
     :selected-id="selectedId"
     :viewpoint-id="viewpointId"
+    :read-only="readOnly"
     :get-kinship="getKinship"
     :initial-view="initialGridView"
     :layout-reset-version="layoutResetVersion"

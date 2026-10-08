@@ -1,8 +1,18 @@
 /** Browser-only Google Drive transport. Auth owns the short-lived credential cache. */
-export const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+export const GOOGLE_DRIVE_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.readonly',
+] as const
+export const GOOGLE_DRIVE_SCOPE = GOOGLE_DRIVE_SCOPES.join(' ')
+
+function hasRequiredScopes(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const granted = new Set(value.split(/\s+/))
+  return GOOGLE_DRIVE_SCOPES.every(scope => granted.has(scope))
+}
 const API_ROOT = 'https://www.googleapis.com/drive/v3/'
 const UPLOAD_ROOT = 'https://www.googleapis.com/upload/drive/v3/files'
-const FILE_FIELDS = 'id,name,mimeType,parents,appProperties,createdTime,size,trashed'
+const FILE_FIELDS = 'id,name,mimeType,parents,appProperties,createdTime,size,trashed,isAppAuthorized,capabilities(canAddChildren,canRename)'
 const JSON_LIMIT = 4 * 1024 * 1024
 const MULTIPART_LIMIT = 5 * 1024 * 1024
 // Drive requires non-final upload chunks to be a multiple of 256 KiB.
@@ -23,6 +33,8 @@ export interface DriveFile {
   createdTime?: string
   size?: string
   trashed?: boolean
+  isAppAuthorized?: boolean
+  capabilities?: { canAddChildren?: boolean; canRename?: boolean }
 }
 
 export interface DriveApi {
@@ -75,6 +87,21 @@ function parseFile(value: unknown): DriveFile {
   if (value.trashed !== undefined) {
     if (typeof value.trashed !== 'boolean') invalidResponse()
     file.trashed = value.trashed
+  }
+  if (value.isAppAuthorized !== undefined) {
+    if (typeof value.isAppAuthorized !== 'boolean') invalidResponse()
+    file.isAppAuthorized = value.isAppAuthorized
+  }
+  if (value.capabilities !== undefined) {
+    if (!record(value.capabilities)) invalidResponse()
+    file.capabilities = {}
+    for (const key of ['canAddChildren', 'canRename'] as const) {
+      const capability = value.capabilities[key]
+      if (capability !== undefined) {
+        if (typeof capability !== 'boolean') invalidResponse()
+        file.capabilities[key] = capability
+      }
+    }
   }
   return file
 }
@@ -481,7 +508,7 @@ export function createGoogleDriveAuth(clientId: string, options: GoogleDriveAuth
       if (!raw) return
       const saved: unknown = JSON.parse(raw)
       if (!record(saved) || saved.version !== 1 || saved.clientId !== clientId
-        || saved.scope !== GOOGLE_DRIVE_SCOPE || typeof saved.accessToken !== 'string' || !saved.accessToken
+        || !hasRequiredScopes(saved.scope) || typeof saved.accessToken !== 'string' || !saved.accessToken
         || typeof saved.expiresAt !== 'number' || !Number.isFinite(saved.expiresAt) || saved.expiresAt <= now()
         || typeof saved.permissionId !== 'string' || !saved.permissionId) {
         clearCache()
@@ -565,8 +592,8 @@ export function createGoogleDriveAuth(clientId: string, options: GoogleDriveAuth
               const lifetime = Number(response.expires_in)
               const token = response.access_token
               if (response.error || typeof token !== 'string' || !token || !Number.isFinite(lifetime) || lifetime <= 30
-                || typeof response.scope !== 'string' || !response.scope.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE)) {
-                finish(new DriveError('auth-failed', '未获得 Google Drive 所需权限，请重新授权'))
+                || !hasRequiredScopes(response.scope)) {
+                finish(new DriveError('auth-failed', '未获得 Google Drive 所需的读取与应用文件权限，请重新连接并完成授权'))
                 return
               }
               const deadline = now() + (lifetime - 30) * 1000

@@ -144,11 +144,12 @@ export function createGoogleDriveConnection(clientId: string, authOverride?: Goo
       return (await provider(providerId).listProjects()).map(project => ({ ...project, providerId }))
     },
     listVersions(ref: ProjectRef) { return provider(ref.providerId).listVersions(ref.id) },
+    getProjectAccess(ref: ProjectRef) { return provider(ref.providerId).getProjectAccess(ref.id) },
     async selectVersion(ref: ProjectRef, revisionId: string) {
       const loaded = await provider(ref.providerId).loadVersion(ref.id, revisionId)
       return validateLoadedProject({
         ref: { ...ref, id: loaded.id, displayName: loaded.displayName },
-        meta: loaded.meta, family: loaded.family,
+        meta: loaded.meta, family: loaded.family, access: loaded.access,
       })
     },
     resolveConflict(ref: ProjectRef, family: FamilyData, heads: string[]) {
@@ -168,5 +169,6 @@ export const isGoogleDriveProvider = connection.isProvider
 export const registerGoogleDriveProviders = connection.registerWith
 export const listGoogleDriveProjects = connection.listProjects
 export const listGoogleDriveVersions = connection.listVersions
+export const getGoogleDriveProjectAccess = connection.getProjectAccess
 export const selectGoogleDriveVersion = connection.selectVersion
 export const resolveGoogleDriveConflict = connection.resolveConflict

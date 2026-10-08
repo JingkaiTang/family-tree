@@ -9,6 +9,7 @@ import type { FamilyData } from '@/core/schema'
 import {
   googleDriveState,
   prepareGoogleDrive,
+  getGoogleDriveProjectAccess,
   isGoogleDriveProvider,
   listGoogleDriveVersions,
   selectGoogleDriveVersion,
@@ -62,8 +63,11 @@ async function onReconnect() {
     // OAuth 只从这个点击发起，后台自动保存和媒体请求不会打开授权窗口。
     await authorizeProject(project)
     if (family.projectToken !== token) return
+    const access = await getGoogleDriveProjectAccess(project)
+    if (family.projectToken !== token) return
+    family.setAccess(access)
     await flushNow()
-    if (family.projectToken === token) ui.showToast('success', 'Google Drive 已连接，修改已保存')
+    if (family.projectToken === token) ui.showToast('success', family.canEdit ? 'Google Drive 已连接，修改已保存' : 'Google Drive 已连接，可继续查看')
   } catch (e) {
     if (family.projectToken === token) report(e)
   } finally {
@@ -102,7 +106,7 @@ async function onSelectVersion(revisionId: string) {
     if (family.revision !== revision) {
       throw new Error('读取版本期间又产生了修改，未切换版本。请先导出草稿，再重新选择版本，或确认以当前内容解决冲突后继续。')
     }
-    family.setProject(result.project, result.meta, result.family)
+    family.setProject(result.project, result.meta, result.family, result.access)
     ui.setSelected(null)
     ui.setViewpoint(null)
     ui.setCanvasView(null)
@@ -117,6 +121,7 @@ async function onSelectVersion(revisionId: string) {
 }
 
 async function onResolveConflict() {
+  if (!family.canEdit) return
   const project = family.projectRef
   const token = family.projectToken
   if (!project || busy.value) return
@@ -166,13 +171,13 @@ function onPrepareDraft() {
 <template>
   <aside v-if="active" class="fixed bottom-[max(.75rem,env(safe-area-inset-bottom))] right-3 z-40 max-h-[60vh] w-[min(26rem,calc(100vw-1.5rem))] overflow-auto rounded-lg border border-slate-300 bg-white p-3 text-sm shadow-lg" aria-label="Google Drive 保存状态">
     <details :open="Boolean(currentError)">
-      <summary class="cursor-pointer text-slate-700">Google Drive · {{ currentError ? '需要处理' : family.isDirty ? '修改尚未保存' : '已保存' }}</summary>
+      <summary class="cursor-pointer text-slate-700">Google Drive · {{ currentError ? '需要处理' : family.isDirty ? '修改尚未保存' : !family.canEdit ? '仅查看' : '已保存' }}</summary>
       <div class="mt-3 flex flex-col gap-3">
         <p v-if="currentError" role="alert" class="break-words text-rose-700">{{ currentError }}</p>
         <button v-if="!googleDriveState.ready && currentError" type="button" class="self-start text-sky-800 disabled:opacity-50" :disabled="busy" @click="onPrepareDrive">重试加载 Google 授权</button>
-        <p class="text-xs text-slate-500">修改只有上传成功后才算保存。授权过期时请重新连接；冲突版本会保留，内容不会自动合并。</p>
+        <p class="text-xs text-slate-500">{{ family.canEdit ? '修改只有上传成功后才算保存。授权过期时请重新连接；冲突版本会保留，内容不会自动合并。' : '当前连接仅查看此项目。授权过期时可重新连接；如需编辑，请确认文件夹及应用访问权限，再点击重新连接以刷新权限。' }}</p>
         <div class="flex flex-wrap gap-2">
-          <button type="button" class="rounded border border-slate-300 px-3 py-2 disabled:opacity-50" :disabled="busy || googleDriveState.busy || !googleDriveState.ready" @click="onReconnect">重新连接并保存</button>
+          <button type="button" class="rounded border border-slate-300 px-3 py-2 disabled:opacity-50" :disabled="busy || googleDriveState.busy || !googleDriveState.ready" @click="onReconnect">{{ family.canEdit ? '重新连接并保存' : '重新连接' }}</button>
           <button type="button" class="rounded border border-slate-300 px-3 py-2 disabled:opacity-50" :disabled="busy || !googleDriveState.ready" @click="onListVersions">查看历史与冲突版本</button>
         </div>
         <template v-if="versions.length">
@@ -181,7 +186,7 @@ function onPrepareDraft() {
               <button type="button" class="text-left text-sky-800 disabled:opacity-50" :disabled="busy" @click="onSelectVersion(version.id)">{{ version.createdTime }}{{ version.isHead ? '（当前分支）' : '' }}</button>
             </li>
           </ul>
-          <button type="button" class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 disabled:opacity-50" :disabled="busy" @click="onResolveConflict">以当前内容解决冲突</button>
+          <button v-if="family.canEdit" type="button" class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 disabled:opacity-50" :disabled="busy" @click="onResolveConflict">以当前内容解决冲突</button>
         </template>
         <div class="flex flex-col items-start gap-2 border-t border-slate-200 pt-3">
           <button type="button" class="text-sky-800" @click="onPrepareDraft">生成草稿 JSON（不含照片）</button>

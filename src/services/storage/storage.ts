@@ -65,6 +65,7 @@ export function createStorage(
         ref: { providerId, id: loaded.id, displayName: loaded.displayName },
         meta: loaded.meta,
         family: loaded.family,
+        ...(loaded.access ? { access: loaded.access } : {}),
       }
     },
     async saveProject(ref: ProjectRef, family: FamilyData): Promise<void> {

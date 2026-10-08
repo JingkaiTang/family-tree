@@ -1,10 +1,10 @@
 import { FamilyData, ProjectMeta, SCHEMA_VERSION, createEmptyMeta } from '@/core/schema'
 import { migrate } from '@/core/migrate'
 import { assertFamilyIntegrity } from '@/core/familyIntegrity'
-import type { ProjectRef } from './storage/types'
+import type { ProjectRef, ProjectAccess } from './storage/types'
 import type { OpenResult } from './projectService'
 
-export function validateLoadedProject(loaded: { ref: ProjectRef; meta: unknown; family: unknown }): OpenResult {
+export function validateLoadedProject(loaded: { ref: ProjectRef; meta: unknown; family: unknown; access?: ProjectAccess }): OpenResult {
   const migrated = migrate(loaded.family)
   const parsed = FamilyData.safeParse(migrated)
   if (!parsed.success) {
@@ -21,5 +21,5 @@ export function validateLoadedProject(loaded: { ref: ProjectRef; meta: unknown; 
   const meta = parsedMeta.success
     ? { ...parsedMeta.data, schemaVersion: parsed.data.schemaVersion }
     : createEmptyMeta(loaded.ref.displayName || '未命名家族')
-  return { project: loaded.ref, meta, family: parsed.data }
+  return { project: loaded.ref, meta, family: parsed.data, ...(loaded.access ? { access: loaded.access } : {}) }
 }

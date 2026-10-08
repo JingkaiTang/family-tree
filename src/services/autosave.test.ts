@@ -6,8 +6,22 @@ import { mk } from '@/__tests__/fixtures/families'
 import { useFamilyStore } from '@/stores/family'
 import { createAutosaveController, installPageLifecycleFlush } from './autosave'
 import type { ProjectRef } from '@/services/storage/types'
+import { ProjectReadOnlyError } from '@/services/storage/types'
 
 describe('autosave coordinator', () => {
+  it('stops writes on permission loss and preserves the unsaved draft', async () => {
+    const family = openedFamily()
+    const save = vi.fn(async () => { throw new ProjectReadOnlyError() })
+    const controller = createAutosaveController(family, { save })
+    family.upsertMember(mk('draft'))
+    await expect(controller.flushNow()).rejects.toThrow('仅查看')
+    expect(family.canEdit).toBe(false)
+    expect(family.isDirty).toBe(true)
+    expect(family.getMember('draft')).toBeDefined()
+    await expect(controller.flushNow()).rejects.toThrow('仅查看')
+    expect(save).toHaveBeenCalledOnce()
+  })
+
   beforeEach(() => {
     setActivePinia(createPinia())
   })

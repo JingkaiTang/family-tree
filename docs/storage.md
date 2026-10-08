@@ -83,7 +83,7 @@ interface ProjectRef {
 
 ## Google Drive 与可靠性
 
-- `googleDriveClient.ts` 封装 GIS token 授权与 Drive v3 REST；只申请 `drive.file`，通过 `about.get` 的 `permissionId` 确认账号。Access token 与原到期时间、账号标识由认证模块单独写入按 Client ID 隔离的 localStorage；启动时通过 Drive 核验账号后恢复，过期/401/断开时清除，存储不可用时退回仅内存连接。过期后由用户点击重连；无 Client Secret、刷新令牌或后台授权弹窗。
+- `googleDriveClient.ts` 封装 GIS token 授权与 Drive v3 REST；在同一次连接中申请 `drive.readonly` 与 `drive.file`，分别用于统一读取可访问的项目和写入应用已获授权的文件，通过 `about.get` 的 `permissionId` 确认账号。Access token 与原到期时间、账号标识由认证模块单独写入按 Client ID 隔离的 localStorage；启动时通过 Drive 核验账号后恢复，过期/401/断开时清除，存储不可用时退回仅内存连接。过期后由用户点击重连；无 Client Secret、刷新令牌或后台授权弹窗。
 - `googleDriveConnection.ts` 将连接状态、账号隔离、项目列表和版本操作接入 UI。REST 客户端校验响应与大小，处理分页、超时和有限重试；上传使用预生成文件 ID，遇到结果不确定时检查同一 ID 的内容，避免盲目追加重复文件。
 - 超过 5 MiB 的文件使用 resumable 上传，每片最多 1 MiB；响应丢失时先查询进度再续传。有进展不会消耗连续失败预算，连续八次失败或无进展会停止，并保留待保存状态。
 - `googleDrive.ts` 使用本应用的 `appProperties` 标记识别项目、快照和照片，不按可重名的文件名识别。项目只列出本 OAuth 应用可访问的项目文件夹，不提供全盘 Picker 或亲友共享流程。

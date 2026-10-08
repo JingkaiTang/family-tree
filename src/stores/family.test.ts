@@ -5,6 +5,19 @@ import { mk } from '@/__tests__/fixtures/families'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 
 describe('family store relation invariants', () => {
+  it('blocks domain edits before changing a read-only project', () => {
+    const family = useFamilyStore()
+    family.setProject({ providerId: 'reader', id: 'shared', displayName: '共享家谱' },
+      createEmptyMeta('共享家谱'), { ...createEmptyFamily(), members: { a: mk('a') } },
+      { canEdit: false, canRename: false })
+    const before = JSON.stringify(family.data)
+    expect(() => family.updateMember('a', { firstName: 'changed' })).toThrow('仅查看')
+    expect(() => family.deleteMember('a')).toThrow('仅查看')
+    expect(() => family.setRootMember('a')).toThrow('仅查看')
+    expect(JSON.stringify(family.data)).toBe(before)
+    expect(family.isDirty).toBe(false)
+  })
+
   beforeEach(() => {
     setActivePinia(createPinia())
   })

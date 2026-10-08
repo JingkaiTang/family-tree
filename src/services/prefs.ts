@@ -12,6 +12,26 @@ const PREVIOUS_PROJECT_KEY = 'family-tree:lastProject'
 const LEGACY_PROJECT_PATH_KEY = 'family-tree:lastProjectPath'
 const LAYOUT_MODE_KEY = 'family-tree:layoutModePreference'
 
+function viewpointKey(project: ProjectRef): string {
+  return `family-tree:viewpoint:${JSON.stringify([project.providerId, project.id])}`
+}
+
+/** undefined means no local preference; null explicitly clears the project default. */
+export function getProjectViewpoint(project: ProjectRef): string | null | undefined {
+  try {
+    const raw = localStorage.getItem(viewpointKey(project))
+    if (raw === null) return undefined
+    const value: unknown = JSON.parse(raw)
+    if (value === null || typeof value === 'string') return value
+  } catch { /* Preferences are optional. */ }
+  return undefined
+}
+
+export function setProjectViewpoint(project: ProjectRef, memberId: string | null): void {
+  try { localStorage.setItem(viewpointKey(project), JSON.stringify(memberId)) }
+  catch { /* Keep the current page's browsing state when storage is unavailable. */ }
+}
+
 function parseProjectRef(value: unknown): ProjectRef | null {
   if (!isProjectRef(value)) return null
   return { providerId: value.providerId, id: value.id, displayName: value.displayName }

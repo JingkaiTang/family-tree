@@ -48,7 +48,9 @@ class MemoryDrive implements DriveApi {
     this.creates.push(metadata.id)
     await this.beforeCreate?.(metadata)
     if (this.files.has(metadata.id)) throw new Error('conflict: existing ID')
-    const file = { ...structuredClone(metadata), createdTime: new Date(this.sequence * 1000).toISOString(), size: String(content?.size ?? 0) }
+    const file = { ...structuredClone(metadata), isAppAuthorized: true,
+      capabilities: { canAddChildren: true, canRename: true },
+      createdTime: new Date(this.sequence * 1000).toISOString(), size: String(content?.size ?? 0) }
     this.files.set(file.id, file)
     if (content) this.contents.set(file.id, content)
     await this.afterCreate?.(metadata)
@@ -73,6 +75,34 @@ async function revision(api: MemoryDrive, id: string) {
 }
 
 describe('Google Drive immutable project storage', () => {
+  it.each([
+    { isAppAuthorized: false, capabilities: { canAddChildren: true, canRename: true } },
+    { isAppAuthorized: undefined, capabilities: { canAddChildren: true } },
+    { isAppAuthorized: true, capabilities: undefined },
+  ])('requires both app authorization and folder capabilities before writing: %j', async permissions => {
+    const { api, provider, projectId } = await fixture()
+    Object.assign(api.files.get(projectId)!, permissions)
+    expect((await provider.loadProject(projectId)).access).toEqual({ canEdit: false, canRename: false })
+    const writes = api.creates.length
+    await expect(provider.saveProject(projectId, family('forbidden'))).rejects.toThrow('仅查看')
+    expect(api.creates).toHaveLength(writes)
+  })
+
+  it('discovers and loads shared projects but refuses writes when the folder cannot accept children', async () => {
+    const { api, projectId } = await fixture()
+    Object.assign(api.files.get(projectId)!, { capabilities: { canAddChildren: false, canRename: false } })
+    const reader = createGoogleDriveStorage('google-drive:recipient', api)
+    expect(await reader.listProjects()).toContainEqual({ id: projectId, displayName: '测试家族' })
+    expect(await reader.loadProject(projectId)).toMatchObject({
+      family: family('initial'), access: { canEdit: false, canRename: false },
+    })
+    const writes = api.creates.length
+    await expect(reader.saveProject(projectId, family('forbidden'))).rejects.toThrow('仅查看')
+    await expect(reader.renameProject!(projectId, 'forbidden')).rejects.toThrow('仅查看')
+    await expect(reader.importPhoto(projectId, new Uint8Array([1]), 'image/png')).rejects.toThrow('仅查看')
+    expect(api.creates).toHaveLength(writes)
+  })
+
   it('creates discoverable projects and keeps every saved snapshot across fresh connections', async () => {
     const { api, provider, projectId } = await fixture()
     await provider.saveProject(projectId, family('changed'))

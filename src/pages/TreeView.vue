@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
+import { getProjectViewpoint, setProjectViewpoint } from '@/services/prefs'
 import { flushNow, startAutosave } from '@/services/autosave'
 import TreeLayoutHost from '@/components/tree/TreeLayoutHost.vue'
 import SearchBar from '@/components/search/SearchBar.vue'
@@ -34,6 +35,7 @@ const {
 
 const saveStatus = computed(() => {
   if (!family.projectRef) return ''
+  if (!family.canEdit) return isDirty.value ? '仅查看 · 有未保存草稿' : '仅查看'
   if (isDirty.value) return '未保存…'
   return '已保存'
 })
@@ -61,7 +63,7 @@ const canRestoreDefaultLayout = computed(() => {
 })
 
 function restoreDefaultLayout() {
-  if (!canRestoreDefaultLayout.value) return
+  if (!family.canEdit || !canRestoreDefaultLayout.value) return
   family.clearAllLayoutOrderPreferences()
   ui.setCanvasView(null)
   layoutResetVersion.value += 1
@@ -112,7 +114,7 @@ async function onBack() {
 async function onSaveNow() {
   const project = family.projectRef
   const projectToken = family.projectToken
-  if (!project) return
+  if (!project || !family.canEdit) return
   try {
     await authorizeProject(project)
     if (family.projectToken !== projectToken) return
@@ -171,7 +173,7 @@ onBeforeUnmount(() => {
 })
 
 function openNameDialog(mode: 'rename' | 'copy') {
-  if (!family.projectMeta || nameBusy.value) return
+  if (!family.projectMeta || nameBusy.value || (mode === 'rename' && !family.canRename)) return
   projectName.value = family.projectMeta.name
   nameError.value = ''
   nameMode.value = mode
@@ -204,7 +206,7 @@ async function submitProjectName() {
 async function onRenameProject(name: string) {
   const project = family.projectRef
   const token = family.projectToken
-  if (!project) return
+  if (!project || !family.canRename) return
   renaming.value = true
   try {
     await authorizeProject(project)
@@ -249,7 +251,7 @@ async function onCopyToDrive(name: string) {
       ui.showToast('info', 'Google Drive 副本已创建。上传期间又有修改，当前项目保持打开；可在首页打开副本。')
       return
     }
-    family.setProject(result.project, result.meta, result.family)
+    family.setProject(result.project, result.meta, result.family, result.access)
     startAutosave()
     ui.showToast('success', '已另存到 Google Drive，并打开副本')
   } catch (error) {
@@ -283,37 +285,24 @@ function onOpen(id: string) {
 
 function setViewpoint() {
   ui.setViewpoint(selectedId.value)
-  // 持久化到项目文件：下次打开该家族会自动以这个人为视角并聚焦画布
-  family.setDefaultViewpoint(selectedId.value ?? undefined)
+  if (family.projectRef) setProjectViewpoint(family.projectRef, selectedId.value)
 }
 
 function clearViewpoint() {
   ui.setViewpoint(null)
-  family.setDefaultViewpoint(undefined)
+  if (family.projectRef) setProjectViewpoint(family.projectRef, null)
 }
 
-/**
- * 进入 TreeView 时若项目里存了 defaultViewpointId，恢复到 UI store。
- * 称呼视角与纵流聚焦点分别维护，避免选择或切换布局时互相覆盖。
- *
- * 会话策略：
- *   - UI 里已有视角且仍然有效 → 保留（从 MemberDetail 返回时不重置画布位置）
- *   - UI 里视角指向不存在的成员（如换了项目）→ 清掉，走默认视角恢复
- *   - UI 没视角 → 从 data.defaultViewpointId 恢复
- *   - data.defaultViewpointId 也失效 → 清空项目里的存值
- */
+/** Browser-specific viewpoint never writes to a shared family project. */
 onMounted(() => {
   void prepareGoogleDrive().catch(() => undefined)
   if (ui.viewpointId && !family.getMember(ui.viewpointId)) {
     ui.setViewpoint(null)
   }
   if (!ui.viewpointId) {
-    const stored = data.value.defaultViewpointId
-    if (stored && !family.getMember(stored)) {
-      family.setDefaultViewpoint(undefined)
-    } else if (stored) {
-      ui.setViewpoint(stored)
-    }
+    const local = family.projectRef ? getProjectViewpoint(family.projectRef) : undefined
+    const stored = local === undefined ? data.value.defaultViewpointId : local
+    if (stored && family.getMember(stored)) ui.setViewpoint(stored)
   }
   ensureLayoutFocus()
 })
@@ -353,11 +342,13 @@ async function onGcMedia() {
 }
 
 function onAddMember() {
+  if (!family.canEdit) return
   router.push({ name: 'member-new' })
 }
 
 // M3 验证用：快速添加一个祖孙三代 fixture
 function seedFixture() {
+  if (!family.canEdit) return
   const gpa = uuidv4()
   const gma = uuidv4()
   const dad = uuidv4()
@@ -406,7 +397,7 @@ function seedFixture() {
           <div class="flex min-w-0 items-center gap-2">
             <h2 class="truncate text-lg font-semibold">{{ projectMeta?.name ?? '（未打开项目）' }}</h2>
             <button
-              v-if="projectMeta"
+              v-if="projectMeta && family.canRename"
               data-testid="rename-project"
               class="shrink-0 rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50"
               :disabled="nameBusy"
@@ -443,6 +434,7 @@ function seedFixture() {
         </label>
         <span class="text-xs text-slate-500">成员：{{ memberCount }}</span>
         <button
+          v-if="family.canEdit"
           class="rounded bg-slate-900 px-3 py-1 text-sm text-white hover:bg-slate-700"
           @click="onAddMember"
         >
@@ -470,7 +462,7 @@ function seedFixture() {
           清除视角
         </button>
         <button
-          v-if="resolvedLayoutMode === 'family-grid'"
+          v-if="family.canEdit && resolvedLayoutMode === 'family-grid'"
           data-testid="restore-default-layout"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="!canRestoreDefaultLayout"
@@ -479,7 +471,7 @@ function seedFixture() {
           恢复默认布局
         </button>
         <button
-          v-if="memberCount === 0"
+          v-if="memberCount === 0 && family.canEdit"
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"
           @click="seedFixture"
         >
@@ -490,7 +482,7 @@ function seedFixture() {
         </span>
         <button
           class="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50"
-          :disabled="!isDirty"
+          :disabled="!isDirty || !family.canEdit"
           @click="onSaveNow"
         >
           立即保存
@@ -538,6 +530,7 @@ function seedFixture() {
     <main class="min-h-0 flex-1">
       <TreeLayoutHost
         :mode="resolvedLayoutMode"
+        :read-only="!family.canEdit"
         :data="family.data"
         :root-id="rootId"
         :selected-id="selectedId"

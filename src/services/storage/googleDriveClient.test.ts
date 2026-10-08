@@ -400,6 +400,19 @@ function authFixture(overrides: GoogleDriveAuthOptions & { response?: unknown; c
 }
 
 describe('Google Drive authorization', () => {
+  it('requests both discovery/read and app-file write access and accepts reordered scopes', async () => {
+    const test = authFixture()
+    await test.auth.prepare()
+    const connected = test.auth.authorize()
+    expect(test.config()?.scope.split(' ').sort()).toEqual([
+      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/drive.readonly',
+    ])
+    test.callback({ access_token: 'test-token', expires_in: 3600,
+      scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file' })
+    await expect(connected).resolves.toEqual(account)
+  })
+
   it('loads GIS only on explicit preparation and requests the popup synchronously on click', async () => {
     const test = authFixture()
     expect(test.loadIdentity).not.toHaveBeenCalled()
@@ -434,6 +447,7 @@ describe('Google Drive authorization', () => {
   })
 
   it.each([
+    { access_token: 'token', expires_in: 3600, scope: 'https://www.googleapis.com/auth/drive.file' },
     { access_token: 'token', expires_in: 3600, scope: 'https://www.googleapis.com/auth/drive.readonly' },
     { access_token: 'token', expires_in: 3600, scope: '' },
     { access_token: 'token', expires_in: 'not-a-number', scope: GOOGLE_DRIVE_SCOPE },
@@ -532,6 +546,21 @@ async function saveSession(storage: GoogleDriveAuthOptions['storage'], now = () 
 }
 
 describe('Google Drive remembered connection', () => {
+  it('discards a legacy file-only session instead of silently restoring a partial project list', async () => {
+    const { storage, data } = sessionStorageFixture()
+    await saveSession(storage)
+    const key = [...data.keys()][0]
+    const saved = JSON.parse(data.get(key)!)
+    saved.scope = 'https://www.googleapis.com/auth/drive.file'
+    storage.setItem(key, JSON.stringify(saved))
+    const reopened = authFixture({ storage, now: () => 2000 })
+    await reopened.auth.prepare()
+    expect(reopened.auth.getAccount()).toBeNull()
+    expect(reopened.fetch).not.toHaveBeenCalled()
+    expect(reopened.requestAccessToken).not.toHaveBeenCalled()
+    expect(data.size).toBe(0)
+  })
+
   it('restores a verified account in a new instance without OAuth or extending the deadline', async () => {
     const { storage, data } = sessionStorageFixture()
     await saveSession(storage)

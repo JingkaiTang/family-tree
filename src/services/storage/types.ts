@@ -1,5 +1,18 @@
 import type { FamilyData, ProjectMeta } from '@/core/schema'
 
+/** Current connection capabilities; never persisted as part of the family data. */
+export interface ProjectAccess {
+  canEdit: boolean
+  canRename: boolean
+}
+
+export class ProjectReadOnlyError extends Error {
+  constructor(message = '当前项目仅查看，无法保存修改；需要文件编辑权限及应用写入授权。') {
+    super(message)
+    this.name = 'ProjectReadOnlyError'
+  }
+}
+
 /** 可持久化的位置引用。id 只由对应提供商解释，不能假定是路径。 */
 export interface ProjectRef {
   readonly providerId: string
@@ -13,6 +26,7 @@ export interface StoredProject {
   displayName: string
   meta: unknown
   family: unknown
+  access?: ProjectAccess
 }
 
 export interface CreatedProject {

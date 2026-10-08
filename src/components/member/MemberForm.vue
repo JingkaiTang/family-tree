@@ -7,6 +7,7 @@ const props = withDefaults(defineProps<{
   modelValue: Member
   canDelete?: boolean
   saving?: boolean
+  readOnly?: boolean
 }>(), { canDelete: true, saving: false })
 
 const emit = defineEmits<{
@@ -46,8 +47,8 @@ function onPhotoChange(photoId: string | undefined) {
 </script>
 
 <template>
-  <form @submit.prevent="!saving && !mediaPending && emit('save')">
-    <fieldset :disabled="saving" class="space-y-4">
+  <form @submit.prevent="!readOnly && !saving && !mediaPending && emit('save')">
+    <fieldset :disabled="saving || readOnly" class="space-y-4">
       <PhotoPicker
         :photo-id="local.photoId"
         @change="onPhotoChange"
@@ -165,7 +166,7 @@ function onPhotoChange(photoId: string | undefined) {
         ></textarea>
       </label>
 
-      <div class="flex flex-wrap justify-between gap-3">
+      <div v-if="!readOnly" class="flex flex-wrap justify-between gap-3">
         <button
           v-if="canDelete !== false"
           type="button"

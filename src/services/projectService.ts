@@ -7,12 +7,13 @@ import { assertFamilyIntegrity } from '@/core/familyIntegrity'
 import { validateLoadedProject } from './projectValidation'
 import * as api from './storage'
 import type { ProjectRef } from './storage'
-import { normalizeProjectName } from './storage/types'
+import { normalizeProjectName, type ProjectAccess } from './storage/types'
 
 export interface OpenResult {
   project: ProjectRef
   meta: ProjectMeta
   family: FamilyData
+  access?: ProjectAccess
 }
 
 /**

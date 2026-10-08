@@ -4,6 +4,8 @@ import {
   getLayoutModePreference,
   setLastProjectRef,
   setLayoutModePreference,
+  getProjectViewpoint,
+  setProjectViewpoint,
 } from './prefs'
 
 const providers = vi.hoisted(() => new Set<string>())
@@ -36,6 +38,16 @@ afterEach(() => {
 })
 
 describe('recent project preferences', () => {
+  it('keeps browsing viewpoint per connection/project, including an explicit clear', () => {
+    expect(getProjectViewpoint(project)).toBeUndefined()
+    setProjectViewpoint(project, 'member-a')
+    expect(getProjectViewpoint(project)).toBe('member-a')
+    expect(getProjectViewpoint({ ...project, providerId: 'another-account' })).toBeUndefined()
+    expect(getProjectViewpoint({ ...project, id: 'another-project' })).toBeUndefined()
+    setProjectViewpoint(project, null)
+    expect(getProjectViewpoint(project)).toBeNull()
+  })
+
   it('保留当前部署的 Drive 账号引用，刷新后无需 token 也能显示重新连接入口', () => {
     const remote = { providerId: 'google-drive:configured-client:known-account', id: 'cloud-folder', displayName: '云端家族' }
     setLastProjectRef(remote)

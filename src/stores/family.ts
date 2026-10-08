@@ -26,7 +26,7 @@ import {
   reconcileSiblingOrders,
 } from '@/core/siblingOrder'
 import { setLastProjectRef } from '@/services/prefs'
-import type { ProjectRef } from '@/services/storage/types'
+import { ProjectReadOnlyError, type ProjectRef, type ProjectAccess } from '@/services/storage/types'
 
 /**
  * family store 的职责：
@@ -41,6 +41,17 @@ export const useFamilyStore = defineStore('family', () => {
   const projectMeta = ref<ProjectMeta | null>(null)
   const data = ref<FamilyData>(createEmptyFamily())
   const isDirty = ref(false)
+  const access = ref<ProjectAccess>({ canEdit: true, canRename: true })
+  const canEdit = computed(() => access.value.canEdit)
+  const canRename = computed(() => access.value.canEdit && access.value.canRename)
+
+  function requireEditable() {
+    if (!canEdit.value) throw new ProjectReadOnlyError()
+  }
+
+  function setAccess(value: ProjectAccess) {
+    access.value = { ...value }
+  }
   /** 当前项目会话标识；切换或关闭项目时递增，防止旧保存回写新会话状态。 */
   const projectToken = ref(0)
   /** 当前项目数据修订号；每次受控变更严格递增。 */
@@ -51,7 +62,8 @@ export const useFamilyStore = defineStore('family', () => {
   const membersArray = computed(() => Object.values(data.value.members))
   const memberCount = computed(() => membersArray.value.length)
 
-  function setProject(project: ProjectRef, meta: ProjectMeta, family: FamilyData) {
+  function setProject(project: ProjectRef, meta: ProjectMeta, family: FamilyData, permissions: ProjectAccess = { canEdit: true, canRename: true }) {
+    setAccess(permissions)
     projectToken.value += 1
     isDirty.value = false
     revision.value = 0
@@ -76,6 +88,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function closeProject() {
+    setAccess({ canEdit: true, canRename: true })
     projectToken.value += 1
     isDirty.value = false
     revision.value = 0
@@ -101,6 +114,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function markDirty() {
+    requireEditable()
     isDirty.value = true
     // autosave 同步订阅 revision；首个变更也必须先处于 dirty 状态。
     revision.value += 1
@@ -113,12 +127,14 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function upsertMember(member: Member) {
+    requireEditable()
     data.value.members[member.id] = member
     data.value.siblingOrders = reconcileSiblingOrders(data.value)
     markDirty()
   }
 
   function updateMember(id: string, patch: Partial<Member>) {
+    requireEditable()
     const m = data.value.members[id]
     if (!m) return
     data.value.members[id] = { ...m, ...patch }
@@ -129,6 +145,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function deleteMember(id: string) {
+    requireEditable()
     const m = data.value.members[id]
     if (!m) return
     // 在其他成员的关系列表中移除对它的引用
@@ -201,6 +218,7 @@ export const useFamilyStore = defineStore('family', () => {
     otherId: string,
     opts: { replaceConflicts?: boolean } = {},
   ): LinkCurrentSpouseResult {
+    requireEditable()
     if (memberId === otherId) return { ok: false, conflicts: [] }
     const me = data.value.members[memberId]
     const other = data.value.members[otherId]
@@ -235,6 +253,7 @@ export const useFamilyStore = defineStore('family', () => {
    * 自动维护双向一致。
    */
   function linkRelation(memberId: string, otherId: string, kind: RelationKind) {
+    requireEditable()
     if (memberId === otherId) return
     const me = data.value.members[memberId]
     const other = data.value.members[otherId]
@@ -274,6 +293,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function unlinkRelation(memberId: string, otherId: string, kind: RelationKind) {
+    requireEditable()
     const me = data.value.members[memberId]
     const other = data.value.members[otherId]
     if (!me || !other) return
@@ -304,6 +324,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setSiblingOrder(parentageId: string, memberIds: string[] | null) {
+    requireEditable()
     const group = listSiblingOrderGroups(data.value).find(value => value.id === parentageId)
     if (group === undefined) return
 
@@ -321,6 +342,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setNicknameOverride(fromId: string, toId: string, label: string | null) {
+    requireEditable()
     if (!data.value.nicknameOverrides[fromId]) {
       data.value.nicknameOverrides[fromId] = {}
     }
@@ -336,18 +358,21 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setRootMember(id: string | undefined) {
+    requireEditable()
     data.value.rootMemberId = id
     markDirty()
   }
 
   /** 保存上次选用的视角成员到项目文件。下次打开自动恢复。传 undefined 清空。 */
   function setDefaultViewpoint(id: string | undefined) {
+    requireEditable()
     if (data.value.defaultViewpointId === id) return
     data.value.defaultViewpointId = id
     markDirty()
   }
 
   function setChildLayoutAssignment(id: string, assignment: ChildLayoutAssignment | null) {
+    requireEditable()
     if (!data.value.members[id]) return
     data.value.childLayoutAssignments ??= {}
 
@@ -360,6 +385,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setGridLayoutOverride(slotId: string, override: GridLayoutOverride | null) {
+    requireEditable()
     data.value.gridLayoutOverrides ??= {}
 
     if (!override) {
@@ -395,6 +421,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function setFamilyAccentAssignment(unitId: string, accent: string | null) {
+    requireEditable()
     if (accent === null) delete data.value.layoutPreferences.familyAccentAssignments[unitId]
     else data.value.layoutPreferences.familyAccentAssignments[unitId] = accent
     markDirty()
@@ -406,6 +433,7 @@ export const useFamilyStore = defineStore('family', () => {
    * 且是"平移前"的原始坐标（参见 layoutFamilyTree 的 offsetX 字段）。
    */
   function setManualPosition(id: string, cx: number, top: number) {
+    requireEditable()
     if (!data.value.members[id]) return
     data.value.manualPositions[id] = { cx, top }
     markDirty()
@@ -413,6 +441,7 @@ export const useFamilyStore = defineStore('family', () => {
 
   /** 撤销某成员的手工位置，回到算法布局 */
   function clearManualPosition(id: string) {
+    requireEditable()
     if (data.value.manualPositions[id]) {
       delete data.value.manualPositions[id]
       markDirty()
@@ -420,6 +449,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function applyLayoutPreferenceUpdate(nextData: FamilyData) {
+    requireEditable()
     if (
       JSON.stringify(nextData.layoutPreferences)
       === JSON.stringify(data.value.layoutPreferences)
@@ -437,6 +467,9 @@ export const useFamilyStore = defineStore('family', () => {
     projectToken,
     revision,
     lastSavedAt,
+    canEdit,
+    canRename,
+    setAccess,
     // getters
     membersArray,
     memberCount,

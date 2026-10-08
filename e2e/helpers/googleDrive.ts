@@ -9,6 +9,8 @@ interface RemoteFile {
   createdTime?: string
   size?: string
   trashed?: boolean
+  isAppAuthorized?: boolean
+  capabilities?: { canAddChildren: boolean; canRename: boolean }
 }
 
 interface SavedRevision {
@@ -19,7 +21,7 @@ interface SavedRevision {
   }
 }
 
-const scope = 'https://www.googleapis.com/auth/drive.file'
+const scope = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly'
 const identityScript = `
   window.__driveOAuthRequests = 0;
   window.__driveOAuthActivations = [];
@@ -59,6 +61,8 @@ export async function installGoogleDrive(page: Page) {
   const expiredTokens = new Set<string>()
   const errors: string[] = []
   let sequence = 0
+  let currentAccount = { permissionId: 'e2e-account', displayName: '虚构测试账号', emailAddress: 'test@example.invalid' }
+  let writes = 0
   let unauthorizedRequests = 0
   let mediaReads = 0
 
@@ -90,8 +94,9 @@ export async function installGoogleDrive(page: Page) {
       return
     }
     try {
+      if (request.method() !== 'GET') writes++
       if (url.pathname === '/drive/v3/about') {
-        await json({ user: { permissionId: 'e2e-account', displayName: '虚构测试账号', emailAddress: 'test@example.invalid' } })
+        await json({ user: currentAccount })
         return
       }
       if (url.pathname === '/drive/v3/files/generateIds') {
@@ -120,7 +125,7 @@ export async function installGoogleDrive(page: Page) {
           return
         }
         metadata = {
-          ...metadata, createdTime: new Date(Date.UTC(2026, 0, 1, 0, 0, files.size)).toISOString(),
+          ...metadata, isAppAuthorized: true, capabilities: { canAddChildren: true, canRename: true }, createdTime: new Date(Date.UTC(2026, 0, 1, 0, 0, files.size)).toISOString(),
           size: String(content.length), trashed: false,
         }
         files.set(metadata.id, { metadata, content })
@@ -165,6 +170,14 @@ export async function installGoogleDrive(page: Page) {
 
   return {
     files, errors,
+    get writes() { return writes },
+    useRecipientAccount() {
+      currentAccount = { permissionId: 'recipient', displayName: '受邀亲人', emailAddress: 'recipient@example.invalid' }
+      for (const file of files.values()) {
+        file.metadata.isAppAuthorized = false
+        file.metadata.capabilities = { canAddChildren: false, canRename: false }
+      }
+    },
     latestRevision(): SavedRevision | undefined {
       const latest = [...files.values()].filter(file => file.metadata.appProperties?.kind === 'revision').at(-1)
       return latest ? JSON.parse(latest.content.toString('utf8')) as SavedRevision : undefined

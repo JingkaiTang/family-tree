@@ -3,8 +3,7 @@ import { createEmptyMeta, PhotoId, ProjectMeta, SCHEMA_VERSION, type FamilyData 
 import { prepareBrowserPhoto } from './browserPhotos'
 import { validateLoadedProject } from '../projectValidation'
 import type { DriveApi, DriveFile } from './googleDriveClient'
-import type { ProjectStorageProvider, StoredProject } from './types'
-import { normalizeProjectName } from './types'
+import { normalizeProjectName, ProjectReadOnlyError, type ProjectAccess, type ProjectStorageProvider, type StoredProject } from './types'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 const JSON_MIME = 'application/json'
@@ -50,6 +49,7 @@ interface ProjectState {
 }
 
 export interface GoogleDriveStorage extends ProjectStorageProvider {
+  getProjectAccess(projectId: string): Promise<ProjectAccess>
   listProjects(): Promise<Array<{ id: string; displayName: string }>>
   listVersions(projectId: string): Promise<Array<{ id: string; createdTime: string; isHead: boolean }>>
   loadVersion(projectId: string, revisionId: string): Promise<StoredProject>
@@ -134,6 +134,18 @@ export function createGoogleDriveStorage(
     const file = await api.getFile(id)
     checkProject(file, id)
     return file
+  }
+
+  function access(file: DriveFile): ProjectAccess {
+    // Drive role capabilities alone do not grant this app drive.file write access.
+    const canEdit = file.isAppAuthorized === true && file.capabilities?.canAddChildren === true
+    return { canEdit, canRename: canEdit && file.capabilities?.canRename === true }
+  }
+
+  function requireWritable(file: DriveFile, rename = false): void {
+    const permissions = access(file)
+    if (!permissions.canEdit) throw new ProjectReadOnlyError()
+    if (rename && !permissions.canRename) throw new ProjectReadOnlyError('当前连接不能重命名此项目，请检查文件夹权限。')
   }
 
   async function limitedRead(file: DriveFile, limit: number): Promise<Blob> {
@@ -273,11 +285,12 @@ export function createGoogleDriveStorage(
   }
 
   function stored(projectId: string, folder: DriveFile, revision: Revision): StoredProject {
-    return { id: projectId, displayName: folder.name, meta: revision.meta, family: revision.family }
+    return { id: projectId, displayName: folder.name, meta: revision.meta, family: revision.family, access: access(folder) }
   }
 
   return {
     id: providerId,
+    async getProjectAccess(projectId) { return access(await project(projectId)) },
     async listProjects() {
       const files = await api.listFiles(query('project') + ` and mimeType = '${FOLDER}'`)
       const seen = new Set<string>()
@@ -311,6 +324,7 @@ export function createGoogleDriveStorage(
     },
     saveProject(projectId, family) {
       return serial(projectId, async () => {
+        requireWritable(await project(projectId))
         const state = states.get(projectId)
         if (!state) throw new Error('请先打开 Google Drive 项目，再保存修改')
         requireConfirmedName(state)
@@ -325,6 +339,7 @@ export function createGoogleDriveStorage(
     },
     renameProject(projectId, input) {
       return serial(projectId, async () => {
+        requireWritable(await project(projectId), true)
         const name = normalizeProjectName(input)
         const state = states.get(projectId)
         if (!state) throw new Error('请先打开 Google Drive 项目，再重命名')
@@ -376,6 +391,7 @@ export function createGoogleDriveStorage(
     },
     resolveConflict(projectId, family, expectedHeads) {
       return serial(projectId, async () => {
+        requireWritable(await project(projectId))
         const state = states.get(projectId)
         if (!state) throw new Error('请先打开要保留的版本')
         requireConfirmedName(state)
@@ -393,7 +409,7 @@ export function createGoogleDriveStorage(
       })
     },
     async importPhoto(projectId, bytes, mime) {
-      await project(projectId)
+      requireWritable(await project(projectId))
       const { photo, thumbnail } = await preparePhoto(bytes, mime)
       const photoId = uuidv4()
       for (const [kind, content] of [['photo', photo], ['thumbnail', thumbnail]] as const) {
@@ -423,7 +439,7 @@ export function createGoogleDriveStorage(
     },
     async deletePhoto(projectId, photoId) {
       PhotoId.parse(photoId)
-      await project(projectId)
+      requireWritable(await project(projectId))
       // Deleting a member removes the reference in the next revision. Old
       // snapshots must keep their images, so media is never physically deleted.
     },

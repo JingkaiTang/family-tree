@@ -68,6 +68,7 @@ onBeforeUnmount(() => {
 })
 
 function onFileChange(e: Event) {
+  if (!family.canEdit) return
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = '' // allow re-picking same file
@@ -76,6 +77,7 @@ function onFileChange(e: Event) {
 }
 
 async function onCropConfirm(blob: Blob) {
+  if (!family.canEdit) return
   const project = family.projectRef
   if (!project || uploading.value) return
   const projectToken = family.projectToken
@@ -118,6 +120,7 @@ function onCropError(message: string) {
 }
 
 function onRemove() {
+  if (!family.canEdit) return
   if (!props.photoId) return
   emit('change', undefined)
 }
@@ -137,12 +140,12 @@ const hasPhoto = computed(() => !!previewUrl.value)
         无照片
       </div>
     </div>
-    <div class="flex flex-col gap-2">
+    <div v-if="family.canEdit" class="flex flex-col gap-2">
       <label
         class="cursor-pointer rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-100"
       >
         {{ uploading ? '上传中…' : hasPhoto ? '更换照片' : '上传照片' }}
-        <input type="file" accept="image/*" class="hidden" :disabled="uploading" @change="onFileChange" />
+        <input type="file" accept="image/*" class="hidden" :disabled="uploading || !family.canEdit" @change="onFileChange" />
       </label>
       <button
         v-if="hasPhoto"

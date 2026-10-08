@@ -8,6 +8,7 @@ import DefaultAvatar from '@/components/member/DefaultAvatar.vue'
 import { getDefaultAvatarAgeBand } from '@/core/defaultAvatar'
 
 const props = defineProps<{
+  readOnly?: boolean
   member: Member
   /** 节点在父级 FamilyUnit 内的局部坐标（像素） */
   left: number
@@ -147,6 +148,7 @@ let activePointerId: number | null = null
 let groupDrag = false
 
 function onPointerDown(e: PointerEvent) {
+  if (props.readOnly) return
   // 只响应主键（鼠标左键 / 触摸 / 笔）
   if (e.button !== 0 && e.pointerType === 'mouse') return
   e.stopPropagation()

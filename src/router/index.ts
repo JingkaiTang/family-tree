@@ -34,6 +34,9 @@ export function createAppRouter(history: RouterHistory = createWebHashHistory())
   const router = createRouter({ history, routes })
   const closingProjects = new WeakMap<RouteLocationNormalized, number>()
   router.beforeEach((to) => {
+    if (to.name === 'member-new' && useFamilyStore().projectRef && !useFamilyStore().canEdit) {
+      return { name: 'tree', replace: true }
+    }
     // 刷新项目页面时内存 store 尚未恢复，统一交给 Welcome 读取最近项目和处理授权。
     if (to.meta.requiresProject && !useFamilyStore().projectRef) {
       return { name: 'welcome', replace: true }

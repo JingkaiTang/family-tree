@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
     providerId: 'google-drive:client:account',
     account: { permissionId: 'account', displayName: '我的账号' },
   },
-  authorize: vi.fn(), prepare: vi.fn(), flush: vi.fn(), list: vi.fn(), select: vi.fn(), resolve: vi.fn(), push: vi.fn(),
+  authorize: vi.fn(), prepare: vi.fn(), access: vi.fn(), flush: vi.fn(), list: vi.fn(), select: vi.fn(), resolve: vi.fn(), push: vi.fn(),
 }))
 vi.mock('@/services/googleDriveConnection', async () => {
   const { reactive } = await import('vue')
@@ -21,6 +21,7 @@ vi.mock('@/services/googleDriveConnection', async () => {
   return {
     googleDriveState: mocks.state,
     prepareGoogleDrive: mocks.prepare,
+    getGoogleDriveProjectAccess: mocks.access,
     isGoogleDriveProvider: (id: string) => id.startsWith('google-drive:'),
     listGoogleDriveVersions: mocks.list,
     selectGoogleDriveVersion: mocks.select,
@@ -48,6 +49,7 @@ beforeEach(() => {
   useFamilyStore().setProject(project, createEmptyMeta('云端家族'), createEmptyFamily())
   mocks.authorize.mockResolvedValue(undefined)
   mocks.prepare.mockResolvedValue(undefined)
+  mocks.access.mockResolvedValue({ canEdit: true, canRename: true })
   mocks.flush.mockResolvedValue(undefined)
   mocks.list.mockResolvedValue(versions)
   mocks.resolve.mockResolvedValue(undefined)
@@ -62,6 +64,39 @@ function button(wrapper: ReturnType<typeof mount>, text: string) {
 }
 
 describe('Drive editing recovery', () => {
+  it('refreshes restored write permissions and retries the retained draft without reloading it', async () => {
+    const family = useFamilyStore()
+    family.markDirty()
+    family.setAccess({ canEdit: false, canRename: false })
+    const data = family.data
+    const token = family.projectToken
+    const wrapper = mount(DriveStorageStatus)
+    await button(wrapper, '重新连接').trigger('click')
+    await flushPromises()
+    expect(mocks.access).toHaveBeenCalledExactlyOnceWith(project)
+    expect(family.canEdit).toBe(true)
+    expect(mocks.flush).toHaveBeenCalledOnce()
+    expect(family.data).toBe(data)
+    expect(family.projectToken).toBe(token)
+    expect(family.isDirty).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('does not apply a late capability refresh to a different project', async () => {
+    let complete!: (value: { canEdit: boolean; canRename: boolean }) => void
+    mocks.access.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    const family = useFamilyStore()
+    const wrapper = mount(DriveStorageStatus)
+    await button(wrapper, '重新连接并保存').trigger('click')
+    await flushPromises()
+    family.setProject({ ...project, id: 'other' }, createEmptyMeta('另一个家谱'), createEmptyFamily())
+    complete({ canEdit: false, canRename: false })
+    await flushPromises()
+    expect(family.canEdit).toBe(true)
+    expect(mocks.flush).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('does not display or authorize a local project', () => {
     useFamilyStore().setProject({ ...project, providerId: 'browser-directory' }, createEmptyMeta('本地'), createEmptyFamily())
     const wrapper = mount(DriveStorageStatus)

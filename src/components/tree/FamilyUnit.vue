@@ -16,6 +16,7 @@ const props = defineProps<{
   hubs: PlacedUnionHub[]
   selectedId?: string | null
   viewpointId?: string | null
+  readOnly?: boolean
   dragOffset?: Point
   previewOffset?: Point
   isDragging?: boolean
@@ -264,6 +265,7 @@ function onMemberDrop(payload: MemberDragPayload) {
       v-for="value in renderedCards"
       :key="value.card.id"
       :member="value.member"
+      :read-only="readOnly"
       :left="value.card.rect.x - unit.rect.x"
       :top="value.card.rect.y - unit.rect.y"
       :width="value.card.rect.width"

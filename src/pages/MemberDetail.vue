@@ -90,12 +90,12 @@ function clearOverride() {
 
 const overrideDirty = computed(() => overrideDraft.value !== overrideValue.value)
 const hasDraftChanges = computed(() => profileDirty.value || overrideDirty.value || mediaPending.value)
-const saveStatus = computed(() => saving.value ? '保存中…'
+const saveStatus = computed(() => !family.canEdit ? '仅查看' : saving.value ? '保存中…'
   : hasDraftChanges.value ? '资料未保存'
     : isDirty.value ? '项目未保存…' : !member.value && draft.value ? '新成员尚未保存' : '已保存')
 
 async function onSave(navigateToMember = true): Promise<boolean> {
-  if (!draft.value || saving.value || discarding.value || mediaPending.value) return false
+  if (!family.canEdit || !draft.value || saving.value || discarding.value || mediaPending.value) return false
   const session = editorSession
   const projectToken = family.projectToken
   const id = draft.value.id
@@ -171,6 +171,7 @@ async function onCancel() {
 }
 
 async function onDelete() {
+  if (!family.canEdit) return
   if (!member.value || saving.value) return
   if (!confirm(`确认删除「${member.value.lastName}${member.value.firstName}」？此操作会断开 TA 与其他成员的所有关系。`)) {
     return
@@ -324,7 +325,8 @@ onBeforeUnmount(() => {
           v-else
           :key="`${family.projectToken}:${id}:${formVersion}`"
           v-model="draft"
-          :can-delete="!!member"
+          :can-delete="!!member && family.canEdit"
+          :read-only="!family.canEdit"
           :saving="saving"
           @save="onSave()"
           @cancel="onCancel"
@@ -336,9 +338,9 @@ onBeforeUnmount(() => {
 
       <!-- 右侧：关系编辑 + 称呼覆盖 -->
       <aside class="w-full shrink-0 bg-slate-50 p-4 md:w-96 md:overflow-auto md:p-6">
-        <fieldset :disabled="saving">
+        <fieldset :disabled="saving || !family.canEdit">
           <h3 class="mb-3 font-semibold">家庭关系</h3>
-          <p class="mb-3 text-xs text-slate-500">{{ member ? '关系与长幼排序修改后自动保存；左侧资料需点击保存。' : '保存成员后可添加家庭关系。' }}</p>
+          <p class="mb-3 text-xs text-slate-500">{{ !family.canEdit ? '当前项目仅查看。' : member ? '关系与长幼排序修改后自动保存；左侧资料需点击保存。' : '保存成员后可添加家庭关系。' }}</p>
           <RelationEditor v-if="member" :member-id="member.id" />
           <SiblingOrderEditor v-if="member" :member-id="member.id" />
 

@@ -1,6 +1,7 @@
 import { watch, type WatchStopHandle } from 'vue'
 import type { FamilyData } from '@/core/schema'
 import type { ProjectRef } from '@/services/storage/types'
+import { ProjectReadOnlyError } from '@/services/storage/types'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { saveProject } from './projectService'
@@ -81,6 +82,7 @@ export function createAutosaveController(
 
   function snapshot() {
     if (!family.projectRef || !family.isDirty) return null
+    if (!family.canEdit) throw new ProjectReadOnlyError()
     return {
       project: { ...family.projectRef },
       projectToken: family.projectToken,
@@ -95,7 +97,14 @@ export function createAutosaveController(
       const current = snapshot()
       if (current === null) continue
 
-      await save(current.project, current.data)
+      try {
+        await save(current.project, current.data)
+      } catch (error) {
+        if (error instanceof ProjectReadOnlyError && family.projectToken === current.projectToken) {
+          family.setAccess({ canEdit: false, canRename: false })
+        }
+        throw error
+      }
       family.markSaved(current.projectToken, current.revision)
 
       if (
@@ -121,7 +130,7 @@ export function createAutosaveController(
     stopWatch = watch(
       () => family.revision,
       () => {
-        if (family.projectRef && family.isDirty) schedule()
+        if (family.projectRef && family.isDirty && family.canEdit) schedule()
       },
       { flush: 'sync' },
     )

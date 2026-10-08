@@ -50,6 +50,7 @@ const props = defineProps<{
   rootId?: string
   selectedId?: string | null
   viewpointId?: string | null
+  readOnly?: boolean
   getKinship?: (fromId: string, toId: string) => string | null
   initialView?: PanzoomView | null
   layoutResetVersion?: number
@@ -390,6 +391,7 @@ function screenToStageScale(): number {
 }
 
 function onUnitDrag(payload: FamilyUnitDragPayload) {
+  if (props.readOnly) return
   const scale = screenToStageScale()
   const unit = sceneModel.value.unitById.get(payload.unitId)
   const domain = unit === undefined ? undefined : sceneModel.value.domainById.get(unit.domainId)
@@ -500,6 +502,7 @@ function onUnitDrag(payload: FamilyUnitDragPayload) {
 }
 
 async function onUnitDrop(payload: FamilyUnitDragPayload) {
+  if (props.readOnly) { cancelActiveDragPreview(); return }
   onUnitDrag(payload)
   const state = dragState.value
   if (!state || state.unitId !== payload.unitId || !dragCanDrop.value) {
@@ -736,6 +739,7 @@ function dismissDiagnostics() {
             :hubs="sceneModel.hubsByUnitId.get(unit.id) ?? []"
             :selected-id="selectedId"
             :viewpoint-id="viewpointId"
+            :read-only="readOnly"
             :drag-offset="dragOffsetForUnit(unit)"
             :preview-offset="previewOffsetByUnitId[unit.id]"
             :is-dragging="isUnitDragging(unit)"
