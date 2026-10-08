@@ -4,7 +4,7 @@ import path from 'node:path'
 import { defineConfig } from '@playwright/test'
 
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-  || (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined)
+  || (!process.env.CI && existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined)
 
 export default defineConfig({
   testDir: './e2e/pwa',

@@ -25,7 +25,7 @@ npm run test:layout-perf
 
 `npm run typecheck` 检查 Vue/应用代码、构建配置和浏览器测试，包含测试专用服务器。`npm run build` 先执行同一类型检查，再生成 `dist/` 静态网页。桌面浏览器和移动浏览器使用同一产物；开发与生产部署要求见 [Web/PWA 部署说明](docs/web-deployment.md)。
 
-浏览器测试使用 Playwright：可通过 `npx playwright install chromium` 安装浏览器；配置会优先使用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`，否则尝试 `/usr/bin/chromium` 或 Playwright 自带版本。无头测试用真实 OPFS 句柄替代系统目录选择器，覆盖浏览器 IO 和句柄持久化；生产不使用 OPFS，系统授权和手机文档提供程序仍需真机验收。`test:e2e` 使用开发服务器，`test:pwa` 单独构建生产资源并覆盖真实 Service Worker。测试分层、失败产物和 CI 要求见 [测试说明](docs/testing.md)。
+浏览器测试使用 Playwright：可通过 `npx playwright install chromium` 安装浏览器；配置会优先使用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`，未显式指定时 CI 使用 Playwright 配套版本，本地仍先尝试 `/usr/bin/chromium`。无头测试用真实 OPFS 句柄替代系统目录选择器，覆盖浏览器 IO 和句柄持久化；生产不使用 OPFS，系统授权和手机文档提供程序仍需真机验收。`test:e2e` 使用开发服务器，`test:pwa` 单独构建生产资源并覆盖真实 Service Worker。测试分层、失败产物和 CI 要求见 [测试说明](docs/testing.md)。
 
 编辑器应遵守仓库根目录的 `.editorconfig`。前端目前没有全仓自动格式化命令，请延续现有 TypeScript/Vue 风格并避免格式化无关文件。
 

@@ -18,7 +18,7 @@
 
 ## 浏览器环境
 
-使用 Node.js 24 LTS，先运行 `npm ci` 和 `npx playwright install chromium`。Linux CI 可用 `npx playwright install --with-deps chromium` 同时安装浏览器系统依赖。也可以通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指定已安装的 Chromium；本地存在 `/usr/bin/chromium` 时会优先使用。
+使用 Node.js 24 LTS，先运行 `npm ci` 和 `npx playwright install chromium`。Linux CI 可用 `npx playwright install --with-deps chromium` 同时安装浏览器系统依赖。也可以通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指定已安装的 Chromium；未显式指定时 CI 使用 Playwright 配套浏览器，不自动选择 `/usr/bin/chromium`，本地存在该路径时仍会优先使用。
 
 开发 E2E 使用端口 4179。生产 PWA 套件使用独立端口 4178，自动启动测试专用静态服务器并构建临时产物，无需预先运行 `npm run build` 或修改 `dist/`。测试服务器通过 Node.js 内置 TypeScript 执行能力运行，命令显式使用 `--experimental-strip-types`，兼容所声明的 Node.js 22.12+ 范围；CI 使用 Node.js 24。
 
@@ -29,6 +29,8 @@
 这是测试运行环境的兼容处理，不是应用层的隐身模式修复。上述通过结果只覆盖普通持久化会话，不能据此声称 M153 隐身模式可用。更换浏览器版本或恢复隐身测试前，应在对应版本复验真实句柄的 IndexedDB 写入、读取和刷新恢复；上游问题未解决时仍须记录该兼容限制。
 
 `e2e/member-editing.spec.ts` 验证人物资料与关系的保存边界、草稿离开对话框、键盘与浏览器后退，以及新建取消不产生记录、首次保存创建成员和设置根成员。组件集成测试补充保存失败、跨项目异步结果隔离和媒体任务的取消、读取失败等边界。
+
+持久化 `context` fixture 使用独立的 60 秒预算，`launchPersistentContext` 启动上限为 45 秒，避免冷启动挤占业务测试时间。Web E2E 的业务测试仍为 30 秒，断言仍为 10 秒；生产 PWA 保留原有的 45 秒测试预算。
 
 ## Google Drive 回归与真实验收
 

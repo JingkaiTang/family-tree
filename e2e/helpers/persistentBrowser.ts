@@ -8,10 +8,12 @@ import { test as base } from '@playwright/test'
  * No storage APIs or permission checks are replaced by this fixture.
  */
 export const test = base.extend({
-  context: async ({ playwright, launchOptions, contextOptions, baseURL, viewport, isMobile, hasTouch }, use, testInfo) => {
+  // Browser startup has its own budget so it cannot consume the test's timeout.
+  context: [async ({ playwright, launchOptions, contextOptions, baseURL, viewport, isMobile, hasTouch }, use, testInfo) => {
     const context = await playwright.chromium.launchPersistentContext('', {
       ...launchOptions,
       ...contextOptions,
+      timeout: 45_000,
       baseURL,
       viewport,
       isMobile,
@@ -26,7 +28,7 @@ export const test = base.extend({
     } finally {
       await context.close()
     }
-  },
+  }, { scope: 'test', timeout: 60_000 }],
 })
 
 export { expect } from '@playwright/test'
