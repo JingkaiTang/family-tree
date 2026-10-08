@@ -179,6 +179,8 @@ test('new-member cancellation leaves no records and the first save creates one r
 
   // Updating the newly saved member must not create a second record.
   await page.getByRole('button', { name: '保存', exact: true }).click()
+  // Back is intentionally blocked while saving; wait for the full save to finish.
+  await expect(page.locator('header')).toContainText('已保存')
   expect(Object.keys((await readFamily(page)).members)).toEqual([id])
   // The new route is replaced on save: Back should reach the tree directly.
   await page.goBack()
