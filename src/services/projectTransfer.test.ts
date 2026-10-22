@@ -21,7 +21,7 @@ describe('browser project bundle transfers', () => {
     vi.unstubAllGlobals()
   })
 
-  it('selects the export destination immediately but writes only the supplied saved snapshot', async () => {
+  it('selects the export destination immediately but writes only the supplied snapshot', async () => {
     const output = new WritableStream<Uint8Array>()
     const createWritable = vi.fn(async () => output)
     const picker = vi.fn(async () => ({ name: '家族.familybundle', createWritable }))
@@ -99,11 +99,11 @@ describe('browser project bundle transfers', () => {
     }
   })
 
-  it('streams a cloud project through the same photo IO and destination picker', async () => {
+  it.each(['browser-directory', 'google-drive:account'])('streams a project through the same photo IO and destination picker (%s)', async providerId => {
     const output = new WritableStream<Uint8Array>()
     const picker = vi.fn(async () => ({ name: 'cloud.familybundle', createWritable: async () => output }))
     vi.stubGlobal('window', { showSaveFilePicker: picker })
-    const cloudProject = { ...project, providerId: 'google-drive:account' }
+    const source = { ...project, providerId }
     const photo = new Blob(['private image'])
     readPhoto.mockResolvedValue(photo)
     exportProjectBundleToStream.mockImplementationOnce(async source => {
@@ -111,11 +111,11 @@ describe('browser project bundle transfers', () => {
       expect(await source.readPhoto('image-id', true)).toBe(photo)
     })
 
-    const runExport = await prepareProjectBundleExport(cloudProject)
+    const runExport = await prepareProjectBundleExport(source)
     await expect(runExport!({ meta: createEmptyMeta('家族'), family: createEmptyFamily() }))
       .resolves.toEqual({ kind: 'saved' })
-    expect(readPhoto).toHaveBeenNthCalledWith(1, cloudProject, 'image-id', false)
-    expect(readPhoto).toHaveBeenNthCalledWith(2, cloudProject, 'image-id', true)
+    expect(readPhoto).toHaveBeenNthCalledWith(1, source, 'image-id', false)
+    expect(readPhoto).toHaveBeenNthCalledWith(2, source, 'image-id', true)
   })
 
   it('prepares a downloadable archive without a picker and snapshots reused chunks', async () => {

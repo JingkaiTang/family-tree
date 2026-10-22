@@ -2,6 +2,7 @@ import { DEFAULT_LAYOUT_METRICS, type LayoutScene, type Point } from '@/core/fam
 import type { FamilyData, LayoutRowPreferenceBatch, RowOrderPreference } from '@/core/schema'
 import type { FamilyFacts } from '@/core/family-graph/types'
 import type { LineageTrace } from '@/core/family-graph/lineage'
+import { secondaryParentageRelationId } from '@/core/family-layout/projectView'
 
 export function highlightedLineagePaths(scene: LayoutScene, facts: FamilyFacts, trace: LineageTrace) {
   const childrenByOwnerId = new Map(Object.entries(trace.parentageChildren))
@@ -10,8 +11,7 @@ export function highlightedLineagePaths(scene: LayoutScene, facts: FamilyFacts, 
     for (const childId of trace.parentageChildren[parentage.id] ?? []) {
       for (const parentId of parentage.parentIds) {
         if (!personIds.has(parentId)) continue
-        // Match projectView's exact owner key; person IDs can themselves contain colons.
-        childrenByOwnerId.set(`aux:${parentage.id}:${parentId}:${childId}`, [childId])
+        childrenByOwnerId.set(secondaryParentageRelationId(parentage.id, parentId, childId), [childId])
       }
     }
   }

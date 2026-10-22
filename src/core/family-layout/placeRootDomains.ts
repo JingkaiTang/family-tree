@@ -667,7 +667,7 @@ function buildParentageEdges(
     for (const [fallbackOrder, childPersonId] of group.childPersonIds.entries()) {
       const childId = unitIdByPersonId.get(childPersonId)
       if (childId === undefined || childId === group.sourceUnitId) continue
-      const id = `${group.sourceUnitId}\0${childId}`
+      const id = JSON.stringify([group.sourceUnitId, childId])
       edgeById.set(id, {
         groupId: group.siblingOrderId ?? group.id,
         sourceId: group.sourceUnitId,

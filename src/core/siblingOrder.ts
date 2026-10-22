@@ -1,5 +1,6 @@
 import type { FamilyData, Member, SiblingOrders } from './schema'
 import { normalizeFacts } from './family-graph/normalizeFacts'
+import { compareIds, encodeIdTuple } from './idEncoding'
 
 export interface SiblingOrderGroup {
   id: string
@@ -78,7 +79,7 @@ export function findSiblingOrderForMembers(
     .sort((left, right) => (
       right.overlap - left.overlap
       || right.memberIds.length - left.memberIds.length
-      || left.groupId.localeCompare(right.groupId)
+      || compareIds(left.groupId, right.groupId)
     ))[0]
 }
 
@@ -89,7 +90,7 @@ export function compareSiblingOrderIds(
   siblingOrders: SiblingOrders,
 ): number | null {
   for (const [, order] of Object.entries(siblingOrders)
-    .sort(([left], [right]) => left.localeCompare(right))) {
+    .sort(([left], [right]) => compareIds(left, right))) {
     const leftIndex = order.indexOf(leftId)
     const rightIndex = order.indexOf(rightId)
     if (leftIndex < 0 || rightIndex < 0 || leftIndex === rightIndex) continue
@@ -160,7 +161,7 @@ function discoverSiblingOrderGroups(data: FamilyData): SiblingOrderGroup[] {
   }
 
   return [...componentByRootId.values()]
-    .map(memberIds => [...memberIds].sort((left, right) => left.localeCompare(right)))
+    .map(memberIds => [...memberIds].sort(compareIds))
     .filter(memberIds => memberIds.length > 1)
     .map(memberIds => {
       const memberIdSet = new Set(memberIds)
@@ -171,14 +172,14 @@ function discoverSiblingOrderGroups(data: FamilyData): SiblingOrderGroup[] {
       const parentIds = [...new Set(facts.parentages
         .filter(parentage => parentage.childIds.some(id => memberIdSet.has(id)))
         .flatMap(parentage => parentage.parentIds))]
-        .sort((left, right) => left.localeCompare(right))
+        .sort(compareIds)
       return {
-        id: exactParentage?.id ?? `siblings:${memberIds.join('+')}`,
+        id: exactParentage?.id ?? `siblings:${encodeIdTuple(memberIds)}`,
         parentIds,
         memberIds,
       }
     })
-    .sort((left, right) => left.id.localeCompare(right.id))
+    .sort((left, right) => compareIds(left.id, right.id))
 }
 
 function preferredOrderForGroup(
@@ -202,5 +203,5 @@ function compareAutomaticOrder(
   }
   if (leftBirthDate && !rightBirthDate) return -1
   if (!leftBirthDate && rightBirthDate) return 1
-  return leftId.localeCompare(rightId)
+  return compareIds(leftId, rightId)
 }

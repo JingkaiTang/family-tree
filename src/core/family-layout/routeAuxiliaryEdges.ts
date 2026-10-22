@@ -80,7 +80,7 @@ function allocatePorts(
 }
 
 function portKey(ownerId: string, personId: string): string {
-  return `${ownerId}\u0000${personId}`
+  return JSON.stringify([ownerId, personId])
 }
 
 export function routeAuxiliaryEdges(input: RouteAuxiliaryEdgesInput): RoutedFamilyEdge[] {

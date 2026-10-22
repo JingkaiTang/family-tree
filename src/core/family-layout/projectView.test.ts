@@ -109,13 +109,13 @@ describe('projectView', () => {
     expect(projected.primaryParentages).toEqual([facts.parentages[1]])
     expect(projected.auxiliaryRelations).toEqual([
       {
-        id: 'aux:godparent:parent-b>child',
+        id: 'aux:godparent:["parent-b","child"]',
         kind: 'godparent',
         sourceId: 'parent-b',
         targetId: 'child',
       },
       {
-        id: 'aux:parentage:parent-a:parent-a:child',
+        id: 'aux:parentage:["parentage:parent-a","parent-a","child"]',
         kind: 'secondary-parentage',
         sourceId: 'parent-a',
         targetId: 'child',

@@ -1,3 +1,4 @@
+import { compareIds, encodeIdTuple } from '@/core/idEncoding'
 import type {
   FamilyUnit,
   ProjectedFamily,
@@ -36,7 +37,7 @@ export function discoverRootFamilies(
 ): RootDiscoveryResult {
   const peopleIds = input.projected.people
     .map(person => person.id)
-    .sort((left, right) => left.localeCompare(right))
+    .sort(compareIds)
   const {
     childIdsByParent,
     parentageByChild,
@@ -77,11 +78,11 @@ export function discoverRootFamilies(
     const seedPersonIds = partnerId !== undefined
       && rootCandidateSet.has(partnerId)
       && !assignedSeeds.has(partnerId)
-      ? [personId, partnerId].sort((left, right) => left.localeCompare(right))
+      ? [personId, partnerId].sort(compareIds)
       : [personId]
     const rootUnitId = unitIdByPersonId.get(seedPersonIds[0])
     if (rootUnitId === undefined) continue
-    const rootId = `root:${seedPersonIds.join('+')}`
+    const rootId = `root:${encodeIdTuple(seedPersonIds)}`
     const componentId = componentIdByPersonId.get(seedPersonIds[0])
       ?? `component:${seedPersonIds[0]}`
     roots.push({
@@ -98,9 +99,9 @@ export function discoverRootFamilies(
   }
 
   roots.sort((left, right) => (
-    left.componentId.localeCompare(right.componentId)
+    compareIds(left.componentId, right.componentId)
     || left.generation - right.generation
-    || left.id.localeCompare(right.id)
+    || compareIds(left.id, right.id)
   ))
   const previousRootIdByRootId = matchPreviousRoots(
     roots,
@@ -304,7 +305,7 @@ function buildComponentIds(
         pending.push(adjacentId)
       }
     }
-    componentPeople.sort((left, right) => left.localeCompare(right))
+    componentPeople.sort(compareIds)
     const componentId = `component:${componentPeople[0]}`
     componentPeople.forEach(value => componentIdByPersonId.set(value, componentId))
   }

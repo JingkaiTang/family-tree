@@ -90,6 +90,12 @@ function clearOverride() {
 
 const overrideDirty = computed(() => overrideDraft.value !== overrideValue.value)
 const hasDraftChanges = computed(() => profileDirty.value || overrideDirty.value || mediaPending.value)
+// 项目 revision 不包含未提交资料；异步切换还必须识别草稿编辑、撤销及照片处理。
+watch([
+  () => draft.value ? JSON.stringify(profileOf(draft.value)) : null,
+  overrideDraft,
+  mediaPending,
+], () => ui.advanceMemberDraftRevision(), { flush: 'sync' })
 const saveStatus = computed(() => !family.canEdit ? '仅查看' : saving.value ? '保存中…'
   : hasDraftChanges.value ? '资料未保存'
     : isDirty.value ? '项目未保存…' : !member.value && draft.value ? '新成员尚未保存' : '已保存')
@@ -292,6 +298,7 @@ async function discardUnreferencedStagedPhotos(preserveDraft = false) {
 }
 
 onBeforeUnmount(() => {
+  ui.advanceMemberDraftRevision()
   disposed = true
   finishLeave(false)
   window.removeEventListener('beforeunload', onBeforeUnload)

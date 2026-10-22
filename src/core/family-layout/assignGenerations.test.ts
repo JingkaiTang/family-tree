@@ -67,7 +67,7 @@ describe('assignGenerations', () => {
     const result = assignGenerations(projected, built)
 
     expect(projected.auxiliaryRelations).toContainEqual({
-      id: 'aux:godparent:godparent>child',
+      id: 'aux:godparent:["godparent","child"]',
       kind: 'godparent',
       sourceId: 'godparent',
       targetId: 'child',
@@ -134,10 +134,11 @@ describe('assignGenerations', () => {
 
   it('reports a malformed self parentage edge as a cycle', () => {
     const input = buildProjectedInput(familyData([member('a')]))
-    input.built.parentageGroups.push({
+    input.projected.primaryParentages.push({
       id: 'parentage:self',
-      sourceUnitId: 'unit:person:a',
-      childPersonIds: ['a'],
+      parentIds: ['a'],
+      childIds: ['a'],
+      typeByChildId: { a: 'blood' },
     })
 
     const result = assignGenerations(input.projected, input.built)
@@ -161,12 +162,18 @@ describe('assignGenerations', () => {
     linkParent(grandchild, childA)
     const input = buildProjectedInput(familyData([grandchild, childB, parent, childA]))
     const reordered = structuredClone(input.built)
+    const reorderedProjection = structuredClone(input.projected)
     reordered.units.reverse()
     reordered.parentageGroups.reverse()
     reordered.parentageGroups.forEach(group => group.childPersonIds.reverse())
+    reorderedProjection.primaryParentages.reverse()
+    reorderedProjection.primaryParentages.forEach(parentage => {
+      parentage.parentIds.reverse()
+      parentage.childIds.reverse()
+    })
 
     const expected = assignGenerations(input.projected, input.built)
-    const actual = assignGenerations(input.projected, reordered)
+    const actual = assignGenerations(reorderedProjection, reordered)
 
     expect(actual).toEqual(expected)
   })
@@ -194,18 +201,21 @@ describe('assignGenerations', () => {
       member('cycle-a'),
       member('cycle-b'),
     ]))
-    input.built.parentageGroups = [{
+    input.projected.primaryParentages = [{
       id: 'parentage:predecessor>cycle-a',
-      sourceUnitId: 'unit:person:predecessor',
-      childPersonIds: ['cycle-a'],
+      parentIds: ['predecessor'],
+      childIds: ['cycle-a'],
+      typeByChildId: { 'cycle-a': 'blood' },
     }, {
       id: 'parentage:cycle-a>cycle-b',
-      sourceUnitId: 'unit:person:cycle-a',
-      childPersonIds: ['cycle-b'],
+      parentIds: ['cycle-a'],
+      childIds: ['cycle-b'],
+      typeByChildId: { 'cycle-b': 'blood' },
     }, {
       id: 'parentage:cycle-b>cycle-a',
-      sourceUnitId: 'unit:person:cycle-b',
-      childPersonIds: ['cycle-a'],
+      parentIds: ['cycle-b'],
+      childIds: ['cycle-a'],
+      typeByChildId: { 'cycle-a': 'blood' },
     }]
 
     const result = assignGenerations(input.projected, input.built)

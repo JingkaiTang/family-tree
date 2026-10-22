@@ -103,8 +103,8 @@ describe('routeFamilyLanes', () => {
     expect(result.diagnostics).toEqual([])
     const gatewayIds = route.gatewayIds!
     expect(gatewayIds).toEqual([
-      `gateway:${sourceDomainId}:right:${ownerId}`,
-      `gateway:${targetDomainId}:left:${ownerId}`,
+      `gateway:${JSON.stringify([sourceDomainId, 'right', ownerId])}`,
+      `gateway:${JSON.stringify([targetDomainId, 'left', ownerId])}`,
     ])
     expect(gatewayIds.every(id => result.gateways.some(gateway => (
       gateway.id === id && gateway.routeOwnerId === ownerId

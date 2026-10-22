@@ -179,8 +179,8 @@ describe('portable project bundles', () => {
     const entries = projectEntries({ schemaVersion: 2, members: {}, nicknameOverrides: {} })
     entries[1].content = JSON.stringify({ ...createEmptyMeta('旧家族'), schemaVersion: 2 })
     const reader = await openProjectBundle(await fixture(entries))
-    expect(reader.family.schemaVersion).toBe(4)
-    expect(reader.meta.schemaVersion).toBe(4)
+    expect(reader.family.schemaVersion).toBe(5)
+    expect(reader.meta.schemaVersion).toBe(5)
     await reader.close()
   })
 

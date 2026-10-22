@@ -8,7 +8,7 @@ export interface GenerationResult {
 }
 
 export function assignGenerations(
-  _projected: ProjectedFamily,
+  projected: ProjectedFamily,
   built: BuiltFamilyUnits,
 ): GenerationResult {
   const unitIds = built.units.map(unit => unit.id).sort((a, b) => a.localeCompare(b))
@@ -16,16 +16,21 @@ export function assignGenerations(
   const outgoing = new Map(unitIds.map(unitId => [unitId, new Set<string>()]))
   const selfEdgeUnitIds = new Set<string>()
 
-  for (const group of built.parentageGroups) {
-    if (!knownUnitIds.has(group.sourceUnitId)) continue
-    for (const childPersonId of group.childPersonIds) {
-      const childUnitId = built.unitIdByPersonId[childPersonId]
-      if (childUnitId === undefined || !knownUnitIds.has(childUnitId)) continue
-      if (childUnitId === group.sourceUnitId) {
-        selfEdgeUnitIds.add(childUnitId)
-        continue
+  // A routing group chooses one source unit, but every represented parent
+  // constrains its child's generation, including parents in separate units.
+  for (const parentage of projected.primaryParentages) {
+    for (const parentId of parentage.parentIds) {
+      const parentUnitId = built.unitIdByPersonId[parentId]
+      if (parentUnitId === undefined || !knownUnitIds.has(parentUnitId)) continue
+      for (const childId of parentage.childIds) {
+        const childUnitId = built.unitIdByPersonId[childId]
+        if (childUnitId === undefined || !knownUnitIds.has(childUnitId)) continue
+        if (childUnitId === parentUnitId) {
+          selfEdgeUnitIds.add(childUnitId)
+          continue
+        }
+        outgoing.get(parentUnitId)?.add(childUnitId)
       }
-      outgoing.get(group.sourceUnitId)?.add(childUnitId)
     }
   }
 

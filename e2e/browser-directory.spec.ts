@@ -150,7 +150,7 @@ test('exports a real familybundle stream and imports its family and photos into 
     })
   }, backupName)
   await page.getByRole('button', { name: '导出备份', exact: true }).click()
-  await expect(page.getByText('家族备份已导出', { exact: true })).toBeVisible()
+  await expect(page.getByText('家族备份已导出；项目的保存状态未改变', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => sessionStorage.getItem('e2e:export-user-activation'))).toBe('true')
   const archive = await page.evaluate(async name => {
     const file = await (await (await navigator.storage.getDirectory()).getFileHandle(name)).getFile()

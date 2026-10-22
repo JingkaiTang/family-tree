@@ -2,7 +2,7 @@ export const SYNTHETIC_FAMILY_SEED = 20260716
 export const SYNTHETIC_GENERATION_COUNTS = Object.freeze([12, 24, 36, 48, 48, 32])
 export const SYNTHETIC_AVATARS_PER_GENERATION = 8
 
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 const BASE_BIRTH_YEARS = [1885, 1911, 1937, 1963, 1989, 2015]
 const LAST_NAMES = [
   '赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫',

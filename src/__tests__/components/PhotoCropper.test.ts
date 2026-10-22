@@ -12,9 +12,13 @@ import PhotoCropper from '@/components/member/PhotoCropper.vue'
 
 describe('PhotoCropper', () => {
   const readers: FileReader[] = []
+  let nextUrl = 0
   beforeEach(() => {
     readers.length = 0
-    vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (this: FileReader) {
+    nextUrl = 0
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:photo-${++nextUrl}`)
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(FileReader.prototype, 'readAsArrayBuffer').mockImplementation(function (this: FileReader) {
       readers.push(this)
     })
   })
@@ -23,19 +27,23 @@ describe('PhotoCropper', () => {
   it('ignores a delayed file read after another file has replaced it', async () => {
     const CropperStub = defineComponent({ props: ['src'], setup: () => () => h('div') })
     const wrapper = mount(PhotoCropper, {
-      props: { file: new File(['first'], 'first.png') },
+      props: { file: new File([png()], 'first.png') },
       global: { stubs: { Cropper: CropperStub } },
     })
-    await wrapper.setProps({ file: new File(['second'], 'second.png') })
-    completeRead(readers[1], 'data:image/png;base64,second')
+    await wrapper.setProps({ file: new File([png()], 'second.png') })
+    completeRead(readers[1])
     await nextTick()
-    expect(wrapper.getComponent(CropperStub).props('src')).toBe('data:image/png;base64,second')
+    expect(wrapper.getComponent(CropperStub).props('src')).toBe('blob:photo-1')
 
-    Object.defineProperty(readers[0], 'result', { value: 'data:image/png;base64,first' })
+    Object.defineProperty(readers[0], 'result', { value: png().buffer })
     readers[0].dispatchEvent(new ProgressEvent('load'))
+    readers[0].dispatchEvent(new ProgressEvent('error'))
+    readers[0].dispatchEvent(new ProgressEvent('abort'))
     await nextTick()
 
-    expect(wrapper.getComponent(CropperStub).props('src')).toBe('data:image/png;base64,second')
+    expect(wrapper.getComponent(CropperStub).props('src')).toBe('blob:photo-1')
+    expect(wrapper.emitted('error')).toBeUndefined()
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
     wrapper.unmount()
   })
 
@@ -50,7 +58,7 @@ describe('PhotoCropper', () => {
       },
     })
     const wrapper = mount(PhotoCropper, {
-      props: { file: new File(['unreadable'], 'unreadable.png') },
+      props: { file: new File([png()], 'unreadable.png') },
       global: { stubs: { Cropper: CropperStub } },
     })
 
@@ -60,8 +68,8 @@ describe('PhotoCropper', () => {
       ? '照片读取已取消，请重新选择文件'
       : '无法读取照片，请重新选择文件']])
     expect(wrapper.find('.fixed').exists()).toBe(false)
-    await wrapper.setProps({ file: new File(['retry'], 'retry.png') })
-    completeRead(readers[1], 'data:image/png;base64,retry')
+    await wrapper.setProps({ file: new File([png()], 'retry.png') })
+    completeRead(readers[1])
     await nextTick()
     readers[0].dispatchEvent(new ProgressEvent(eventType))
     await wrapper.findAll('button').find(button => button.text() === '确认裁剪')!.trigger('click')
@@ -83,17 +91,17 @@ describe('PhotoCropper', () => {
       },
     })
     const wrapper = mount(PhotoCropper, {
-      props: { file: new File(['image'], 'portrait.png') },
+      props: { file: new File([png()], 'portrait.png') },
       global: { stubs: { Cropper: CropperStub } },
     })
-    completeRead(readers[0], 'data:image/png;base64,portrait')
+    completeRead(readers[0])
     await nextTick()
     await wrapper.findAll('button').find(button => button.text() === '确认裁剪')!.trigger('click')
 
     if (action === 'cancel') {
       await wrapper.findAll('button').find(button => button.text() === '取消')!.trigger('click')
     } else if (action === 'replace') {
-      await wrapper.setProps({ file: new File(['replacement'], 'replacement.png') })
+      await wrapper.setProps({ file: new File([png()], 'replacement.png') })
     } else wrapper.unmount()
     finishBlob(new Blob(['late image'], { type: 'image/png' }))
     await flushPromises()
@@ -113,14 +121,14 @@ describe('PhotoCropper', () => {
       },
     })
     const wrapper = mount(PhotoCropper, {
-      props: { file: new File(['first'], 'first.png') },
+      props: { file: new File([png()], 'first.png') },
       global: { stubs: { Cropper: CropperStub } },
     })
-    completeRead(readers[0], 'data:image/png;base64,first')
+    completeRead(readers[0])
     await nextTick()
     await wrapper.findAll('button').find(button => button.text() === '确认裁剪')!.trigger('click')
-    await wrapper.setProps({ file: new File(['second'], 'second.png') })
-    completeRead(readers[1], 'data:image/png;base64,second')
+    await wrapper.setProps({ file: new File([png()], 'second.png') })
+    completeRead(readers[1])
     await nextTick()
     await wrapper.findAll('button').find(button => button.text() === '确认裁剪')!.trigger('click')
 
@@ -144,17 +152,86 @@ describe('PhotoCropper', () => {
     expect(wrapper.find('.fixed').exists()).toBe(false)
   })
 
+  it.each(['clear', 'unmount'] as const)('aborts an unfinished source read after %s and ignores its late result', async action => {
+    const abort = vi.spyOn(FileReader.prototype, 'abort')
+    const wrapper = mount(PhotoCropper, {
+      props: { file: new File([png()], 'portrait.png') },
+      global: { stubs: { Cropper: true } },
+    })
+    if (action === 'clear') await wrapper.setProps({ file: null })
+    else wrapper.unmount()
+    completeRead(readers[0])
+    readers[0].dispatchEvent(new ProgressEvent('error'))
+    await nextTick()
+
+    expect(abort).toHaveBeenCalledOnce()
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    expect(wrapper.emitted('error')).toBeUndefined()
+    if (action === 'clear') wrapper.unmount()
+  })
+
+  it('releases validated source URLs on replacement, cancel and unmount', async () => {
+    const wrapper = mount(PhotoCropper, {
+      props: { file: new File([png()], 'first.png') },
+      global: { stubs: { Cropper: true } },
+    })
+    completeRead(readers[0])
+    await wrapper.setProps({ file: new File([png()], 'second.png') })
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo-1')
+    completeRead(readers[1])
+    await nextTick()
+    await wrapper.findAll('button').find(button => button.text() === '取消')!.trigger('click')
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo-2')
+    await wrapper.setProps({ file: new File([png()], 'third.png') })
+    completeRead(readers[2])
+    wrapper.unmount()
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo-3')
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3)
+  })
+
+  it('reports decoder failures, releases their URL, and ignores a previous decoder error after retry', async () => {
+    const CropperStub = defineComponent({
+      props: { src: String },
+      emits: ['error'],
+      setup: () => () => h('div'),
+    })
+    const wrapper = mount(PhotoCropper, {
+      props: { file: new File([png()], 'first.png') },
+      global: { stubs: { Cropper: CropperStub } },
+    })
+    completeRead(readers[0])
+    await nextTick()
+    const oldCropper = wrapper.getComponent(CropperStub)
+    oldCropper.vm.$emit('error')
+    await nextTick()
+
+    expect(wrapper.emitted('error')?.[0]?.[0]).toContain('图片解码失败')
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:photo-1')
+    expect(wrapper.findComponent(CropperStub).exists()).toBe(false)
+    await wrapper.setProps({ file: new File([png()], 'retry.png') })
+    completeRead(readers[1])
+    await nextTick()
+    oldCropper.vm.$emit('error')
+    await nextTick()
+
+    expect(wrapper.emitted('error')).toHaveLength(1)
+    expect(wrapper.getComponent(CropperStub).props('src')).toBe('blob:photo-2')
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('blob:photo-2')
+    wrapper.unmount()
+  })
+
   it('does not submit the surrounding member form when cancelling a crop', async () => {
     const form = document.createElement('form')
     document.body.append(form)
     const onSubmit = vi.fn((event: Event) => event.preventDefault())
     form.addEventListener('submit', onSubmit)
     const wrapper = mount(PhotoCropper, {
-      props: { file: new File(['image'], 'portrait.png') },
+      props: { file: new File([png()], 'portrait.png') },
       attachTo: form,
       global: { stubs: { Cropper: true } },
     })
-    completeRead(readers[0], 'data:image/png;base64,portrait')
+    completeRead(readers[0])
     await nextTick()
 
     wrapper.findAll('button').find(button => button.text() === '取消')!.element.click()
@@ -184,7 +261,19 @@ describe('PhotoCropper', () => {
   })
 })
 
-function completeRead(reader: FileReader, result: string) {
+function png(): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(33)
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10])
+  const view = new DataView(bytes.buffer)
+  view.setUint32(8, 13)
+  bytes.set([73, 72, 68, 82], 12)
+  view.setUint32(16, 32)
+  view.setUint32(20, 24)
+  return bytes
+}
+
+function completeRead(reader: FileReader) {
+  const result = png().buffer
   Object.defineProperty(reader, 'result', { value: result, configurable: true })
   reader.dispatchEvent(new ProgressEvent('load'))
 }

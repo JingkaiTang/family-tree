@@ -134,6 +134,25 @@ export function assertFamilyIntegrity(family: FamilyData): void {
   }
 }
 
+/** 新增 childId → parentId 父母引用前，检查父母是否已经是该子女的后代。 */
+export function wouldCreateAncestryCycle(
+  members: FamilyData['members'],
+  childId: string,
+  parentId: string,
+): boolean {
+  const pending = [parentId]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const id = pending.pop()!
+    if (id === childId) return true
+    if (visited.has(id)) continue
+    visited.add(id)
+    // blood、adopted、step 都属于亲子链；不沿配偶、同胞或干亲关系遍历。
+    for (const parent of members[id]?.parents ?? []) pending.push(parent.id)
+  }
+  return false
+}
+
 function validateMemberPointer(
   memberId: string | undefined,
   path: string,

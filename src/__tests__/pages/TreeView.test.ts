@@ -541,9 +541,11 @@ describe('TreeView row order integration', () => {
     wrapper.unmount()
   })
 
-  it('resets auxiliary visibility when closing the project', async () => {
+  it('delegates project departure to the router without closing the session itself', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.setProject(project, createEmptyMeta('家族'), createEmptyFamily())
     const ui = useUiStore()
     ui.setShowAuxiliaryRelations(true)
     const wrapper = mount(TreeView, {
@@ -559,47 +561,22 @@ describe('TreeView row order integration', () => {
     const back = wrapper.findAll('button').find(button => button.text() === '返回')!
     await back.trigger('click')
 
-    expect(flushNowMock).toHaveBeenCalledOnce()
-    expect(ui.showAuxiliaryRelations).toBe(false)
+    expect(flushNowMock).not.toHaveBeenCalled()
+    expect(family.projectRef).toEqual(project)
+    expect(ui.showAuxiliaryRelations).toBe(true)
     expect(routerPush).toHaveBeenCalledWith('/')
+    wrapper.unmount()
   })
 
-  it('flushes pending changes before exporting a project backup', async () => {
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    const family = useFamilyStore()
-    const project = { providerId: 'browser-directory', id: 'test-project', displayName: 'test.family' }
-    family.setProject(project, {
-      name: '测试',
-      schemaVersion: 4,
-      createdAt: '2026-07-16T00:00:00.000Z',
-      updatedAt: '2026-07-16T00:00:00.000Z',
-    }, family.data)
-    const wrapper = mount(TreeView, {
-      global: {
-        plugins: [pinia],
-        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
-      },
-    })
-
-    const exportButton = wrapper.findAll('button')
-      .find(button => button.text() === '导出备份')!
-    await exportButton.trigger('click')
-
-    expect(flushNowMock).toHaveBeenCalledOnce()
-    expect(exportProjectBundleMock).toHaveBeenCalledWith(project)
-    expect(flushNowMock.mock.invocationCallOrder[0])
-      .toBeLessThan(exportProjectBundleMock.mock.invocationCallOrder[0]!)
-  })
-
-  it.each(['another-project', project.id])('does not export after the session changes while saving (%s)', async (id) => {
+  it.each(['another-project', project.id])('does not export after the session changes while choosing a destination (%s)', async (id) => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const family = useFamilyStore()
     const localProject = { ...project, providerId: 'browser-directory' }
     family.setProject(localProject, createEmptyMeta('原家族'), createEmptyFamily())
-    let finishSave!: () => void
-    flushNowMock.mockImplementationOnce(() => new Promise<void>(resolve => { finishSave = resolve }))
+    const runExport = vi.fn().mockResolvedValue({ kind: 'saved' })
+    let finishPicker!: (exporter: typeof runExport) => void
+    prepareExportMock.mockImplementationOnce(() => new Promise(resolve => { finishPicker = resolve }))
     const wrapper = mount(TreeView, {
       global: {
         plugins: [pinia],
@@ -608,56 +585,29 @@ describe('TreeView row order integration', () => {
     })
 
     await wrapper.findAll('button').find(button => button.text() === '导出备份')!.trigger('click')
-    expect(flushNowMock).toHaveBeenCalledOnce()
-    expect(exportProjectBundleMock).not.toHaveBeenCalled()
+    expect(prepareExportMock).toHaveBeenCalledExactlyOnceWith(localProject)
+    expect(runExport).not.toHaveBeenCalled()
 
     family.setProject({ ...localProject, id }, createEmptyMeta('新会话'), createEmptyFamily())
-    finishSave()
+    finishPicker(runExport)
     await flushPromises()
 
-    expect(exportProjectBundleMock).not.toHaveBeenCalled()
+    expect(runExport).not.toHaveBeenCalled()
+    expect(flushNowMock).not.toHaveBeenCalled()
     expect(family.projectRef).toEqual({ ...localProject, id })
     wrapper.unmount()
   })
 
-  it('keeps the project open when the final save fails', async () => {
+  it.each(['browser-directory', 'google-drive:account'])('exports an unsaved snapshot even when saving would conflict (%s)', async providerId => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const family = useFamilyStore()
     const ui = useUiStore()
-    family.setProject({ providerId: 'browser-directory', id: 'test-project', displayName: 'test.family' }, {
-      name: '测试',
-      schemaVersion: 4,
-      createdAt: '2026-07-16T00:00:00.000Z',
-      updatedAt: '2026-07-16T00:00:00.000Z',
-    }, family.data)
-    family.upsertMember(mk('a'))
-    flushNowMock.mockRejectedValueOnce(new Error('disk full'))
-    const wrapper = mount(TreeView, {
-      global: {
-        plugins: [pinia],
-        stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true },
-      },
-    })
-
-    const back = wrapper.findAll('button').find(button => button.text() === '返回')!
-    await back.trigger('click')
-
-    expect(family.projectRef).toEqual({ providerId: 'browser-directory', id: 'test-project', displayName: 'test.family' })
-    expect(routerPush).not.toHaveBeenCalled()
-    expect(ui.toast?.text).toContain('项目保持打开')
-  })
-
-  it('exports an unsaved cloud snapshot even when cloud saving would conflict', async () => {
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    const family = useFamilyStore()
-    const ui = useUiStore()
-    const cloudProject = { ...project, providerId: 'google-drive:account' }
-    const meta = { ...createEmptyMeta('云端家族'), updatedAt: '2020-01-01T00:00:00.000Z' }
-    family.setProject(cloudProject, meta, createEmptyFamily())
+    const source = { ...project, providerId }
+    const meta = { ...createEmptyMeta('测试家族'), updatedAt: '2020-01-01T00:00:00.000Z' }
+    family.setProject(source, meta, createEmptyFamily())
     family.upsertMember(mk('unsaved'))
-    flushNowMock.mockRejectedValue(new Error('conflicting remote revision'))
+    flushNowMock.mockRejectedValue(new Error('保存冲突'))
     const runExport = vi.fn().mockResolvedValue({ kind: 'saved' })
     prepareExportMock.mockResolvedValue(runExport)
     const wrapper = mount(TreeView, {
@@ -668,6 +618,8 @@ describe('TreeView row order integration', () => {
     await flushPromises()
 
     expect(flushNowMock).not.toHaveBeenCalled()
+    expect(authorizeProjectMock).not.toHaveBeenCalled()
+    expect(connectDriveMock).not.toHaveBeenCalled()
     expect(runExport).toHaveBeenCalledWith({
       meta: { ...meta, updatedAt: expect.any(String) }, family: expect.objectContaining({ members: { unsaved: mk('unsaved') } }),
     })
@@ -675,6 +627,33 @@ describe('TreeView row order integration', () => {
     expect(family.projectMeta!.updatedAt).toBe(meta.updatedAt)
     expect(family.isDirty).toBe(true)
     expect(ui.toast?.text).toContain('保存状态未改变')
+    family.updateMember('unsaved', { firstName: '导出后的新输入' })
+    expect(runExport.mock.calls[0]![0].family.members.unsaved).toEqual(mk('unsaved'))
+    wrapper.unmount()
+  })
+
+  it.each(['browser-directory', 'google-drive:account'])('preserves unsaved edits and reports an incomplete backup when export fails (%s)', async providerId => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const family = useFamilyStore()
+    family.setProject({ ...project, providerId }, createEmptyMeta('测试家族'), createEmptyFamily())
+    family.upsertMember({ ...mk('unsaved'), photoId: 'unreadable-photo' })
+    flushNowMock.mockRejectedValue(new Error('保存冲突'))
+    const runExport = vi.fn().mockRejectedValue(new Error('无法读取照片，未生成完整备份'))
+    prepareExportMock.mockResolvedValue(runExport)
+    const wrapper = mount(TreeView, {
+      global: { plugins: [pinia], stubs: { TreeLayoutHost: TreeLayoutHostStub, SearchBar: true } },
+    })
+
+    await wrapper.findAll('button').find(button => button.text() === '导出备份')!.trigger('click')
+    await flushPromises()
+
+    expect(runExport).toHaveBeenCalledOnce()
+    expect(flushNowMock).not.toHaveBeenCalled()
+    expect(family.isDirty).toBe(true)
+    expect(family.data.members.unsaved.photoId).toBe('unreadable-photo')
+    expect(useUiStore().toast).toEqual({ type: 'error', text: '导出失败：无法读取照片，未生成完整备份' })
+    expect(wrapper.find('[data-testid="download-bundle"]').exists()).toBe(false)
     wrapper.unmount()
   })
 

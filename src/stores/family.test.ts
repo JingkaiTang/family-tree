@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useFamilyStore } from './family'
-import { mk } from '@/__tests__/fixtures/families'
+import { addParent, mk } from '@/__tests__/fixtures/families'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
+import { validateFamilyIntegrity } from '@/core/familyIntegrity'
 
 describe('family store relation invariants', () => {
   it('blocks domain edits before changing a read-only project', () => {
@@ -34,6 +35,50 @@ describe('family store relation invariants', () => {
 
     expect(family.getCurrentSpouseConflicts('a', 'c')).toEqual(['b'])
     expect(family.getCurrentSpouseConflicts('b', 'c')).toEqual(['a'])
+  })
+
+  it.each((['blood', 'adopted', 'step'] as const).flatMap(type => (
+    [false, true].flatMap(indirect => (['parent', 'child'] as const)
+      .map(kind => ({ type, indirect, kind })))
+  )))('rejects $type ancestry cycles ($kind, indirect=$indirect) before changing state', ({ type, indirect, kind }) => {
+    const family = useFamilyStore()
+    const ancestor = mk('ancestor')
+    const child = mk('child')
+    const grandchild = mk('grandchild')
+    addParent(child, ancestor, type)
+    if (indirect) addParent(grandchild, child, type)
+    family.$patch(state => {
+      state.data.members = { ancestor, child, grandchild }
+    })
+    family.markClean()
+    const descendantId = indirect ? 'grandchild' : 'child'
+    const before = JSON.stringify(family.data)
+    const revision = family.revision
+
+    expect(() => kind === 'parent'
+      ? family.linkRelation('ancestor', descendantId, kind)
+      : family.linkRelation(descendantId, 'ancestor', kind))
+      .toThrow('祖先')
+
+    expect(JSON.stringify(family.data)).toBe(before)
+    expect(family.revision).toBe(revision)
+    expect(family.isDirty).toBe(false)
+  })
+
+  it.each(['blood', 'adopted', 'step'] as const)('allows an existing %s parent edge without changing its type', type => {
+    const family = useFamilyStore()
+    const parent = mk('parent')
+    const child = mk('child')
+    addParent(child, parent, type)
+    family.$patch(state => {
+      state.data.members = { parent, child }
+    })
+
+    expect(() => family.linkRelation('child', 'parent', 'parent')).not.toThrow()
+    expect(() => family.linkRelation('parent', 'child', 'child')).not.toThrow()
+    expect(child.parents).toEqual([{ id: 'parent', type }])
+    expect(parent.children).toEqual([{ id: 'child', type }])
+    expect(validateFamilyIntegrity(family.data)).toEqual([])
   })
 
   it('only marks the exact saved project revision as clean', () => {
@@ -346,5 +391,25 @@ describe('family store relation invariants', () => {
         'unit:person:a': '#111111',
       },
     })
+  })
+
+  it.each([
+    { deletedId: 'child', expectedChild: undefined, expectedOnlyParent: { primaryParentId: 'parent' } },
+    { deletedId: 'parent', expectedChild: { primarySpouseId: 'spouse' }, expectedOnlyParent: undefined },
+    { deletedId: 'spouse', expectedChild: { primaryParentId: 'parent' }, expectedOnlyParent: { primaryParentId: 'parent' } },
+  ])('cleans legacy layout references when deleting $deletedId', ({ deletedId, expectedChild, expectedOnlyParent }) => {
+    const family = useFamilyStore()
+    for (const id of ['parent', 'spouse', 'child', 'onlyParent', 'unrelatedParent', 'unrelatedChild']) {
+      family.upsertMember(mk(id))
+    }
+    family.setChildLayoutAssignment('child', { primaryParentId: 'parent', primarySpouseId: 'spouse' })
+    family.setChildLayoutAssignment('onlyParent', { primaryParentId: 'parent' })
+    family.setChildLayoutAssignment('unrelatedChild', { primaryParentId: 'unrelatedParent' })
+
+    family.deleteMember(deletedId)
+
+    expect(family.data.childLayoutAssignments.child).toEqual(expectedChild)
+    expect(family.data.childLayoutAssignments.onlyParent).toEqual(expectedOnlyParent)
+    expect(family.data.childLayoutAssignments.unrelatedChild).toEqual({ primaryParentId: 'unrelatedParent' })
   })
 })

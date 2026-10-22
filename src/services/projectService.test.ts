@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { createEmptyFamily, createEmptyMeta, SCHEMA_VERSION, type Member } from '@/core/schema'
+import { useFamilyStore } from '@/stores/family'
 import { copyProject, createProject, openProject, saveProject } from './projectService'
 import type { ProjectRef } from './storage'
 
@@ -80,6 +82,21 @@ describe('projectService format boundary', () => {
 
     await expect(saveProject(project, family)).rejects.toThrow('rootMemberId')
     expect(api.saveProject).not.toHaveBeenCalled()
+  })
+
+  it.each(['child', 'parent', 'spouse'])('删除布局引用中的 %s 后仍可保存项目', async deletedId => {
+    setActivePinia(createPinia())
+    const family = useFamilyStore()
+    for (const id of ['parent', 'spouse', 'child']) family.upsertMember(member(id))
+    family.linkRelation('child', 'parent', 'parent')
+    family.linkCurrentSpouse('parent', 'spouse')
+    family.setChildLayoutAssignment('child', { primaryParentId: 'parent', primarySpouseId: 'spouse' })
+
+    family.deleteMember(deletedId)
+
+    await expect(saveProject(project, family.data)).resolves.toBeUndefined()
+    expect(api.saveProject).toHaveBeenCalledExactlyOnceWith(project, family.data)
+    expect(family.data.members[deletedId]).toBeUndefined()
   })
 
   it('创建后保存到提供商返回的新项目，而不是创建目标', async () => {

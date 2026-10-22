@@ -33,21 +33,41 @@ const routes: RouteRecordRaw[] = [
 export function createAppRouter(history: RouterHistory = createWebHashHistory()) {
   const router = createRouter({ history, routes })
   const closingProjects = new WeakMap<RouteLocationNormalized, number>()
-  router.beforeEach((to) => {
-    if (to.name === 'member-new' && useFamilyStore().projectRef && !useFamilyStore().canEdit) {
+  const departureSessions = new WeakMap<RouteLocationNormalized, { projectToken: number; draftRevision: number }>()
+  router.beforeEach((to, from) => {
+    const family = useFamilyStore()
+    if (to.name === 'member-new' && family.projectRef && !family.canEdit) {
       return { name: 'tree', replace: true }
     }
     // 刷新项目页面时内存 store 尚未恢复，统一交给 Welcome 读取最近项目和处理授权。
-    if (to.meta.requiresProject && !useFamilyStore().projectRef) {
+    if (to.meta.requiresProject && !family.projectRef) {
       return { name: 'welcome', replace: true }
+    }
+    if (from.meta.requiresProject && !to.meta.requiresProject && family.projectRef) {
+      // 组件草稿守卫已通过，但目标页面尚未懒加载；把此刻的确认绑定到本次导航。
+      departureSessions.set(to, {
+        projectToken: family.projectToken,
+        draftRevision: useUiStore().memberDraftRevision,
+      })
     }
   })
   router.beforeResolve(async (to, from) => {
     const family = useFamilyStore()
     if (from.meta.requiresProject && !to.meta.requiresProject && family.projectRef) {
-      const projectToken = family.projectToken
+      const departure = departureSessions.get(to)
+      if (!departure) return false
+      const ui = useUiStore()
+      const canLeave = () => {
+        if (family.projectToken !== departure.projectToken) return false
+        if (ui.memberDraftRevision === departure.draftRevision) return true
+        if (router.currentRoute.value === from) {
+          ui.showToast('info', '等待离开期间资料发生变化，项目保持打开。请先保存或放弃资料，再返回。')
+        }
+        return false
+      }
+      if (!canLeave()) return false
       try {
-        // 在离开组件的草稿守卫和目标页面懒加载之后保存，覆盖等待加载期间发生的编辑。
+        // 资料草稿仍由成员页拥有；只刷新已提交到 store 的修改。
         // 浏览器后退也必须等待落盘；失败时留在当前项目，不自动弹出授权窗口。
         await flushNow()
       } catch (error) {
@@ -55,13 +75,14 @@ export function createAppRouter(history: RouterHistory = createWebHashHistory())
           + (error instanceof Error ? error.message : String(error)))
         return false
       }
-      if (family.projectToken !== projectToken) return false
-      closingProjects.set(to, projectToken)
+      if (!canLeave()) return false
+      closingProjects.set(to, departure.projectToken)
     }
   })
   router.afterEach((to, _from, failure) => {
     const projectToken = closingProjects.get(to)
     closingProjects.delete(to)
+    departureSessions.delete(to)
     const family = useFamilyStore()
     // 等待保存期间用户可能发起另一条导航；只有成功离开的那条导航才能关闭会话。
     if (failure || projectToken === undefined || family.projectToken !== projectToken) return

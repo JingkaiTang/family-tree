@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
@@ -30,6 +30,8 @@ const privacyUrl = `${import.meta.env.BASE_URL}privacy.html`
 const aboutUrl = `${import.meta.env.BASE_URL}about.html`
 const family = useFamilyStore()
 const ui = useUiStore()
+let disposed = false
+onBeforeUnmount(() => { disposed = true })
 
 const busy = ref(false)
 const preparingDrive = ref(false)
@@ -124,11 +126,17 @@ async function onCreateDrive() {
 async function onChooseDriveVersion(revisionId: string) {
   const project = conflictingProject.value
   if (!project || busy.value) return
+  const token = family.projectToken
+  let acceptedToken: number | undefined
   busy.value = true
   error.value = null
   try {
-    const result = await selectGoogleDriveVersion(project, revisionId)
-    family.setProject(result.project, result.meta, result.family, result.access)
+    await selectGoogleDriveVersion(project, revisionId, result => {
+      if (disposed || family.projectToken !== token) throw new Error('当前项目已切换，未打开历史版本。')
+      family.setProject(result.project, result.meta, result.family, result.access)
+      acceptedToken = family.projectToken
+    })
+    if (disposed || family.projectToken !== acceptedToken) return
     startAutosave()
     ui.showToast('info', '已打开所选版本；其他版本仍保留在 Google Drive。')
     await router.push('/tree')

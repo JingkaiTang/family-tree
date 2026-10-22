@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useFamilyStore } from '@/stores/family'
 import type { Member } from '@/core/schema'
+import { decodeIdTuple, encodeIdTuple } from '@/core/idEncoding'
 
 type RelationKind = 'parent' | 'child' | 'sibling' | 'spouse' | 'godparent' | 'godchild'
 
@@ -48,14 +49,15 @@ const godchildrenList = computed(() =>
 
 const addKind = ref<RelationKind>('parent')
 const addTargetId = ref<string>('')
+const addError = ref<string | null>(null)
 
 const childLayoutValue = computed({
   get() {
     const assignment = family.data.childLayoutAssignments[props.memberId]
-    if (!assignment?.primaryParentId) return ''
-    return assignment.primarySpouseId
-      ? `${assignment.primaryParentId}+${assignment.primarySpouseId}`
-      : assignment.primaryParentId
+    if (assignment?.primaryParentId === undefined) return ''
+    return encodeIdTuple(assignment.primarySpouseId !== undefined
+      ? [assignment.primaryParentId, assignment.primarySpouseId]
+      : [assignment.primaryParentId])
   },
   set(value: string) {
     if (!value) {
@@ -63,8 +65,11 @@ const childLayoutValue = computed({
       return
     }
 
-    const [primaryParentId, primarySpouseId] = value.split('+')
-    family.setChildLayoutAssignment(props.memberId, primarySpouseId
+    const ids = decodeIdTuple(value)
+    if (!ids || ids.length < 1 || ids.length > 2) return
+    if (!childLayoutOptions.value.some(option => option.value === value)) return
+    const [primaryParentId, primarySpouseId] = ids
+    family.setChildLayoutAssignment(props.memberId, primarySpouseId !== undefined
       ? { primaryParentId, primarySpouseId }
       : { primaryParentId },
     )
@@ -78,21 +83,23 @@ const childLayoutOptions = computed(() => {
     .map((parent) => family.getMember(parent.id))
     .filter((parent): parent is Member => Boolean(parent))
     .flatMap((parent) => {
+      const parentOption = { value: encodeIdTuple([parent.id]), label: fullName(parent) }
       const spouse = parent.spouses.find((ref) => ref.type === 'married')
-      if (!spouse) return [{ value: parent.id, label: fullName(parent) }]
+      if (!spouse) return [parentOption]
 
       const spouseMember = family.getMember(spouse.id)
-      if (!spouseMember) return [{ value: parent.id, label: fullName(parent) }]
+      if (!spouseMember) return [parentOption]
 
       return [
-        { value: `${parent.id}+${spouse.id}`, label: `${fullName(parent)} + ${fullName(spouseMember)}` },
-        { value: parent.id, label: fullName(parent) },
+        { value: encodeIdTuple([parent.id, spouse.id]), label: `${fullName(parent)} + ${fullName(spouseMember)}` },
+        parentOption,
       ]
     })
 })
 
 function addRelation() {
   if (!addTargetId.value) return
+  addError.value = null
   if (addKind.value === 'spouse') {
     const conflicts = family.getCurrentSpouseConflicts(props.memberId, addTargetId.value)
     if (conflicts.length > 0) {
@@ -109,8 +116,12 @@ function addRelation() {
     return
   }
 
-  family.linkRelation(props.memberId, addTargetId.value, addKind.value)
-  addTargetId.value = ''
+  try {
+    family.linkRelation(props.memberId, addTargetId.value, addKind.value)
+    addTargetId.value = ''
+  } catch (error) {
+    addError.value = error instanceof Error ? error.message : String(error)
+  }
 }
 
 function removeRelation(otherId: string, kind: RelationKind) {
@@ -261,6 +272,7 @@ function fullName(m: Member) {
     <!-- 添加关系 -->
     <div class="rounded-md border border-slate-200 bg-white p-2">
       <div class="mb-2 text-xs font-medium text-slate-500">添加关系</div>
+      <p v-if="addError" role="alert" class="mb-2 text-xs text-rose-600">{{ addError }}</p>
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
         <select v-model="addKind" class="rounded border border-slate-300 px-2 py-1">
           <option value="parent">父母</option>

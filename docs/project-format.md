@@ -1,6 +1,6 @@
 # 项目与备份格式
 
-Family Tree 的领域数据共用 `schemaVersion=4`。本地项目使用用户授权的普通目录，推荐目录名以 `.family` 结尾，但识别依赖标记文件；Google Drive 使用下文的独立版本封装。两者均能导出 `.familybundle`，不应把 Drive 内部文件布局当作可直接打开的本地目录。
+Family Tree 的领域数据共用 `schemaVersion=5`。本地项目使用用户授权的普通目录，推荐目录名以 `.family` 结尾，但识别依赖标记文件；Google Drive 使用下文的独立版本封装。两者均能导出 `.familybundle`，不应把 Drive 内部文件布局当作可直接打开的本地目录。
 
 ## 目录结构
 
@@ -23,14 +23,14 @@ MyFamily.family/
 
 ## 当前版本
 
-当前 `schemaVersion` 为 **4**，定义在 `src/core/schema.ts`。
+当前 `schemaVersion` 为 **5**，定义在 `src/core/schema.ts`。
 
 `meta.json` 示例：
 
 ```json
 {
   "name": "示例家族",
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "createdAt": "2026-07-16T00:00:00Z",
   "updatedAt": "2026-07-16T00:00:00Z"
 }
@@ -40,7 +40,7 @@ MyFamily.family/
 
 | 字段 | 说明 |
 |---|---|
-| `schemaVersion` | 格式版本，保存时必须等于 4 |
+| `schemaVersion` | 格式版本，保存时必须等于 5 |
 | `members` | `memberId -> Member` 映射，键必须等于成员内部 `id` |
 | `nicknameOverrides` | 指定两名成员之间的自定义称谓 |
 | `siblingOrders` | 按兄弟姐妹关系组保存的共享顺序（同父母组使用 `parentage:*`，跨父母组或显式关系使用 `siblings:*`），用于布局和长幼称呼；未设置时按出生日期排序 |
@@ -69,7 +69,11 @@ MyFamily.family/
 
 ## 版本迁移
 
-`src/core/migrate.ts` 负责把 0–3 版本逐步转换到版本 4，包括配偶关系规范化、旧布局字段转换和偏好协调。高于当前版本的文件会拒绝打开，避免旧版本网页破坏新数据。
+`src/core/migrate.ts` 负责把 0–4 版本逐步转换到版本 5，包括配偶关系规范化、旧布局字段转换和偏好协调。高于当前版本的文件会拒绝打开，避免旧版本网页破坏新数据。
+
+版本 5 为派生关系、家庭单元、根族和域标识引入可逆的元组编码；成员原始 ID 和关系引用不改写。`+` 分隔的元组把各项中的 `%`、`+` 分别转义为 `%25`、`%2B`，`|` 分隔的根签名同理使用 `%25`、`%7C`；空项用 `%e` 表示，空元组是空字符串。转义逐层应用，解码只接受规范形式。普通 UUID 标识保持原样；形成集合的 ID 先按 locale 顺序排序，collation 相等时以原始字符串顺序打破平局，避免不同 Unicode 字符串随输入顺序生成不同键。
+
+迁移根据实际成员及关系建立旧标识到新标识的映射，更新 `siblingOrders`、根/行/桥域顺序、列位置和配色。仅有唯一去向的旧键会保留；旧格式已将两组事实合为同一字符串时，无法确定归属的偏好会丢弃并使用自动布局，成员和关系本身完整保留。V2 网格偏好直接转换为新编码，不重复转义；重复打开已迁移项目不会再改写标识。
 
 格式变更必须同时：
 
@@ -92,7 +96,7 @@ MyFamily.family/
 
 每个 Drive 项目是“我的云端硬盘”中的文件夹，使用私有 `appProperties` 识别归属；文件名只供查看，不作为唯一标识。项目文件夹下保存不可变版本 JSON、WebP 主图和缩略图，没有持续覆盖的 `family.json` 或三份滚动备份。
 
-版本封装的 `formatVersion` 当前为 **1**，与内部家谱的 `schemaVersion=4` 分开：
+版本封装的 `formatVersion` 当前为 **1**，与内部家谱的 `schemaVersion=5` 分开：
 
 ```ts
 interface DriveRevision {

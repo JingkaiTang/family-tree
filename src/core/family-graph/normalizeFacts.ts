@@ -1,4 +1,5 @@
 import type { FamilyData } from '@/core/schema'
+import { compareIds, encodeIdTuple } from '@/core/idEncoding'
 import type {
   NormalizedFamilyFactsResult,
   ParentageFact,
@@ -14,7 +15,7 @@ const PARENT_TYPES = ['blood', 'adopted', 'step'] as const
 export function normalizeFacts(data: FamilyData): NormalizedFamilyFactsResult {
   const diagnostics: NormalizedFamilyFactsResult['diagnostics'] = []
   const people = Object.values(data.members)
-    .sort((a, b) => a.id.localeCompare(b.id))
+    .sort((a, b) => compareIds(a.id, b.id))
     .map(member => ({ id: member.id, member }))
   const knownIds = new Set(people.map(person => person.id))
   const partnershipById = new Map<string, PartnershipFact>()
@@ -30,9 +31,9 @@ export function normalizeFacts(data: FamilyData): NormalizedFamilyFactsResult {
         continue
       }
       if (spouse.id === person.id) continue
-      const partnerIds = [person.id, spouse.id].sort((a, b) => a.localeCompare(b))
+      const partnerIds = [person.id, spouse.id].sort(compareIds)
       const status = spouse.type === 'married' ? 'current' : 'historical'
-      const id = `partnership:${status}:${partnerIds.join('+')}`
+      const id = `partnership:${status}:${encodeIdTuple(partnerIds)}`
       partnershipById.set(id, { id, partnerIds, status })
     }
   }
@@ -49,13 +50,13 @@ export function normalizeFacts(data: FamilyData): NormalizedFamilyFactsResult {
         })
         return false
       })
-      .sort((a, b) => a.id.localeCompare(b.id))
+      .sort((a, b) => compareIds(a.id, b.id))
     for (const type of PARENT_TYPES) {
       const parentIds = [...new Set(validParents
         .filter(parent => parent.type === type)
         .map(parent => parent.id))]
       if (parentIds.length === 0) continue
-      const id = `parentage:${parentIds.join('+')}`
+      const id = `parentage:${encodeIdTuple(parentIds)}`
       const existing = parentageById.get(id) ?? {
         id,
         parentIds,
@@ -70,13 +71,13 @@ export function normalizeFacts(data: FamilyData): NormalizedFamilyFactsResult {
 
   const parentages = [...parentageById.values()].map(parentage => ({
     ...parentage,
-    childIds: [...new Set(parentage.childIds)].sort((a, b) => a.localeCompare(b)),
-  })).sort((a, b) => a.id.localeCompare(b.id))
+    childIds: [...new Set(parentage.childIds)].sort(compareIds),
+  })).sort((a, b) => compareIds(a.id, b.id))
 
   return {
     facts: {
       people,
-      partnerships: [...partnershipById.values()].sort((a, b) => a.id.localeCompare(b.id)),
+      partnerships: [...partnershipById.values()].sort((a, b) => compareIds(a.id, b.id)),
       parentages,
     },
     diagnostics: diagnostics.sort((a, b) => a.message.localeCompare(b.message)),

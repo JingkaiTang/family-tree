@@ -307,7 +307,7 @@ function ancestorBlocksFor(context: FocusFlowContext, focusId: string): FocusFlo
       if (seenParentageIds.has(parentage.id)) continue
       seenParentageIds.add(parentage.id)
       blocks.push(block(
-        `ancestors:${parentId}:${parentage.id}`,
+        `ancestors:${JSON.stringify([parentId, parentage.id])}`,
         parentage.parentIds,
         'ancestors',
         `${memberName(context.memberById.get(parentId)!)}的${parentageLabel(parentage.typeByChildId[parentId])}`,

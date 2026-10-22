@@ -8,6 +8,8 @@ import Welcome from '@/pages/Welcome.vue'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
+import type { OpenResult } from '@/services/projectService'
+import type { ProjectRef } from '@/services/storage/types'
 
 const mocks = vi.hoisted(() => ({
   pickProject: vi.fn(),
@@ -34,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   isGoogleDriveProvider: vi.fn(),
   listGoogleDriveVersions: vi.fn(),
   selectGoogleDriveVersion: vi.fn(),
+  afterVersionAcceptance: vi.fn(),
 }))
 
 vi.mock('@/services/googleDriveConnection', async () => {
@@ -47,7 +50,10 @@ vi.mock('@/services/googleDriveConnection', async () => {
     listGoogleDriveProjects: mocks.listGoogleDriveProjects,
     isGoogleDriveProvider: mocks.isGoogleDriveProvider,
     listGoogleDriveVersions: mocks.listGoogleDriveVersions,
-    selectGoogleDriveVersion: mocks.selectGoogleDriveVersion,
+    selectGoogleDriveVersion: async (project: ProjectRef, revisionId: string, accept: (result: OpenResult) => undefined) => {
+      accept(await mocks.selectGoogleDriveVersion(project, revisionId))
+      mocks.afterVersionAcceptance()
+    },
   }
 })
 
@@ -202,6 +208,48 @@ describe('Welcome Google Drive connections', () => {
     expect(mocks.selectGoogleDriveVersion).toHaveBeenCalledWith(driveProject, 'b')
     expect(family.projectRef).toEqual(driveProject)
     expect(mocks.routerPush).toHaveBeenCalledWith('/tree')
+  })
+
+  it('rejects a historical version if another project is adopted while it is loading', async () => {
+    mocks.getLastProjectRef.mockReturnValue(driveProject)
+    mocks.openProject.mockRejectedValue(Object.assign(new Error('存在多个远端分支'), { name: 'GoogleDriveConflictError' }))
+    mocks.listGoogleDriveVersions.mockResolvedValue([{ id: 'old', createdTime: '历史版本', isHead: false }])
+    let finish!: (loaded: OpenResult) => void
+    mocks.selectGoogleDriveVersion.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const { wrapper, family } = await mountedWelcome()
+    await wrapper.findAll('button').find(button => button.text() === driveProject.displayName)!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === '历史版本')!.trigger('click')
+    await flushPromises()
+
+    family.setProject(selected, createEmptyMeta('新项目'), createEmptyFamily())
+    finish({ project: driveProject, meta: createEmptyMeta('旧项目'), family: createEmptyFamily() })
+    await flushPromises()
+
+    expect(family.projectRef).toEqual(selected)
+    expect(mocks.startAutosave).not.toHaveBeenCalled()
+    expect(mocks.routerPush).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('当前项目已切换')
+  })
+
+  it.each(['new-project', 'unmount'])('does not navigate after version acceptance if %s supersedes it', async change => {
+    mocks.getLastProjectRef.mockReturnValue(driveProject)
+    mocks.openProject.mockRejectedValue(Object.assign(new Error('存在多个远端分支'), { name: 'GoogleDriveConflictError' }))
+    mocks.listGoogleDriveVersions.mockResolvedValue([{ id: 'old', createdTime: '历史版本', isHead: false }])
+    mocks.selectGoogleDriveVersion.mockResolvedValue({ project: driveProject, meta: createEmptyMeta('旧项目'), family: createEmptyFamily() })
+    const { wrapper, family } = await mountedWelcome()
+    await wrapper.findAll('button').find(button => button.text() === driveProject.displayName)!.trigger('click')
+    await flushPromises()
+    mocks.afterVersionAcceptance.mockImplementation(() => {
+      if (change === 'unmount') wrapper.unmount()
+      else family.setProject(selected, createEmptyMeta('新项目'), createEmptyFamily())
+    })
+
+    await wrapper.findAll('button').find(button => button.text() === '历史版本')!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.startAutosave).not.toHaveBeenCalled()
+    expect(mocks.routerPush).not.toHaveBeenCalled()
   })
 })
 

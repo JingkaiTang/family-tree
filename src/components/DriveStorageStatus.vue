@@ -27,6 +27,7 @@ const draftUrl = ref<string | null>(null)
 const draftRevision = ref<number | null>(null)
 const currentError = computed(() => error.value || googleDriveState.error)
 const draftName = computed(() => `${(family.projectMeta?.name || '家族草稿').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 80)}-草稿.json`)
+let disposed = false
 
 function revokeDraft() {
   if (draftUrl.value) URL.revokeObjectURL(draftUrl.value)
@@ -39,7 +40,10 @@ watch(() => family.projectToken, () => {
   versions.value = []
   revokeDraft()
 })
-onBeforeUnmount(revokeDraft)
+onBeforeUnmount(() => {
+  disposed = true
+  revokeDraft()
+})
 
 function report(e: unknown) {
   error.value = e instanceof Error ? e.message : String(e)
@@ -98,19 +102,24 @@ async function onSelectVersion(revisionId: string) {
   if (!project || busy.value) return
   if (!window.confirm('打开此版本将替换当前页面的家族内容，尚未保存的编辑将被放弃。Google Drive 中其他版本会保留。继续吗？')) return
   const revision = family.revision
+  const draftRevision = ui.memberDraftRevision
+  let acceptedToken: number | undefined
   busy.value = true
   error.value = null
   try {
-    const result = await selectGoogleDriveVersion(project, revisionId)
-    if (family.projectToken !== token) return
-    if (family.revision !== revision) {
-      throw new Error('读取版本期间又产生了修改，未切换版本。请先导出草稿，再重新选择版本，或确认以当前内容解决冲突后继续。')
-    }
-    family.setProject(result.project, result.meta, result.family, result.access)
-    ui.setSelected(null)
-    ui.setViewpoint(null)
-    ui.setCanvasView(null)
-    ui.resetFocusFlowState()
+    await selectGoogleDriveVersion(project, revisionId, result => {
+      if (disposed || family.projectToken !== token) throw new Error('当前项目已切换，未打开历史版本。')
+      if (family.revision !== revision || ui.memberDraftRevision !== draftRevision) {
+        throw new Error('读取版本期间又产生了修改或切换了编辑页面，未切换版本。请先导出草稿，再重新选择版本，或确认以当前内容解决冲突后继续。')
+      }
+      family.setProject(result.project, result.meta, result.family, result.access)
+      acceptedToken = family.projectToken
+      ui.setSelected(null)
+      ui.setViewpoint(null)
+      ui.setCanvasView(null)
+      ui.resetFocusFlowState()
+    })
+    if (disposed || family.projectToken !== acceptedToken) return
     await router.push('/tree')
     ui.showToast('info', '已打开所选版本；其他版本仍保留在 Google Drive。')
   } catch (e) {

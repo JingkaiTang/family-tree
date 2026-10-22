@@ -39,11 +39,11 @@ function rawFamily(members: Member[], patch: Record<string, unknown> = {}): Reco
 }
 
 describe('migrate', () => {
-  it('creates V4 families with empty semantic layout preferences', () => {
+  it('creates V5 families with empty semantic layout preferences', () => {
     const family = createEmptyFamily()
 
-    expect(SCHEMA_VERSION).toBe(4)
-    expect(family.schemaVersion).toBe(4)
+    expect(SCHEMA_VERSION).toBe(5)
+    expect(family.schemaVersion).toBe(5)
     expect(family.layoutPreferences).toEqual({
       rootOrders: [],
       rowOrders: [],
@@ -198,7 +198,7 @@ describe('migrate', () => {
       },
     })
 
-    expect(migrated.schemaVersion).toBe(4)
+    expect(migrated.schemaVersion).toBe(5)
     expect(migrated.layoutPreferences).toEqual({
       rootOrders: [],
       rowOrders: [{

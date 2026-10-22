@@ -48,11 +48,21 @@ interface ProjectState {
   unconfirmedRename?: boolean
 }
 
+interface ValidatedDriveProject extends StoredProject {
+  meta: ProjectMeta
+  family: FamilyData
+}
+
 export interface GoogleDriveStorage extends ProjectStorageProvider {
   getProjectAccess(projectId: string): Promise<ProjectAccess>
   listProjects(): Promise<Array<{ id: string; displayName: string }>>
   listVersions(projectId: string): Promise<Array<{ id: string; createdTime: string; isHead: boolean }>>
-  loadVersion(projectId: string, revisionId: string): Promise<StoredProject>
+  /**
+   * Read and accept a historical snapshot in the project's serial queue.
+   * The caller must synchronously check/apply the result; throwing leaves
+   * the save baseline unchanged. An async callback cannot accept a version.
+   */
+  loadVersion(projectId: string, revisionId: string, accept: (loaded: ValidatedDriveProject) => undefined): Promise<ValidatedDriveProject>
   resolveConflict(projectId: string, family: FamilyData, expectedHeads: readonly string[]): Promise<void>
 }
 
@@ -284,8 +294,12 @@ export function createGoogleDriveStorage(
     await finishPending(projectId, state)
   }
 
-  function stored(projectId: string, folder: DriveFile, revision: Revision): StoredProject {
-    return { id: projectId, displayName: folder.name, meta: revision.meta, family: revision.family, access: access(folder) }
+  function validatedStored(projectId: string, folder: DriveFile, revision: Revision): ValidatedDriveProject {
+    const validated = validateLoadedProject({
+      ref: { providerId, id: projectId, displayName: folder.name },
+      meta: revision.meta, family: revision.family, access: access(folder),
+    })
+    return { id: projectId, displayName: folder.name, meta: validated.meta, family: validated.family, access: validated.access }
   }
 
   return {
@@ -318,8 +332,9 @@ export function createGoogleDriveStorage(
         if (current.heads.length === 0) invalid('项目尚未完成首次保存')
         const node = current.nodes.get(current.heads[0])!
         const revision = node.revision ?? await readRevision(node.file, projectId)
-        states.set(projectId, { base: revision.revisionId, meta: revision.meta, historical: false })
-        return stored(projectId, current.folder, revision)
+        const loaded = validatedStored(projectId, current.folder, revision)
+        states.set(projectId, { base: revision.revisionId, meta: loaded.meta, historical: false })
+        return loaded
       })
     },
     saveProject(projectId, family) {
@@ -378,15 +393,19 @@ export function createGoogleDriveStorage(
         id, createdTime: node.file.createdTime ?? '', isHead: current.heads.includes(id),
       })).sort((left, right) => right.createdTime.localeCompare(left.createdTime) || left.id.localeCompare(right.id))
     },
-    loadVersion(projectId, revisionId) {
+    loadVersion(projectId, revisionId, accept) {
       return serial(projectId, async () => {
         checkId(revisionId)
         const current = await graph(projectId)
         const node = current.nodes.get(revisionId)
         if (!node) invalid('该版本不属于当前项目')
         const revision = node.revision ?? await readRevision(node.file, projectId)
-        states.set(projectId, { base: revisionId, meta: revision.meta, historical: true })
-        return stored(projectId, current.folder, revision)
+        const loaded = validatedStored(projectId, current.folder, revision)
+        // No await between UI acceptance and the baseline commit: queued saves
+        // must observe both changes together, or neither if acceptance throws.
+        accept(loaded)
+        states.set(projectId, { base: revisionId, meta: loaded.meta, historical: true })
+        return loaded
       })
     },
     resolveConflict(projectId, family, expectedHeads) {

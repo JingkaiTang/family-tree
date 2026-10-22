@@ -97,18 +97,8 @@ function ensureLayoutFocus() {
 }
 
 async function onBack() {
-  try {
-    await flushNow()
-    ui.setViewpoint(null)
-    ui.setSelected(null)
-    ui.setShowAuxiliaryRelations(false)
-    ui.setCanvasView(null)
-    ui.resetFocusFlowState()
-    family.closeProject()
-    await router.push('/')
-  } catch (e) {
-    ui.showToast('error', '保存失败，项目保持打开：' + (e instanceof Error ? e.message : String(e)))
-  }
+  // 统一路由守卫等待保存，并且只在这次导航成功后关闭项目。
+  await router.push('/')
 }
 
 async function onSaveNow() {
@@ -136,10 +126,8 @@ async function onExportBundle() {
     clearBundleDownload()
     const runExport = await prepareProjectBundleExport(project)
     if (!runExport || disposed || family.projectToken !== projectToken) return
-    // A cloud conflict must not block rescuing the current editor snapshot.
-    if (project.providerId === 'browser-directory') await flushNow()
-    if (disposed || family.projectToken !== projectToken) return
     if (!family.projectMeta) return
+    // 备份独立导出当前快照，原项目的保存冲突不能阻断数据救援。
     const exported = await runExport({
       meta: { ...family.projectMeta, updatedAt: new Date().toISOString() },
       family: JSON.parse(JSON.stringify(family.data)),
@@ -149,9 +137,7 @@ async function onExportBundle() {
       bundleDownload.value = { url: URL.createObjectURL(exported.blob), filename: exported.filename }
       ui.showToast('info', '备份已准备，请点击下载备份。备份不代表项目已保存。')
     } else {
-      ui.showToast('success', project.providerId === 'browser-directory'
-        ? '家族备份已导出'
-        : '家族备份已导出；项目的保存状态未改变')
+      ui.showToast('success', '家族备份已导出；项目的保存状态未改变')
     }
   } catch (e) {
     if (disposed || family.projectToken !== projectToken) return

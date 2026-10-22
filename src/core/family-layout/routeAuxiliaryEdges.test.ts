@@ -110,7 +110,7 @@ describe('routeAuxiliaryEdges', () => {
     expect(primaryGeometry(focused)).toEqual(primaryGeometry(hidden))
     expect(focused.diagnostics).toEqual([{
       code: 'UNROUTABLE_AUXILIARY_EDGE',
-      ids: ['aux:godparent:b-godmother>c-godchild', 'b-godmother', 'c-godchild'],
+      ids: ['aux:godparent:["b-godmother","c-godchild"]', 'b-godmother', 'c-godchild'],
       message: '部分辅助连线暂时无法显示：当前卡片间没有找到安全通道。',
     }])
   })

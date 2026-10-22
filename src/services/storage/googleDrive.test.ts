@@ -197,7 +197,7 @@ describe('Google Drive immutable project storage', () => {
     const first = (await provider.listVersions(projectId))[0].id
     await provider.saveProject(projectId, family('current'))
     const currentHeads = (await provider.listVersions(projectId)).filter(v => v.isHead).map(v => v.id)
-    const selected = await provider.loadVersion(projectId, first)
+    const selected = await provider.loadVersion(projectId, first, () => {})
     expect(selected.family).toEqual(family('initial'))
     await expect(provider.saveProject(projectId, family('initial'))).rejects.toBeInstanceOf(GoogleDriveConflictError)
     await provider.resolveConflict(projectId, family('initial'), currentHeads)
@@ -208,7 +208,7 @@ describe('Google Drive immutable project storage', () => {
   it('treats even explicitly selected current versions as requiring confirmation', async () => {
     const { provider, projectId } = await fixture()
     const head = (await provider.listVersions(projectId))[0].id
-    await provider.loadVersion(projectId, head)
+    await provider.loadVersion(projectId, head, () => {})
     await expect(provider.saveProject(projectId, family('edit'))).rejects.toBeInstanceOf(GoogleDriveConflictError)
     await provider.resolveConflict(projectId, family('edit'), [head])
     await expect(provider.saveProject(projectId, family('another edit'))).resolves.toBeUndefined()
@@ -220,6 +220,81 @@ describe('Google Drive immutable project storage', () => {
     await provider.saveProject(projectId, family('response lost'))
     expect((await provider.loadProject(projectId)).family).toEqual(family('response lost'))
     expect(api.files.size).toBe(3)
+  })
+
+  it('keeps the current save baseline and title when the caller rejects a loaded version', async () => {
+    const { api, provider, projectId } = await fixture()
+    const old = (await provider.listVersions(projectId))[0].id
+    await provider.renameProject!(projectId, '当前名称')
+
+    await expect(provider.loadVersion(projectId, old, () => {
+      throw new Error('读取期间产生了新草稿')
+    })).rejects.toThrow('新草稿')
+
+    await expect(provider.saveProject(projectId, family('retained draft'))).resolves.toBeUndefined()
+    const reopened = await createGoogleDriveStorage('google-drive:account-one', api).loadProject(projectId)
+    expect(reopened.meta).toMatchObject({ name: '当前名称' })
+    expect(reopened.family).toEqual(family('retained draft'))
+  })
+
+  it('does not accept a domain-invalid historical snapshot or change the current baseline', async () => {
+    const { api, provider, projectId } = await fixture()
+    const old = (await provider.listVersions(projectId))[0].id
+    await provider.renameProject!(projectId, '当前名称')
+    const broken = await revision(api, old)
+    broken.family.rootMemberId = 'missing-member'
+    api.contents.set(old, new Blob([JSON.stringify(broken)]))
+    const accept = vi.fn<() => undefined>()
+
+    await expect(provider.loadVersion(projectId, old, accept)).rejects.toThrow('rootMemberId')
+    expect(accept).not.toHaveBeenCalled()
+    await expect(provider.saveProject(projectId, family('retained draft'))).resolves.toBeUndefined()
+    expect((await provider.loadProject(projectId)).meta).toMatchObject({ name: '当前名称' })
+  })
+
+  it('does not advance the save baseline when opening a domain-invalid current version fails', async () => {
+    const { api, provider, projectId } = await fixture()
+    const other = createGoogleDriveStorage('google-drive:account-one', api)
+    await other.loadProject(projectId)
+    await other.saveProject(projectId, family('remote change'))
+    const head = (await other.listVersions(projectId)).find(version => version.isHead)!.id
+    const broken = await revision(api, head)
+    broken.family.rootMemberId = 'missing-member'
+    api.contents.set(head, new Blob([JSON.stringify(broken)]))
+
+    await expect(provider.loadProject(projectId)).rejects.toThrow('rootMemberId')
+    const count = api.files.size
+    await expect(provider.saveProject(projectId, family('original draft'))).rejects.toBeInstanceOf(GoogleDriveConflictError)
+    expect(api.files.size).toBe(count)
+  })
+
+  it('rejects an older save queued behind an accepted historical version', async () => {
+    const { api, provider, projectId } = await fixture()
+    const old = (await provider.listVersions(projectId))[0].id
+    await provider.saveProject(projectId, family('remote current'))
+    let reading!: () => void
+    const readStarted = new Promise<void>(resolve => { reading = resolve })
+    let release!: () => void
+    const readBlocked = new Promise<void>(resolve => { release = resolve })
+    api.beforeList = async () => {
+      api.beforeList = undefined
+      reading()
+      await readBlocked
+    }
+    const accept = vi.fn<() => undefined>()
+    const selection = provider.loadVersion(projectId, old, accept)
+    await readStarted
+    const count = api.files.size
+    const queuedSave = expect(provider.saveProject(projectId, family('old queued edit')))
+      .rejects.toBeInstanceOf(GoogleDriveConflictError)
+    release()
+
+    await selection
+    await queuedSave
+    expect(accept).toHaveBeenCalledOnce()
+    expect(api.files.size).toBe(count)
+    const fresh = await createGoogleDriveStorage('google-drive:account-one', api).loadProject(projectId)
+    expect(fresh.family).toEqual(family('remote current'))
   })
 
   it('retries an uncertain upload with the same fixed ID instead of making duplicate snapshots', async () => {
@@ -276,7 +351,7 @@ describe('Google Drive immutable project storage', () => {
     const second = await provider.createProject('root', 'another')
     await provider.saveProject(second.id, family('second project'))
     const foreignRevision = (await provider.listVersions(second.id))[0].id
-    await expect(provider.loadVersion(projectId, foreignRevision)).rejects.toThrow('不属于当前项目')
+    await expect(provider.loadVersion(projectId, foreignRevision, () => {})).rejects.toThrow('不属于当前项目')
     api.files.get(projectId)!.appProperties = {}
     await expect(provider.loadProject(projectId)).rejects.toThrow('不是本应用创建')
     api.files.get(projectId)!.appProperties = { familyTree: '1', kind: 'project' }
@@ -387,7 +462,7 @@ describe('project renaming', () => {
     const reopened = createGoogleDriveStorage('google-drive:account-one', api)
     await reopened.loadProject(projectId)
     const renamed = await reopened.renameProject!(projectId, '旧家谱的新标题')
-    expect(renamed.meta).toMatchObject({ name: '旧家谱的新标题', schemaVersion: 4 })
+    expect(renamed.meta).toMatchObject({ name: '旧家谱的新标题', schemaVersion: 5 })
     const loaded = await reopened.loadProject(projectId)
     expect(loaded.family).toEqual(family('initial'))
   })
@@ -400,7 +475,7 @@ describe('project renaming', () => {
     const rename = vi.spyOn(api, 'renameFile')
     await expect(other.renameProject!(projectId, '过期')).rejects.toBeInstanceOf(GoogleDriveConflictError)
     const head = (await provider.listVersions(projectId)).find(v => v.isHead)!
-    await provider.loadVersion(projectId, head.id)
+    await provider.loadVersion(projectId, head.id, () => {})
     await expect(provider.renameProject!(projectId, '历史')).rejects.toBeInstanceOf(GoogleDriveConflictError)
     expect(rename).not.toHaveBeenCalled()
   })

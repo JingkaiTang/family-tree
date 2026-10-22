@@ -5,6 +5,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import DriveStorageStatus from './DriveStorageStatus.vue'
 import { useFamilyStore } from '@/stores/family'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
+import type { OpenResult } from '@/services/projectService'
+import type { ProjectRef } from '@/services/storage/types'
 
 const mocks = vi.hoisted(() => ({
   state: {
@@ -13,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     providerId: 'google-drive:client:account',
     account: { permissionId: 'account', displayName: '我的账号' },
   },
-  authorize: vi.fn(), prepare: vi.fn(), access: vi.fn(), flush: vi.fn(), list: vi.fn(), select: vi.fn(), resolve: vi.fn(), push: vi.fn(),
+  authorize: vi.fn(), prepare: vi.fn(), access: vi.fn(), flush: vi.fn(), list: vi.fn(), select: vi.fn(), afterAcceptance: vi.fn(), resolve: vi.fn(), push: vi.fn(),
 }))
 vi.mock('@/services/googleDriveConnection', async () => {
   const { reactive } = await import('vue')
@@ -24,7 +26,10 @@ vi.mock('@/services/googleDriveConnection', async () => {
     getGoogleDriveProjectAccess: mocks.access,
     isGoogleDriveProvider: (id: string) => id.startsWith('google-drive:'),
     listGoogleDriveVersions: mocks.list,
-    selectGoogleDriveVersion: mocks.select,
+    selectGoogleDriveVersion: async (project: ProjectRef, revisionId: string, accept: (result: OpenResult) => undefined) => {
+      accept(await mocks.select(project, revisionId))
+      mocks.afterAcceptance()
+    },
     resolveGoogleDriveConflict: mocks.resolve,
   }
 })
@@ -233,6 +238,23 @@ describe('Drive editing recovery', () => {
     expect(family.projectMeta?.name).toBe('云端家族')
     expect(family.isDirty).toBe(true)
     expect(wrapper.text()).toContain('读取版本期间又产生了修改')
+    wrapper.unmount()
+  })
+
+  it.each(['new-project', 'unmount'])('does not navigate after acceptance if %s supersedes the selection', async change => {
+    mocks.select.mockResolvedValue({ project, meta: createEmptyMeta('历史家族'), family: createEmptyFamily() })
+    const wrapper = mount(DriveStorageStatus)
+    await button(wrapper, '查看历史与冲突版本').trigger('click')
+    await flushPromises()
+    mocks.afterAcceptance.mockImplementation(() => {
+      if (change === 'unmount') wrapper.unmount()
+      else useFamilyStore().setProject({ ...project, id: 'other' }, createEmptyMeta('新家族'), createEmptyFamily())
+    })
+
+    await button(wrapper, '2026-09-30').trigger('click')
+    await flushPromises()
+
+    expect(mocks.push).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 

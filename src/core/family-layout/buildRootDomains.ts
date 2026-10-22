@@ -116,7 +116,7 @@ function buildInteractionEdges(
       ) {
         const leftRootId = rootIds[leftIndex]
         const rightRootId = rootIds[rightIndex]
-        const id = `interaction:${leftRootId}|${rightRootId}`
+        const id = `interaction:${rootSignatureKey([leftRootId, rightRootId])}`
         const current = edgeById.get(id) ?? {
           id,
           leftRootId,
@@ -202,7 +202,7 @@ function buildInteractionComponents(
       && unitIds.length <= 3
       && !containsMultiRootSignature
     const kind = isSparsePair ? 'pair-bridge' : 'multi-root-island'
-    const signatureKey = componentRootIds.join('|')
+    const signatureKey = rootSignatureKey(componentRootIds)
     components.push({
       rootIds: componentRootIds,
       edgeIds: componentEdges.map(edge => edge.id),

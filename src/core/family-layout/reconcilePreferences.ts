@@ -7,6 +7,7 @@ import type {
   RowOrderPreference,
 } from '@/core/schema'
 import { normalizeFacts } from '@/core/family-graph/normalizeFacts'
+import { decodeIdTuple } from '@/core/idEncoding'
 import { assignGenerations } from './assignGenerations'
 import { buildRootDomains } from './buildRootDomains'
 import { buildFamilyUnits, type BuiltFamilyUnits } from './buildFamilyUnits'
@@ -108,9 +109,13 @@ export function withoutManualLayoutOrders(data: FamilyData): FamilyData {
 
 export function convertLegacyGridPreferences(data: FamilyData): PersistedLayoutPreferences {
   const state = buildCurrentLayoutState(data)
-  const memberIdsByLegacySlotId = new Map<string, string[]>()
+  const memberIdsByLegacySlotId = new Map<string, string[] | null>()
   const addAlias = (slotId: string, memberIds: string[]) => {
-    if (!memberIdsByLegacySlotId.has(slotId)) memberIdsByLegacySlotId.set(slotId, memberIds)
+    if (!memberIdsByLegacySlotId.has(slotId)) {
+      memberIdsByLegacySlotId.set(slotId, memberIds)
+    } else if (JSON.stringify(memberIdsByLegacySlotId.get(slotId)) !== JSON.stringify(memberIds)) {
+      memberIdsByLegacySlotId.set(slotId, null)
+    }
   }
   for (const unit of state.built.units) {
     for (const memberId of unit.memberIds) {
@@ -451,7 +456,7 @@ function persistedUnitMemberIds(unitId: string): string[] {
   if (unitId.startsWith(personPrefix)) return [unitId.slice(personPrefix.length)]
   const currentPartnershipPrefix = 'unit:partnership:current:'
   if (unitId.startsWith(currentPartnershipPrefix)) {
-    return unitId.slice(currentPartnershipPrefix.length).split('+')
+    return decodeIdTuple(unitId.slice(currentPartnershipPrefix.length)) ?? []
   }
   return []
 }

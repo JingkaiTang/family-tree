@@ -20,6 +20,7 @@ import type {
   RowOrderPreference,
 } from '@/core/schema'
 import { createEmptyFamily } from '@/core/schema'
+import { wouldCreateAncestryCycle } from '@/core/familyIntegrity'
 import {
   listSiblingOrderGroups,
   orderSiblingIds,
@@ -172,6 +173,16 @@ export const useFamilyStore = defineStore('family', () => {
     if (data.value.manualPositions[id]) {
       delete data.value.manualPositions[id]
     }
+    // 旧布局归属仍参与保存校验，只清理被删除成员的引用，保留其余兼容数据。
+    delete data.value.childLayoutAssignments[id]
+    for (const [childId, assignment] of Object.entries(data.value.childLayoutAssignments)) {
+      if (assignment.primaryParentId !== id && assignment.primarySpouseId !== id) continue
+      if (assignment.primaryParentId === id) delete assignment.primaryParentId
+      if (assignment.primarySpouseId === id) delete assignment.primarySpouseId
+      if (assignment.primaryParentId === undefined && assignment.primarySpouseId === undefined) {
+        delete data.value.childLayoutAssignments[childId]
+      }
+    }
     delete data.value.members[id]
     data.value.siblingOrders = reconcileSiblingOrders(data.value)
     data.value.layoutPreferences = reconcileLayoutPreferences(data.value)
@@ -258,6 +269,14 @@ export const useFamilyStore = defineStore('family', () => {
     const me = data.value.members[memberId]
     const other = data.value.members[otherId]
     if (!me || !other) return
+
+    if (kind === 'parent' || kind === 'child') {
+      const childId = kind === 'parent' ? memberId : otherId
+      const parentId = kind === 'parent' ? otherId : memberId
+      if (wouldCreateAncestryCycle(data.value.members, childId, parentId)) {
+        throw new Error('不能添加这条亲子关系：会让成员成为自己的祖先，请检查已有父母和子女关系。')
+      }
+    }
 
     const ensure = <T extends { id: string; type: string }>(arr: T[], ref: T) => {
       if (!arr.some((r) => r.id === ref.id)) arr.push(ref)

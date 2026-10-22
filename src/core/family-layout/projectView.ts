@@ -9,6 +9,10 @@ import type {
 
 const PARENTAGE_TYPE_PRIORITY = { blood: 0, adopted: 1, step: 2 } as const
 
+export function secondaryParentageRelationId(parentageId: string, parentId: string, childId: string): string {
+  return `aux:parentage:${JSON.stringify([parentageId, parentId, childId])}`
+}
+
 export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): ProjectedFamily {
   const diagnostics: LayoutDiagnostic[] = []
   const selectedPartnershipIds = new Set<string>()
@@ -108,7 +112,7 @@ export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): Project
         if (selectedParentageIdByChild.get(childId) === parentage.id) continue
         for (const parentId of parentage.parentIds) {
           auxiliaryRelations.push({
-            id: `aux:${parentage.id}:${parentId}:${childId}`,
+            id: secondaryParentageRelationId(parentage.id, parentId, childId),
             kind: 'secondary-parentage',
             sourceId: parentId,
             targetId: childId,
@@ -124,7 +128,7 @@ export function projectView(facts: FamilyFacts, view: FamilyViewPolicy): Project
       for (const godparent of person.member.godparents) {
         if (!knownIds.has(godparent.id)) continue
         auxiliaryRelations.push({
-          id: `aux:godparent:${godparent.id}>${person.id}`,
+          id: `aux:godparent:${JSON.stringify([godparent.id, person.id])}`,
           kind: 'godparent',
           sourceId: godparent.id,
           targetId: person.id,

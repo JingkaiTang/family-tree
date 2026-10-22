@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyFamily, type FamilyData, type Member } from './schema'
-import { assertFamilyIntegrity, validateFamilyIntegrity } from './familyIntegrity'
+import { assertFamilyIntegrity, validateFamilyIntegrity, wouldCreateAncestryCycle } from './familyIntegrity'
 
 function member(id: string): Member {
   return {
@@ -22,6 +22,46 @@ function familyOf(...members: Member[]): FamilyData {
   family.members = Object.fromEntries(members.map(value => [value.id, value]))
   return family
 }
+
+describe('wouldCreateAncestryCycle', () => {
+  it('checks the complete mixed parent chain without changing it', () => {
+    const a = member('a')
+    const b = member('b')
+    const c = member('c')
+    const d = member('d')
+    b.parents.push({ id: 'a', type: 'blood' })
+    c.parents.push({ id: 'b', type: 'adopted' })
+    d.parents.push({ id: 'c', type: 'step' })
+    const family = familyOf(a, b, c, d)
+    const before = JSON.stringify(family)
+
+    expect(wouldCreateAncestryCycle(family.members, 'a', 'a')).toBe(true)
+    expect(wouldCreateAncestryCycle(family.members, 'a', 'd')).toBe(true)
+    expect(wouldCreateAncestryCycle(family.members, 'd', 'a')).toBe(false)
+    expect(wouldCreateAncestryCycle(family.members, 'b', 'a')).toBe(false)
+    expect(JSON.stringify(family)).toBe(before)
+  })
+
+  it('does not treat spouses, siblings or godparents as ancestors', () => {
+    const a = member('a')
+    const b = member('b')
+    b.spouses.push({ id: 'a', type: 'married' })
+    b.siblings.push({ id: 'a', type: 'blood' })
+    b.godparents.push({ id: 'a', type: 'godparent' })
+
+    expect(wouldCreateAncestryCycle(familyOf(a, b).members, 'a', 'b')).toBe(false)
+  })
+
+  it('terminates when the inspected data already has a cycle or missing reference', () => {
+    const a = member('a')
+    const b = member('b')
+    const unrelated = member('unrelated')
+    a.parents.push({ id: 'b', type: 'blood' }, { id: 'missing', type: 'step' })
+    b.parents.push({ id: 'a', type: 'adopted' })
+
+    expect(wouldCreateAncestryCycle(familyOf(a, b, unrelated).members, 'unrelated', 'a')).toBe(false)
+  })
+})
 
 describe('validateFamilyIntegrity', () => {
   it('接受引用完整的双向家族图', () => {

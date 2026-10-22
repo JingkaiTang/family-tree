@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // 当前 schema 版本。每次 schema 有破坏性变更递增，并在 core/migrate.ts 添加迁移。
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 // ---------------- Enums ----------------
 export const Gender = z.enum(['male', 'female', 'other'])

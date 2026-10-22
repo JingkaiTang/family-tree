@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyFamily, createEmptyMeta } from '@/core/schema'
 import type { DriveAccount, DriveApiOptions, GoogleDriveAuth } from './storage/googleDriveClient'
+import type { GoogleDriveStorage } from './storage/googleDrive'
 
 const mocks = vi.hoisted(() => ({
   createApi: vi.fn(), createStorage: vi.fn(),
@@ -34,7 +35,11 @@ function fixture() {
     importPhoto: vi.fn(), readPhoto: vi.fn(), deletePhoto: vi.fn(),
     listProjects: vi.fn(async () => [{ id: 'folder', displayName: '家族' }]),
     listVersions: vi.fn(async () => [{ id: 'version', createdTime: '2026-10-03', isHead: true }]),
-    loadVersion: vi.fn(async () => ({ id: 'folder', displayName: '家族', meta: createEmptyMeta('家族'), family: createEmptyFamily() })),
+    loadVersion: vi.fn<GoogleDriveStorage['loadVersion']>(async (_projectId, _revisionId, accept) => {
+      const loaded = { id: 'folder', displayName: '家族', meta: createEmptyMeta('家族'), family: createEmptyFamily() }
+      accept(loaded)
+      return loaded
+    }),
     resolveConflict: vi.fn(),
   }
   let apiOptions: DriveApiOptions | undefined
@@ -134,9 +139,41 @@ describe('Google Drive application connection', () => {
     const { connection, provider } = fixture()
     const providerId = await connection.connect()
     const ref = { providerId, id: 'folder', displayName: '家族' }
-    expect((await connection.selectVersion(ref, 'version')).family.schemaVersion).toBe(4)
+    const accept = vi.fn<() => undefined>()
+    await connection.selectVersion(ref, 'version', accept)
+    expect(accept).toHaveBeenCalledWith(expect.objectContaining({ family: expect.objectContaining({ schemaVersion: 5 }) }))
     const invalid = { ...createEmptyFamily(), rootMemberId: 'missing' }
     expect(() => connection.resolveConflict(ref, invalid, ['version'])).toThrow('rootMemberId')
     expect(provider.resolveConflict).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unaccepted version without marking the connection failed', async () => {
+    const { connection } = fixture()
+    const providerId = await connection.connect()
+    const ref = { providerId, id: 'folder', displayName: '家族' }
+
+    const rejection = new Error('读取期间编辑发生变化')
+    await expect(connection.selectVersion(ref, 'version', () => {
+      throw rejection
+    })).rejects.toBe(rejection)
+    expect(connection.state.error).toBeNull()
+  })
+
+  it('reports a remote version-read failure and preserves it when a later selection is declined', async () => {
+    const { connection, provider } = fixture()
+    const providerId = await connection.connect()
+    const ref = { providerId, id: 'folder', displayName: '家族' }
+    const remoteFailure = new Error('无法读取远端版本')
+    provider.loadVersion.mockRejectedValueOnce(remoteFailure)
+    const accept = vi.fn<() => undefined>()
+
+    await expect(connection.selectVersion(ref, 'version', accept)).rejects.toBe(remoteFailure)
+    expect(accept).not.toHaveBeenCalled()
+    expect(connection.state.error).toBe('无法读取远端版本')
+
+    await expect(connection.selectVersion(ref, 'version', () => {
+      throw new Error('当前项目已切换，未打开历史版本。')
+    })).rejects.toThrow('当前项目已切换')
+    expect(connection.state.error).toBe('无法读取远端版本')
   })
 })

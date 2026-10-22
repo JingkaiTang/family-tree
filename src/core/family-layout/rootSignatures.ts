@@ -1,7 +1,8 @@
 import type { RootSignature } from './types'
+import { compareIds, encodeIdTuple } from '@/core/idEncoding'
 
 export function normalizeRootSignature(rootIds: Iterable<string>): RootSignature {
-  return [...new Set(rootIds)].sort((left, right) => left.localeCompare(right))
+  return [...new Set(rootIds)].sort(compareIds)
 }
 
 export function mergeRootSignatures(
@@ -11,5 +12,5 @@ export function mergeRootSignatures(
 }
 
 export function rootSignatureKey(signature: RootSignature): string {
-  return normalizeRootSignature(signature).join('|')
+  return encodeIdTuple(normalizeRootSignature(signature), '|')
 }

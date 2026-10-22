@@ -17,6 +17,8 @@ import {
 export const useUiStore = defineStore('ui', () => {
   const viewpointId = ref<string | null>(null) // 当前以谁为视角查看称呼
   const selectedId = ref<string | null>(null)
+  /** 资料草稿的单调变更代次，供异步项目切换检查；不写入家谱或触发自动保存。 */
+  const memberDraftRevision = ref(0)
   const searchQuery = ref('')
   const showAuxiliaryRelations = ref(false)
   const defaultLayoutMode = ref(detectDefaultLayoutMode())
@@ -42,6 +44,9 @@ export const useUiStore = defineStore('ui', () => {
   }
   function setSelected(id: string | null) {
     selectedId.value = id
+  }
+  function advanceMemberDraftRevision() {
+    memberDraftRevision.value += 1
   }
   function setSearch(q: string) {
     searchQuery.value = q
@@ -90,6 +95,7 @@ export const useUiStore = defineStore('ui', () => {
   return {
     viewpointId,
     selectedId,
+    memberDraftRevision,
     searchQuery,
     showAuxiliaryRelations,
     defaultLayoutMode,
@@ -102,6 +108,7 @@ export const useUiStore = defineStore('ui', () => {
     canvasView,
     setViewpoint,
     setSelected,
+    advanceMemberDraftRevision,
     setSearch,
     setShowAuxiliaryRelations,
     setLayoutModePreference,

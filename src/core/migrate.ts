@@ -9,6 +9,8 @@ import {
   SCHEMA_VERSION,
 } from './schema'
 import { reconcileSiblingOrders } from './siblingOrder'
+import { migrateIdentifierPreferences } from './migrateIdentifiers'
+import { compareIds } from './idEncoding'
 import { z } from 'zod'
 
 type MutableFamily = Record<string, unknown> & {
@@ -40,12 +42,15 @@ export function migrate(raw: unknown): FamilyData {
     throw new Error('文件版本过新，当前版本不支持')
   }
   let current: MutableFamily = { ...data, schemaVersion: version }
+  let layoutAlreadyEncoded = false
 
   if (current.schemaVersion < 2) {
     current = migrateV1ToV2(current)
   }
   if (current.schemaVersion < 3) {
     current = migrateV2ToV4(current)
+    // The V2 converter builds fresh IDs using the current layout implementation.
+    layoutAlreadyEncoded = true
   }
   if (current.schemaVersion < 4) {
     current = migrateV3ToV4(current)
@@ -57,6 +62,9 @@ export function migrate(raw: unknown): FamilyData {
   current.childLayoutAssignments = current.childLayoutAssignments ?? {}
   current.gridLayoutOverrides = current.gridLayoutOverrides ?? {}
   current.layoutPreferences = parseLayoutPreferences(current.layoutPreferences)
+  if (version < 5) {
+    current = migrateIdentifierPreferences(current as unknown as FamilyData, layoutAlreadyEncoded)
+  }
   current.layoutPreferences = reconcileLayoutPreferences(current as unknown as FamilyData)
   current.siblingOrders = reconcileSiblingOrders(current as unknown as FamilyData)
   return current as unknown as FamilyData
@@ -232,7 +240,7 @@ function findCurrentSpouseParentPair(
 }
 
 function spouseEdgeKey(leftId: string, rightId: string): string {
-  return `${leftId}\0${rightId}`
+  return JSON.stringify([leftId, rightId])
 }
 
 function sortedMemberIds(members: Record<string, Member>): string[] {
@@ -245,8 +253,4 @@ function uniqueSortedIds(ids: string[]): string[] {
 
 function compareSpouseEdges(left: SpouseEdge, right: SpouseEdge): number {
   return compareIds(left.leftId, right.leftId) || compareIds(left.rightId, right.rightId)
-}
-
-function compareIds(a: string, b: string): number {
-  return a.localeCompare(b)
 }

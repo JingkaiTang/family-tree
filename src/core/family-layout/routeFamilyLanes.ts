@@ -205,12 +205,14 @@ function assignGatewaySlots(
     const targetIsRight = rectCenterX(targetDomain.rect) > rectCenterX(sourceDomain.rect)
     const sourceSide = targetIsRight ? 'right' : 'left'
     const targetSide = targetIsRight ? 'left' : 'right'
-    const key = [
-      `${sourceDomain.id}:${sourceSide}`,
-      `${targetDomain.id}:${targetSide}`,
+    const key = JSON.stringify([
+      sourceDomain.id,
+      sourceSide,
+      targetDomain.id,
+      targetSide,
       request.parentBottom,
       request.childClearanceTop,
-    ].join('|')
+    ])
     const grouped = requestsByBoundaryPair.get(key) ?? []
     grouped.push(request)
     requestsByBoundaryPair.set(key, grouped)
@@ -543,7 +545,7 @@ function gatewayAt(
   routeOwnerId: string,
 ): RouteGateway {
   return {
-    id: `gateway:${domain.id}:${side}:${routeOwnerId}`,
+    id: `gateway:${JSON.stringify([domain.id, side, routeOwnerId])}`,
     domainId: domain.id,
     side,
     point: {

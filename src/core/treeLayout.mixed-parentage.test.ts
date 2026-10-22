@@ -69,11 +69,11 @@ describe('layoutFamilyTree mixed parentage', () => {
         kind: 'primary',
       },
       {
-        owner: 'aux:parentage:adoptive-parent:adoptive-parent:child',
+        owner: 'aux:parentage:["parentage:adoptive-parent","adoptive-parent","child"]',
         kind: 'secondary-parentage',
       },
       {
-        owner: 'aux:parentage:step-parent:step-parent:child',
+        owner: 'aux:parentage:["parentage:step-parent","step-parent","child"]',
         kind: 'secondary-parentage',
       },
     ])

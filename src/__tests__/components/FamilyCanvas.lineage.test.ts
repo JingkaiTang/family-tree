@@ -140,8 +140,38 @@ describe('FamilyCanvas direct lineage', () => {
     const wrapper = await mountLineage('self', data, true)
     const owners = wrapper.findAll('[data-testid="lineage-route"]')
       .map(path => path.attributes('data-route-id'))
-    expect(owners).toContain('route:aux:parentage:adoptive:adoptive:self')
+    expect(owners).toContain('route:aux:parentage:["parentage:adoptive","adoptive","self"]')
     expect(owners.some(id => id?.includes('godparent'))).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each(['adopted', 'step'] as const)('highlights the actual %s parent route when its ID contains delimiters', async type => {
+    const data = lineageFamily()
+    const parentId = 'parent:+%|:监护人'
+    data.members[parentId] = mk(parentId)
+    data.members.godparent = mk('godparent')
+    addParent(data.members.self, data.members[parentId], type)
+    data.members.self.godparents.push({ id: 'godparent', type: 'godparent' })
+    const scene = layoutFamilyTreeSync(Object.values(data.members), {
+      data,
+      view: { showSecondaryParentage: true, showGodparentRelations: true },
+      auxiliaryFocusPersonId: 'self',
+    })
+    const parentRoute = scene.routes.find(route => route.kind === 'secondary-parentage')!
+    const godparentRoute = scene.routes.find(route => route.kind === 'godparent')!
+    expect(parentRoute.childPaths?.map(path => path.childPersonId)).toContain('self')
+    expect(godparentRoute).toBeDefined()
+
+    const wrapper = await mountLineage('self', data, true)
+    const highlightedOwners = new Set(wrapper.findAll('[data-testid="lineage-route"]')
+      .map(path => path.attributes('data-route-id')))
+
+    expect(highlightedOwners.has(parentRoute.id)).toBe(true)
+    expect(highlightedOwners.has(godparentRoute.id)).toBe(false)
+    const highlightedPeople = wrapper.findAll('[data-testid="member-node"][data-lineage-state="active"]')
+      .map(node => node.attributes('data-member-id'))
+    expect(highlightedPeople).toContain(parentId)
+    expect(highlightedPeople).not.toContain('godparent')
     wrapper.unmount()
   })
 

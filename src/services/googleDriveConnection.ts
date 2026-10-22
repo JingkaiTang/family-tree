@@ -4,8 +4,16 @@ import type { ProjectRef, ProjectStorageProvider } from './storage/types'
 import { createDriveApi, createGoogleDriveAuth, type GoogleDriveAuth, type DriveAccount } from './storage/googleDriveClient'
 import { createGoogleDriveStorage } from './storage/googleDrive'
 import { validateLoadedProject } from './projectValidation'
+import type { OpenResult } from './projectService'
 
 const PREFIX = 'google-drive:'
+
+/** A caller declining a valid snapshot is not a failure of the Drive connection. */
+class VersionAcceptanceRejection extends Error {
+  constructor(cause: unknown) {
+    super('历史版本未被接纳', { cause })
+  }
+}
 
 /** Application connection lifecycle. Credentials are managed privately by auth. */
 export function createGoogleDriveConnection(clientId: string, authOverride?: GoogleDriveAuth) {
@@ -68,6 +76,9 @@ export function createGoogleDriveConnection(clientId: string, authOverride?: Goo
               if (state.providerId === id && (key === 'saveProject' || key === 'resolveConflict')) state.error = null
               return result
             } catch (error) {
+              // Preserve the caller's rejection without displaying it on another
+              // project's connection status. The provider still rejects the load.
+              if (error instanceof VersionAcceptanceRejection) throw error.cause
               // An old account's late response must not change the new connection's UI.
               if (state.providerId === id) return report(error)
               throw error
@@ -145,11 +156,17 @@ export function createGoogleDriveConnection(clientId: string, authOverride?: Goo
     },
     listVersions(ref: ProjectRef) { return provider(ref.providerId).listVersions(ref.id) },
     getProjectAccess(ref: ProjectRef) { return provider(ref.providerId).getProjectAccess(ref.id) },
-    async selectVersion(ref: ProjectRef, revisionId: string) {
-      const loaded = await provider(ref.providerId).loadVersion(ref.id, revisionId)
-      return validateLoadedProject({
-        ref: { ...ref, id: loaded.id, displayName: loaded.displayName },
-        meta: loaded.meta, family: loaded.family, access: loaded.access,
+    /** Acceptance must finish synchronously before storage changes its save baseline. */
+    async selectVersion(ref: ProjectRef, revisionId: string, accept: (result: OpenResult) => undefined): Promise<void> {
+      await provider(ref.providerId).loadVersion(ref.id, revisionId, loaded => {
+        try {
+          accept({
+            project: { ...ref, id: loaded.id, displayName: loaded.displayName },
+            meta: loaded.meta, family: loaded.family, access: loaded.access,
+          })
+        } catch (error) {
+          throw new VersionAcceptanceRejection(error)
+        }
       })
     },
     resolveConflict(ref: ProjectRef, family: FamilyData, heads: string[]) {

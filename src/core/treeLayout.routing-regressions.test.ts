@@ -3,6 +3,7 @@ import { createEmptyFamily, type FamilyData, type Member } from './schema'
 import { validateScene } from './family-layout/validateScene'
 import { DEFAULT_LAYOUT_METRICS, type RouteSegment } from './family-layout/types'
 import { withDomainRowOrderPreference } from './family-layout/reconcilePreferences'
+import { assertFamilyIntegrity } from './familyIntegrity'
 import { layoutFamilyTree } from './treeLayout'
 
 const HARD_DIAGNOSTIC_CODES = new Set([
@@ -12,6 +13,51 @@ const HARD_DIAGNOSTIC_CODES = new Set([
 ])
 
 describe('layoutFamilyTree routing regressions', () => {
+  it.each([
+    { shallowId: 'a', deepId: 'z', ancestorDepth: 1 },
+    { shallowId: 'a', deepId: 'z', ancestorDepth: 2 },
+    { shallowId: 'z', deepId: 'a', ancestorDepth: 1 },
+    { shallowId: 'z', deepId: 'a', ancestorDepth: 2 },
+  ])('places a child below both divorced parents with $ancestorDepth ancestors of $deepId', async ({
+    shallowId, deepId, ancestorDepth,
+  }) => {
+    const shallowParent = member(shallowId)
+    const deepParent = member(deepId)
+    const child = member('child')
+    const members = [shallowParent, deepParent, child]
+    linkSpouse(shallowParent, deepParent, 'divorced')
+    linkParent(child, shallowParent)
+    linkParent(child, deepParent)
+    let descendant = deepParent
+    for (let depth = 1; depth <= ancestorDepth; depth++) {
+      const ancestor = member(`ancestor-${depth}`)
+      linkParent(descendant, ancestor)
+      members.push(ancestor)
+      descendant = ancestor
+    }
+    const data = familyData(members)
+    assertFamilyIntegrity(data)
+
+    const scene = await layoutFamilyTree(members, { data })
+    const childCard = scene.cards.find(card => card.id === child.id)!
+    const parentCards = scene.cards.filter(card => (
+      card.id === shallowId || card.id === deepId
+    ))
+
+    expect(childCard.generation).toBe(ancestorDepth + 1)
+    for (const parentCard of parentCards) {
+      expect(childCard.generation).toBeGreaterThan(parentCard.generation)
+      expect(childCard.rect.y).toBeGreaterThan(parentCard.rect.y)
+    }
+    const routedParentIds = scene.routes
+      .filter(route => route.kind === 'primary'
+        && route.childPaths?.some(path => path.childPersonId === child.id))
+      .flatMap(route => route.sourceParentIds ?? [])
+    expect(routedParentIds.sort()).toEqual([shallowId, deepId].sort())
+    expect(scene.diagnostics).toEqual([])
+    expect(validateScene(scene, DEFAULT_LAYOUT_METRICS)).toEqual([])
+  })
+
   it('keeps distinct parentage ports and primary routes for one single historical parent', async () => {
     const a = member('a')
     const c = member('c')
