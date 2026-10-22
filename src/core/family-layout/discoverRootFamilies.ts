@@ -69,7 +69,7 @@ export function discoverRootFamilies(
     unit.memberIds.map(personId => [personId, unit.id] as const)
   )))
   const roots: RootFamily[] = []
-  const seedRootIdByPersonId: Record<string, string> = {}
+  const seedRootIdByPersonId: Record<string, string> = Object.create(null)
   const assignedSeeds = new Set<string>()
 
   for (const personId of rootCandidateIds) {

@@ -37,7 +37,7 @@ export function buildFamilyUnits(
   metrics: LayoutMetrics,
   siblingOrders: SiblingOrders = {},
 ): BuiltFamilyUnits {
-  const unitIdByPersonId: Record<string, string> = {}
+  const unitIdByPersonId: Record<string, string> = Object.create(null)
   const units: FamilyUnit[] = []
   const assignedPeople = new Set<string>()
 

@@ -3,6 +3,129 @@ import { addParent, addSibling, addSpouse, mk } from '@/__tests__/fixtures/famil
 import { getKinship } from './index'
 
 describe('getKinship — 审核回归', () => {
+  it.each([
+    ['blood', 'male', '儿子的丈夫'],
+    ['blood', 'female', '女儿的妻子'],
+    ['adopted', 'male', '养子的丈夫'],
+    ['adopted', 'female', '养女的妻子'],
+    ['step', 'male', '继子的丈夫'],
+    ['step', 'female', '继女的妻子'],
+  ] as const)('%s 子女的同性 %s 配偶称为 %s', (type, gender, expected) => {
+    const members = {
+      parent: mk('parent', { gender: 'female' }),
+      child: mk('child', { gender }),
+      partner: mk('partner', { gender }),
+    }
+    addParent(members.child, members.parent, type)
+    addSpouse(members.child, members.partner)
+
+    expect(getKinship('parent', 'partner', members)).toBe(expected)
+    expect(getKinship('parent', 'partner', members, { parent: { partner: '家人' } })).toBe('家人')
+  })
+
+  it.each([
+    ['male', '1980-01-01', '哥哥的丈夫'],
+    ['male', '2000-01-01', '弟弟的丈夫'],
+    ['female', '1980-01-01', '姐姐的妻子'],
+    ['female', '2000-01-01', '妹妹的妻子'],
+  ] as const)('未录父母的 %s 手足，其同性配偶保留姻亲关系', (gender, birthDate, expected) => {
+    const members = {
+      self: mk('self', { gender: 'male', birthDate: '1990-01-01' }),
+      sibling: mk('sibling', { gender, birthDate }),
+      partner: mk('partner', { gender }),
+    }
+    addSibling(members.self, members.sibling)
+    addSpouse(members.sibling, members.partner)
+
+    expect(getKinship('self', 'partner', members)).toBe(expected)
+  })
+
+  it.each([
+    ['male', '孙子的丈夫'],
+    ['female', '孙女的妻子'],
+  ] as const)('孙辈的同性 %s 配偶保留姻亲关系', (gender, expected) => {
+    const members = {
+      self: mk('self'),
+      son: mk('son', { gender: 'male' }),
+      grandchild: mk('grandchild', { gender }),
+      partner: mk('partner', { gender }),
+    }
+    addParent(members.son, members.self)
+    addParent(members.grandchild, members.son)
+    addSpouse(members.grandchild, members.partner)
+
+    expect(getKinship('self', 'partner', members)).toBe(expected)
+  })
+
+  it.each([
+    ['male', '堂兄的丈夫'],
+    ['female', '堂姐的妻子'],
+  ] as const)('旁系 %s 亲属的同性配偶保留姻亲关系', (gender, expected) => {
+    const members = {
+      self: mk('self', { gender: 'male', birthDate: '1990-01-01' }),
+      father: mk('father', { gender: 'male' }),
+      uncle: mk('uncle', { gender: 'male' }),
+      cousin: mk('cousin', { gender, birthDate: '1980-01-01' }),
+      partner: mk('partner', { gender }),
+    }
+    addParent(members.self, members.father)
+    addSibling(members.father, members.uncle)
+    addParent(members.cousin, members.uncle)
+    addSpouse(members.cousin, members.partner)
+
+    expect(getKinship('self', 'partner', members)).toBe(expected)
+  })
+
+  it.each([
+    ['male', 'male', '儿子的前夫'],
+    ['male', 'female', '儿子的前妻'],
+    ['female', 'female', '女儿的前妻'],
+    ['male', 'other', '儿子的前伴侣'],
+    ['other', 'female', '子女的前妻'],
+  ] as const)('%s 子女的 %s 前配偶保留历史关系', (gender, partnerGender, expected) => {
+    const members = {
+      self: mk('self'),
+      child: mk('child', { gender }),
+      former: mk('former', { gender: partnerGender }),
+    }
+    addParent(members.child, members.self)
+    members.child.spouses.push({ id: 'former', type: 'divorced' })
+    members.former.spouses.push({ id: 'child', type: 'divorced' })
+
+    expect(getKinship('self', 'former', members)).toBe(expected)
+  })
+
+  it('含中性成员的关系链仍明确表达末尾同性配偶', () => {
+    const members = {
+      self: mk('self'),
+      child: mk('child'),
+      grandson: mk('grandson', { gender: 'male' }),
+      husband: mk('husband', { gender: 'male' }),
+    }
+    addParent(members.child, members.self)
+    addParent(members.grandson, members.child)
+    addSpouse(members.grandson, members.husband)
+
+    expect(getKinship('self', 'husband', members)).toBe('子女的儿子的丈夫')
+  })
+
+  it('祖辈的同性配偶沿用正式祖辈名称，并保留前任标记', () => {
+    const members = {
+      self: mk('self'),
+      father: mk('father', { gender: 'male' }),
+      grandfather: mk('grandfather', { gender: 'male' }),
+      husband: mk('husband', { gender: 'male' }),
+    }
+    addParent(members.self, members.father)
+    addParent(members.father, members.grandfather)
+    addSpouse(members.grandfather, members.husband)
+
+    expect(getKinship('self', 'husband', members)).toBe('祖父的丈夫')
+    members.grandfather.spouses[0].type = 'divorced'
+    members.husband.spouses[0].type = 'divorced'
+    expect(getKinship('self', 'husband', members)).toBe('祖父的前夫')
+  })
+
   it('未录共同父母时，仍识别哥哥的妻子', () => {
     const members = {
       self: mk('self', { gender: 'male', birthDate: '1990-01-01' }),

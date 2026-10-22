@@ -51,7 +51,7 @@ function mergeViewPolicy(
   parentages: ReturnType<typeof normalizeFacts>['facts']['parentages'],
   view: Partial<FamilyViewPolicy> | undefined,
 ): FamilyViewPolicy {
-  const legacyPrimaryParentageByChild: Record<string, string> = {}
+  const legacyPrimaryParentageByChild: Record<string, string> = Object.create(null)
   for (const [childId, assignment] of Object.entries(data.childLayoutAssignments)) {
     if (!assignment.primaryParentId) continue
     const parentage = parentages.find(value => (

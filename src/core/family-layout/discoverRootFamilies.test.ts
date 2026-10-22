@@ -10,8 +10,24 @@ import {
   twoRootMarriageFixture,
   unequalDepthMarriageFixture,
 } from './rootLayoutTestHelpers'
+import { buildProjectedInput, familyData, linkParent, member } from './testHelpers'
+import { assignGenerations } from './assignGenerations'
 
 describe('discoverRootFamilies', () => {
+  it.each(['__proto__', 'constructor', 'toString'])('keeps %s as an own root seed key', id => {
+    const parent = member(id)
+    const child = member('child')
+    linkParent(child, parent)
+    const { projected, built } = buildProjectedInput(familyData([parent, child]))
+    const { generationByUnitId } = assignGenerations(projected, built)
+
+    const result = discoverRootFamilies({ projected, units: built.units, generationByUnitId })
+
+    expect(Object.hasOwn(result.seedRootIdByPersonId, id)).toBe(true)
+    expect(result.seedRootIdByPersonId[id]).toBe(result.roots[0].id)
+    expect(JSON.parse(JSON.stringify(result.seedRootIdByPersonId))[id]).toBe(result.roots[0].id)
+  })
+
   it('groups a source couple into one visible root family', () => {
     const result = discoverRootFamilies(twoRootMarriageFixture())
 

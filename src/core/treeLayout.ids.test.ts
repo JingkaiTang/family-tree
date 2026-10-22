@@ -10,10 +10,68 @@ import { layoutFocusFlow } from './focus-flow/layoutFocusFlow'
 import { listSiblingOrderGroups, reconcileSiblingOrders } from './siblingOrder'
 import { rootSignatureKey } from './family-layout/rootSignatures'
 import { layoutFamilyTreeSync } from './treeLayoutCore'
+import { createEmptyMeta } from './schema'
+import { validateLoadedProject } from '@/services/projectValidation'
 
 const sorted = (ids: readonly string[]) => [...ids].sort((a, b) => a.localeCompare(b))
 
 describe('family layouts with opaque member IDs', () => {
+  it.each(['__proto__', 'constructor', 'toString'])('honors the saved primary parent choice for child %s', id => {
+    const blood = member('blood')
+    const adoptive = member('adoptive')
+    const child = member(id)
+    linkParent(child, blood, 'blood')
+    linkParent(child, adoptive, 'adopted')
+    const { family: data } = validateLoadedProject({
+      ref: { providerId: 'test', id: 'project', displayName: '测试' },
+      meta: createEmptyMeta('测试'),
+      family: familyData([blood, adoptive, child], {
+        childLayoutAssignments: Object.fromEntries([[id, { primaryParentId: adoptive.id }]]),
+      }),
+    })
+
+    const scene = layoutFamilyTreeSync(Object.values(data.members), { data })
+
+    expect(scene.primaryParentageGroups?.map(group => group.id)).toEqual(['parentage:adoptive'])
+    expect(scene.primaryParentageGroups?.[0].childPersonIds).toEqual([id])
+  })
+
+  describe.each(['__proto__', 'constructor', 'toString'])('loaded member ID %s', id => {
+    it.each([0, 1, 2])('preserves relationship types and both layouts at generation %s', specialGeneration => {
+      const people = [0, 1, 2].map(generation => member(generation === specialGeneration ? id : `person-${generation}`))
+      linkParent(people[1], people[0], 'adopted')
+      linkParent(people[2], people[1], 'step')
+      const data = validateLoadedProject({
+        ref: { providerId: 'test', id: 'project', displayName: '测试' },
+        meta: createEmptyMeta('测试'),
+        family: familyData(people),
+      }).family
+      const snapshot = JSON.stringify(data)
+      const { facts } = normalizeFacts(data)
+      for (const child of people.slice(1)) {
+        const parent = child.parents[0]
+        const parentage = facts.parentages.find(fact => fact.childIds.includes(child.id))!
+        expect(Object.hasOwn(parentage.typeByChildId, child.id)).toBe(true)
+        expect(parentage.typeByChildId[child.id]).toBe(parent.type)
+      }
+
+      const grid = layoutFamilyTreeSync(Object.values(data.members), { data })
+      expect(sorted(grid.cards.map(card => card.id))).toEqual(sorted(people.map(person => person.id)))
+      for (const [generation, person] of people.entries()) {
+        expect(grid.cards.find(card => card.id === person.id)?.generation).toBe(generation)
+      }
+      expect(validateScene(grid, DEFAULT_LAYOUT_METRICS)).toEqual([])
+      for (const child of people.slice(1)) {
+        const flow = layoutFocusFlow(data, { focusId: child.id })
+        expect(flow.focusId).toBe(child.id)
+        expect(flow.sections.find(section => section.kind === 'parents')?.blocks).toContainEqual(
+          expect.objectContaining({ memberIds: [child.parents[0].id], parentageType: child.parents[0].type }),
+        )
+      }
+      expect(JSON.stringify(data)).toBe(snapshot)
+    })
+  })
+
   it('canonicalizes distinct collation-equivalent member IDs regardless of relation or member order', () => {
     const composed = member('\u00e9')
     const decomposed = member('e\u0301')

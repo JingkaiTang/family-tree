@@ -173,6 +173,25 @@ describe('MemberDetail photo transaction', () => {
 })
 
 describe('MemberDetail kinship override', () => {
+  it('shows only an own override for members whose IDs match prototype properties', async () => {
+    const { family, wrapper } = mountedMember()
+    family.data.members = Object.fromEntries(['a', 'constructor', 'toString', 'other'].map(id => [id, mk(id)]))
+    family.data.nicknameOverrides = { constructor: { other: '另一个称谓' } }
+    useUiStore().setViewpoint('constructor')
+    await wrapper.setProps({ id: 'toString' })
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('input[placeholder="例如：二叔 / 表姨婆"]')
+    expect(input.element.value).toBe('')
+
+    await input.setValue('家人')
+    await wrapper.findAll('button').find(button => button.text() === '保存覆盖')!.trigger('click')
+    expect(input.element.value).toBe('家人')
+    await wrapper.findAll('button').find(button => button.text() === '清除')!.trigger('click')
+    expect(input.element.value).toBe('')
+    expect(family.data.nicknameOverrides['constructor']).toEqual({ other: '另一个称谓' })
+    wrapper.unmount()
+  })
+
   it('keeps the inferred kinship visible while loading, editing and clearing a custom label', async () => {
     const { family, wrapper } = mountedMember()
     family.data.members.a.gender = 'male'

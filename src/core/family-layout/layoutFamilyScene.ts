@@ -97,7 +97,6 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
     request.metrics,
     retainedDiagnostics,
     request,
-    projected.auxiliaryRelations,
     discovery.previousRootIdByRootId,
   )
 
@@ -114,7 +113,12 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
         )
       : first.scene
     return withPrimaryParentageGroups(
-      completePrimaryParentageRoutes(scene, projected.primaryParentages, built.parentageGroups, request.metrics),
+      completeAuxiliaryRoutes(
+        completePrimaryParentageRoutes(scene, projected.primaryParentages, built.parentageGroups, request.metrics),
+        projected.auxiliaryRelations,
+        request.auxiliaryFocusPersonId,
+        request.metrics,
+      ),
       built.parentageGroups,
     )
   }
@@ -130,10 +134,10 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
     retryMetrics,
     retainedDiagnostics,
     request,
-    projected.auxiliaryRelations,
     discovery.previousRootIdByRootId,
   )
-  const scene = hasUnsafeDiagnostic(retry.scene)
+  const needsFallback = hasUnsafeDiagnostic(retry.scene)
+  const scene = needsFallback
     ? buildSafeFallbackScene(
         units,
         domainModel.domains,
@@ -142,8 +146,14 @@ export function layoutFamilyScene(request: LayoutRequest): LayoutScene {
         retainedDiagnostics,
       )
     : retry.scene
+  const finalMetrics = needsFallback ? request.metrics : retryMetrics
   return withPrimaryParentageGroups(
-    completePrimaryParentageRoutes(scene, projected.primaryParentages, built.parentageGroups, retryMetrics),
+    completeAuxiliaryRoutes(
+      completePrimaryParentageRoutes(scene, projected.primaryParentages, built.parentageGroups, finalMetrics),
+      projected.auxiliaryRelations,
+      request.auxiliaryFocusPersonId,
+      finalMetrics,
+    ),
     built.parentageGroups,
   )
 }
@@ -173,7 +183,6 @@ function buildAttempt(
   metrics: LayoutMetrics,
   retainedDiagnostics: LayoutDiagnostic[],
   request: LayoutRequest,
-  auxiliaryRelations: AuxiliaryRelation[],
   previousRootIdByRootId: Record<string, string>,
 ): LayoutAttempt {
   const geometry = placeRootDomains({
@@ -198,31 +207,50 @@ function buildAttempt(
     routes: routing.routes,
     diagnostics: [...retainedDiagnostics, ...routing.diagnostics],
   }
-  const focusId = request.auxiliaryFocusPersonId
-  if (focusId !== undefined) {
-    const focusedRelations = auxiliaryRelations.filter(relation => (
-      relation.sourceId === focusId || relation.targetId === focusId
-    ))
-    const auxiliaryRoutes = routeAuxiliaryEdges({
-      geometry,
-      auxiliaryRelations: focusedRelations,
-      primaryRoutes: routing.routes,
-      metrics,
-    })
-    scene.routes.push(...auxiliaryRoutes)
-    const routedOwnerIds = new Set(auxiliaryRoutes.map(route => route.routeOwnerId))
-    for (const relation of focusedRelations) {
-      if (routedOwnerIds.has(relation.id)) continue
-      scene.diagnostics.push({
-        code: 'UNROUTABLE_AUXILIARY_EDGE',
-        ids: [relation.id, relation.sourceId, relation.targetId],
-        message: '部分辅助连线暂时无法显示：当前卡片间没有找到安全通道。',
-      })
-    }
-  }
   scene.diagnostics.push(...validateScene(scene, metrics))
   scene.diagnostics.sort(compareDiagnostics)
   return { scene, routingDiagnostics: routing.diagnostics }
+}
+
+/** Auxiliary visibility must not change primary geometry, including safe fallback. */
+function completeAuxiliaryRoutes(
+  scene: LayoutScene,
+  auxiliaryRelations: AuxiliaryRelation[],
+  focusId: string | undefined,
+  metrics: LayoutMetrics,
+): LayoutScene {
+  if (focusId === undefined) return scene
+  const focusedRelations = auxiliaryRelations.filter(relation => (
+    relation.sourceId === focusId || relation.targetId === focusId
+  ))
+  if (focusedRelations.length === 0) return scene
+
+  const auxiliaryRoutes = routeAuxiliaryEdges({
+    geometry: scene,
+    auxiliaryRelations: focusedRelations,
+    primaryRoutes: scene.routes,
+    metrics,
+  })
+  // Validate all candidates together once; only new auxiliary owners may be removed.
+  const invalidOwnerIds = new Set(auxiliaryRoutes.length === 0 ? [] : validateScene({
+    ...scene,
+    routes: [...scene.routes, ...auxiliaryRoutes],
+  }, metrics).flatMap(diagnostic => diagnostic.ids))
+  const safeRoutes = auxiliaryRoutes.filter(route => !invalidOwnerIds.has(route.routeOwnerId))
+  const routedOwnerIds = new Set(safeRoutes.map(route => route.routeOwnerId))
+  const diagnostics: LayoutDiagnostic[] = [
+    ...scene.diagnostics,
+    ...focusedRelations.filter(relation => !routedOwnerIds.has(relation.id)).map(relation => ({
+      code: 'UNROUTABLE_AUXILIARY_EDGE' as const,
+      ids: [relation.id, relation.sourceId, relation.targetId],
+      message: '部分辅助连线暂时无法显示：当前卡片间没有找到安全通道。',
+    })),
+  ]
+  return {
+    ...scene,
+    routes: [...scene.routes, ...safeRoutes],
+    diagnostics: diagnostics.sort(compareDiagnostics),
+  }
 }
 
 function withExpandedGenerationGap(

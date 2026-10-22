@@ -21,10 +21,10 @@ export function getKinship(
   overrides: FamilyData['nicknameOverrides'] = {},
   siblingOrders: FamilyData['siblingOrders'] = {},
 ): string | null {
-  if (!members[fromId] || !members[toId]) return null
+  if (!Object.hasOwn(members, fromId) || !Object.hasOwn(members, toId)) return null
   if (fromId === toId) return '本人'
 
-  const override = overrides?.[fromId]?.[toId]
+  const override = getNicknameOverride(overrides, fromId, toId)
   if (override) return override
 
   const me = members[fromId]
@@ -42,6 +42,17 @@ export function getKinship(
   if (!path) return null
   const normalized = normalizePath(path, members, fromId)
   return describeRelation(normalized, fromId, toId, members, siblingOrders)
+}
+
+/** 成员 ID 只匹配项目中的自有键，不能把继承属性当作称谓。 */
+export function getNicknameOverride(
+  overrides: FamilyData['nicknameOverrides'],
+  fromId: string,
+  toId: string,
+): string | undefined {
+  if (!Object.hasOwn(overrides, fromId)) return undefined
+  const row = overrides[fromId]
+  return Object.hasOwn(row, toId) ? row[toId] : undefined
 }
 
 export * from './pathFinder'

@@ -51,15 +51,39 @@ export const Member = z.object({
 }).passthrough()
 export type Member = z.infer<typeof Member>
 
+/** Keep every JSON dictionary key without invoking Object.prototype's __proto__ setter. */
+function stringRecord<Value extends z.ZodType>(valueSchema: Value) {
+  const record = z.record(z.string(), valueSchema)
+  return z.unknown().transform((input, ctx) => {
+    const parsed = record.safeParse(input)
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) ctx.addIssue({ ...issue })
+      return z.NEVER
+    }
+    // Zod deliberately skips this key. Validate its value too, then restore an own data property.
+    if (typeof input === 'object' && input !== null
+      && Object.prototype.propertyIsEnumerable.call(input, '__proto__')) {
+      const special = valueSchema.safeParse(Reflect.get(input, '__proto__'))
+      if (!special.success) {
+        for (const issue of special.error.issues) {
+          ctx.addIssue({ ...issue, path: ['__proto__', ...issue.path] })
+        }
+        return z.NEVER
+      }
+      Object.defineProperty(parsed.data, '__proto__', {
+        value: special.data, enumerable: true, configurable: true, writable: true,
+      })
+    }
+    return parsed.data
+  })
+}
+
 // ---------------- FamilyData ----------------
-export const NicknameOverrides = z.record(
-  z.string(), // fromId
-  z.record(z.string(), z.string()), // toId -> label
-)
+export const NicknameOverrides = stringRecord(stringRecord(z.string()))
 export type NicknameOverrides = z.infer<typeof NicknameOverrides>
 
 /** 同一兄弟姐妹关系组共享的顺序。key 使用 parentage id 或规范化的 siblings id。 */
-export const SiblingOrders = z.record(z.string(), z.array(z.string()))
+export const SiblingOrders = stringRecord(z.array(z.string()))
 export type SiblingOrders = z.infer<typeof SiblingOrders>
 
 /** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */
@@ -68,7 +92,7 @@ export const ManualPosition = z.object({
   top: z.number(),
 })
 export type ManualPosition = z.infer<typeof ManualPosition>
-export const ManualPositions = z.record(z.string(), ManualPosition)
+export const ManualPositions = stringRecord(ManualPosition)
 export type ManualPositions = z.infer<typeof ManualPositions>
 
 export const ChildLayoutAssignment = z.object({
@@ -76,14 +100,14 @@ export const ChildLayoutAssignment = z.object({
   primarySpouseId: z.string().optional(),
 })
 export type ChildLayoutAssignment = z.infer<typeof ChildLayoutAssignment>
-export const ChildLayoutAssignments = z.record(z.string(), ChildLayoutAssignment)
+export const ChildLayoutAssignments = stringRecord(ChildLayoutAssignment)
 export type ChildLayoutAssignments = z.infer<typeof ChildLayoutAssignments>
 
 export const GridLayoutOverride = z.object({
   order: z.number(),
 })
 export type GridLayoutOverride = z.infer<typeof GridLayoutOverride>
-export const GridLayoutOverrides = z.record(z.string(), GridLayoutOverride)
+export const GridLayoutOverrides = stringRecord(GridLayoutOverride)
 export type GridLayoutOverrides = z.infer<typeof GridLayoutOverrides>
 
 export const RowOrderPreference = z.object({
@@ -91,7 +115,7 @@ export const RowOrderPreference = z.object({
   domainId: z.string().min(1),
   generation: z.number().int(),
   unitIds: z.array(z.string().min(1)),
-  columns: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  columns: stringRecord(z.number().int().nonnegative()).optional(),
 })
 export type RowOrderPreference = z.infer<typeof RowOrderPreference>
 export const RootOrderPreference = z.object({
@@ -109,14 +133,14 @@ export const PersistedLayoutPreferences = z.object({
   rootOrders: z.array(RootOrderPreference).default([]),
   rowOrders: z.array(RowOrderPreference).default([]),
   bridgeOrders: z.array(BridgeOrderPreference).default([]),
-  rootAccentAssignments: z.record(z.string(), z.string()).default({}),
-  familyAccentAssignments: z.record(z.string(), z.string()).default({}),
+  rootAccentAssignments: stringRecord(z.string()).default({}),
+  familyAccentAssignments: stringRecord(z.string()).default({}),
 })
 export type PersistedLayoutPreferences = z.infer<typeof PersistedLayoutPreferences>
 
 export const FamilyData = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
-  members: z.record(z.string(), Member),
+  members: stringRecord(Member),
   nicknameOverrides: NicknameOverrides.default({}),
   siblingOrders: SiblingOrders.default({}),
   /** @deprecated V2 手工坐标仅为兼容旧文件保留，新布局忽略。 */

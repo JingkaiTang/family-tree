@@ -57,11 +57,11 @@ export function validateFamilyIntegrity(family: FamilyData): string[] {
           addIssue(`${path} 不能引用成员自身`)
           continue
         }
-        const target = members[ref.id]
-        if (!target) {
+        if (!Object.hasOwn(members, ref.id)) {
           addIssue(`${path} 引用了不存在的成员 ${ref.id}`)
           continue
         }
+        const target = members[ref.id]
         const reverseRefs = target[relation.reverse] as RelationRef[]
         const reverseType = relation.key === 'godparents'
           ? 'godchild'
@@ -147,6 +147,7 @@ export function wouldCreateAncestryCycle(
     if (id === childId) return true
     if (visited.has(id)) continue
     visited.add(id)
+    if (!Object.hasOwn(members, id)) continue
     // blood、adopted、step 都属于亲子链；不沿配偶、同胞或干亲关系遍历。
     for (const parent of members[id]?.parents ?? []) pending.push(parent.id)
   }
@@ -159,7 +160,7 @@ function validateMemberPointer(
   members: FamilyData['members'],
   addIssue: (message: string) => void,
 ) {
-  if (memberId !== undefined && !members[memberId]) {
+  if (memberId !== undefined && !Object.hasOwn(members, memberId)) {
     addIssue(`${path} 引用了不存在的成员 ${memberId}`)
   }
 }
@@ -189,7 +190,7 @@ function findAncestryCycle(members: FamilyData['members']): string[] | null {
       }
 
       const parentId = parents[frame.nextParent++].id
-      if (!members[parentId]) continue
+      if (!Object.hasOwn(members, parentId)) continue
       if (state.get(parentId) === 'visiting') {
         const cycleStart = activeIndex.get(parentId) ?? 0
         return [...activePath.slice(cycleStart), parentId]

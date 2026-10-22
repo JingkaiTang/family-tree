@@ -112,7 +112,12 @@ export function describeRelation(
       members,
       siblingOrders,
     )
-    return inLawByInner(innerLabel, targetGender, path[path.length - 1].relType)
+    return inLawByInner(
+      innerLabel,
+      members[innerTargetId]?.gender ?? 'other',
+      targetGender,
+      path[path.length - 1].relType,
+    )
   }
 
   // --- 开头是 spouse 的姻亲（路径中仅1个spouse）---
@@ -547,10 +552,20 @@ function unclePaternalLabel(
 
 function inLawByInner(
   innerLabel: string,
+  innerGender: TargetGender,
   targetGender: TargetGender,
   spouseType: RelType | undefined,
 ): string {
   if (targetGender === 'other') return `${innerLabel}的${spouseType === 'divorced' ? '前' : ''}伴侣`
+  // 专用姻亲词表描述异性当前配偶；其余保留关系链，不能退回原亲属称谓。
+  if (targetGender === innerGender || spouseType === 'divorced') {
+    const ancestorSpouse = ancestorSpouseLabel(innerLabel, targetGender, spouseType)
+    if (ancestorSpouse) return ancestorSpouse
+    const partner = spouseType === 'divorced'
+      ? targetGender === 'female' ? '前妻' : '前夫'
+      : spouseLabel(targetGender)
+    return `${innerLabel}的${partner}`
+  }
   if (/父母|子女|兄弟姐妹|的/.test(innerLabel)) {
     return `${innerLabel}的${spouseLabel(targetGender)}`
   }
@@ -662,25 +677,8 @@ function inLawByInner(
   if (innerLabel === '堂外甥') return targetGender === 'female' ? '堂甥媳' : '堂外甥'
   if (innerLabel === '堂外甥女') return targetGender === 'female' ? '堂外甥女' : '堂甥女婿'
   // 父母的配偶：家谱可能尚未补全另一方亲子边，不能仅凭缺边推断为继配。
-  if (innerLabel === '父亲') {
-    if (spouseType === 'divorced') {
-      if (targetGender === 'female') return '父亲的前妻'
-      if (targetGender === 'male') return '父亲的前夫'
-      return '父亲的前伴侣'
-    }
-    if (targetGender === 'female') return '父亲的妻子'
-    if (targetGender === 'male') return '父亲的丈夫'
-    return '父亲的伴侣'
-  }
-  if (innerLabel === '母亲') {
-    if (spouseType === 'divorced') {
-      if (targetGender === 'male') return '母亲的前夫'
-      if (targetGender === 'female') return '母亲的前妻'
-      return '母亲的前伴侣'
-    }
-    if (targetGender === 'male') return '母亲的丈夫'
-    if (targetGender === 'female') return '母亲的妻子'
-    return '母亲的伴侣'
+  if (innerLabel === '父亲' || innerLabel === '母亲') {
+    return `${innerLabel}的${spouseLabel(targetGender)}`
   }
   if (innerLabel === '继父') return targetGender === 'female' ? '继母' : '继父'
   if (innerLabel === '继母') return targetGender === 'female' ? '继母' : '继父'

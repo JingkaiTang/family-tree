@@ -13,6 +13,8 @@
 
 本轮升级包括 Vite 8.3.2、Vitest 5.0.3、`vue-tsc` 3.3.12 和 Node 类型定义。其余直接 npm 依赖已检查稳定版本；TypeScript 是已确认冲突后保留的兼容例外。不要用强制覆盖 peer dependency 或关闭类型检查来掩盖该冲突。
 
+2026-10-22 将 Vite 补丁升级到 8.3.5，并更新其锁定依赖，修复 8.3.2 的开发服务器及编辑器启动路径安全公告。更新后的锁文件通过干净安装，`npm audit --audit-level=moderate` 报告 0 个漏洞；Vue 插件、PWA 插件与 Vitest 复用同一个 Vite 版本。
+
 ## 保留与清理
 
 | 用途 | 依赖与边界 |

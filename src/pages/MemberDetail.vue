@@ -10,7 +10,7 @@ import { deletePhoto, type ProjectRef } from '@/services/storage'
 import MemberForm from '@/components/member/MemberForm.vue'
 import RelationEditor from '@/components/member/RelationEditor.vue'
 import SiblingOrderEditor from '@/components/member/SiblingOrderEditor.vue'
-import { getKinship } from '@/core/kinship'
+import { getKinship, getNicknameOverride } from '@/core/kinship'
 import type { FamilyData, Member } from '@/core/schema'
 
 const props = defineProps<{ id?: string }>()
@@ -72,7 +72,7 @@ const autoKinship = computed(() => {
 })
 const overrideValue = computed(() => {
   if (!props.id || !viewpointId.value) return ''
-  return data.value.nicknameOverrides?.[viewpointId.value]?.[props.id] ?? ''
+  return getNicknameOverride(data.value.nicknameOverrides, viewpointId.value, props.id) ?? ''
 })
 const overrideDraft = ref('')
 watch(overrideValue, (v) => (overrideDraft.value = v), { immediate: true })
@@ -182,18 +182,21 @@ async function onDelete() {
   if (!confirm(`确认删除「${member.value.lastName}${member.value.firstName}」？此操作会断开 TA 与其他成员的所有关系。`)) {
     return
   }
+  const isCurrent = captureEditorSession()
+  const photos = [...stagedPhotos]
   family.deleteMember(member.value.id)
   draft.value = null
   baselineProfile.value = ''
   overrideDraft.value = overrideValue.value
   try {
     await flushNow()
-    await discardUnreferencedStagedPhotos()
+    // 等待保存期间详情页可能已复用于另一位成员；只回收原删除操作拥有的媒体。
+    await discardUnreferencedStagedPhotos(false, photos, isCurrent)
   } catch (e) {
-    ui.showToast('error', '删除保存失败：' + (e instanceof Error ? e.message : String(e)))
+    if (isCurrent()) ui.showToast('error', '删除保存失败：' + (e instanceof Error ? e.message : String(e)))
     return
   }
-  router.push('/tree')
+  if (isCurrent()) router.push('/tree')
 }
 
 function onBack() {
@@ -278,9 +281,19 @@ function onMediaStaged(photoId: string) {
   stagedPhotos.set(key, { photoId, project, data: family.data })
 }
 
-async function discardUnreferencedStagedPhotos(preserveDraft = false) {
-  if (stagedPhotos.size === 0) return
-  for (const [key, staged] of [...stagedPhotos]) {
+function captureEditorSession() {
+  const session = editorSession
+  const token = family.projectToken
+  return () => !disposed && session === editorSession && token === family.projectToken
+}
+
+async function discardUnreferencedStagedPhotos(
+  preserveDraft = false,
+  photos = [...stagedPhotos],
+  isCurrent = captureEditorSession(),
+) {
+  for (const [key, staged] of photos) {
+    if (stagedPhotos.get(key) !== staged) continue
     const { photoId, project, data } = staged
     if (preserveDraft && data === family.data && draft.value?.photoId === photoId) continue
     // 使用照片所属项目的数据判断引用，不能拿切换后的项目决定是否删除。
@@ -290,9 +303,9 @@ async function discardUnreferencedStagedPhotos(preserveDraft = false) {
     }
     try {
       await deletePhoto(project, photoId)
-      stagedPhotos.delete(key)
+      if (stagedPhotos.get(key) === staged) stagedPhotos.delete(key)
     } catch (e) {
-      ui.showToast('error', '暂存照片清理失败：' + (e instanceof Error ? e.message : String(e)))
+      if (isCurrent()) ui.showToast('error', '暂存照片清理失败：' + (e instanceof Error ? e.message : String(e)))
     }
   }
 }

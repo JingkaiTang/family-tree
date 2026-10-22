@@ -206,7 +206,7 @@ function chooseCurrentSpouseEdges(edges: SpouseEdge[]): Set<string> {
 function inferChildLayoutAssignments(
   members: Record<string, Member>,
 ): FamilyData['childLayoutAssignments'] {
-  const assignments: FamilyData['childLayoutAssignments'] = {}
+  const assignments: FamilyData['childLayoutAssignments'] = Object.create(null)
   for (const child of Object.values(members).sort((left, right) => compareIds(left.id, right.id))) {
     const parentIds = uniqueSortedIds(child.parents.map((parent) => parent.id).filter((id) => Boolean(members[id])))
     if (parentIds.length === 0) continue

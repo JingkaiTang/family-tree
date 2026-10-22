@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { layoutFamilyScene } from './layoutFamilyScene'
 import { routeAuxiliaryEdges } from './routeAuxiliaryEdges'
 import { normalizeFacts } from './normalizeFacts'
+import { FamilyData } from '../schema'
+import { assertFamilyIntegrity } from '../familyIntegrity'
+import { validateScene } from './validateScene'
 import { familyData, linkParent, linkSpouse, member, positiveCollinearOverlap } from './testHelpers'
 import {
   DEFAULT_FAMILY_VIEW_POLICY,
@@ -17,6 +20,60 @@ import type {
 } from './types'
 
 describe('routeAuxiliaryEdges', () => {
+  it('routes focused auxiliary relations after safe fallback and primary completion', () => {
+    const data = fallbackFamily()
+    const before = JSON.stringify(data)
+    const normalized = normalizeFacts(data)
+    const request = layoutRequest(normalized, true)
+    const noFocus = layoutFamilyScene(request)
+    const focused = layoutFamilyScene({ ...request, auxiliaryFocusPersonId: 'p8' })
+    const hidden = layoutFamilyScene({
+      ...layoutRequest(normalized, false), auxiliaryFocusPersonId: 'p8',
+    })
+    const unrelated = layoutFamilyScene({ ...request, auxiliaryFocusPersonId: 'p11' })
+    const reversed = normalizeFacts({
+      ...data, members: Object.fromEntries(Object.entries(data.members).reverse()),
+    })
+
+    expect(noFocus.diagnostics).toContainEqual({
+      code: 'UNROUTABLE_PRIMARY_EDGE', ids: ['parentage:p7'],
+      message: 'Unable to route primary family edge parentage:p7',
+    })
+    expect(focused.routes.filter(route => route.kind === 'godparent').map(route => route.routeOwnerId))
+      .toEqual(['aux:godparent:["p0","p8"]'])
+    expect(focused.routes.filter(route => route.kind === 'primary')).toEqual(noFocus.routes)
+    expect(primaryGeometry(focused)).toEqual(primaryGeometry(noFocus))
+    expect(focused.diagnostics).toEqual(noFocus.diagnostics)
+    expect(validateScene(focused, DEFAULT_LAYOUT_METRICS)).toEqual([])
+    expect(hidden).toEqual(noFocus)
+    expect(unrelated).toEqual(noFocus)
+    expect(layoutFamilyScene({ ...layoutRequest(reversed, true), auxiliaryFocusPersonId: 'p8' }))
+      .toEqual(focused)
+    expect(JSON.stringify(data)).toBe(before)
+  })
+
+  it('diagnoses a blocked fallback auxiliary relation while retaining the routable one', () => {
+    const data = fallbackFamily()
+    data.members.p4.godchildren.push({ id: 'p8', type: 'godchild' })
+    data.members.p8.godparents.push({ id: 'p4', type: 'godparent' })
+    assertFamilyIntegrity(data)
+    const request = layoutRequest(normalizeFacts(data), true)
+    const noFocus = layoutFamilyScene(request)
+    const focused = layoutFamilyScene({ ...request, auxiliaryFocusPersonId: 'p8' })
+
+    expect(focused.routes.filter(route => route.kind === 'godparent').map(route => route.routeOwnerId))
+      .toEqual(['aux:godparent:["p0","p8"]'])
+    expect(focused.diagnostics.filter(diagnostic => diagnostic.code === 'UNROUTABLE_AUXILIARY_EDGE'))
+      .toEqual([{
+        code: 'UNROUTABLE_AUXILIARY_EDGE',
+        ids: ['aux:godparent:["p4","p8"]', 'p4', 'p8'],
+        message: '部分辅助连线暂时无法显示：当前卡片间没有找到安全通道。',
+      }])
+    expect(focused.routes.filter(route => route.kind === 'primary')).toEqual(noFocus.routes)
+    expect(primaryGeometry(focused)).toEqual(primaryGeometry(noFocus))
+    expect(validateScene(focused, DEFAULT_LAYOUT_METRICS)).toEqual([])
+  })
+
   it('exposes a child path only for auxiliary parentage when tracing direct lineage', () => {
     const kinds: AuxiliaryRelation['kind'][] = [
       'secondary-parentage', 'godparent', 'historical-partnership', 'secondary-partnership',
@@ -378,6 +435,21 @@ function primaryGeometry(scene: ReturnType<typeof layoutFamilyScene>) {
     gateways: scene.gateways,
     bounds: scene.bounds,
   }
+}
+
+function fallbackFamily() {
+  const ids = ['p0', 'p2', 'p4', 'p6', 'p7', 'p8', 'p10', 'p11']
+  const people = Object.fromEntries(ids.map(id => [id, member(id)]))
+  for (const [parent, child] of [
+    ['p0', 'p4'], ['p2', 'p4'], ['p4', 'p10'], ['p7', 'p8'], ['p7', 'p11'],
+  ]) linkParent(people[child], people[parent])
+  linkSpouse(people.p4, people.p6)
+  linkSpouse(people.p8, people.p10)
+  people.p0.godchildren.push({ id: 'p8', type: 'godchild' })
+  people.p8.godparents.push({ id: 'p0', type: 'godparent' })
+  const data = FamilyData.parse(familyData(Object.values(people)))
+  assertFamilyIntegrity(data)
+  return data
 }
 
 function staggeredFamily() {

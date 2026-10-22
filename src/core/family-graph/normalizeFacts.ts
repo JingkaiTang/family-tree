@@ -57,11 +57,11 @@ export function normalizeFacts(data: FamilyData): NormalizedFamilyFactsResult {
         .map(parent => parent.id))]
       if (parentIds.length === 0) continue
       const id = `parentage:${encodeIdTuple(parentIds)}`
-      const existing = parentageById.get(id) ?? {
+      const existing: ParentageFact = parentageById.get(id) ?? {
         id,
         parentIds,
         childIds: [],
-        typeByChildId: {},
+        typeByChildId: Object.create(null),
       }
       existing.childIds.push(child.id)
       existing.typeByChildId[child.id] = type

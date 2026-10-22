@@ -39,6 +39,19 @@ function rawFamily(members: Member[], patch: Record<string, unknown> = {}): Reco
 }
 
 describe('migrate', () => {
+  it.each(['__proto__', 'constructor', 'toString'])('retains the inferred V1 parent assignment for child %s', id => {
+    const parent = member('parent')
+    const child = member(id)
+    linkParent(child, parent)
+
+    const migrated = FamilyData.parse(migrate(rawFamily([parent, child])))
+
+    expect(Object.hasOwn(migrated.childLayoutAssignments, id)).toBe(true)
+    expect(migrated.childLayoutAssignments[id]).toEqual({ primaryParentId: parent.id })
+    expect(JSON.parse(JSON.stringify(migrated)).childLayoutAssignments[id])
+      .toEqual({ primaryParentId: parent.id })
+  })
+
   it('creates V5 families with empty semantic layout preferences', () => {
     const family = createEmptyFamily()
 

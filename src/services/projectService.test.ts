@@ -51,6 +51,37 @@ describe('projectService format boundary', () => {
     expect(opened.family.schemaVersion).toBe(SCHEMA_VERSION)
   })
 
+  it.each([4, SCHEMA_VERSION])('打开 V%s 项目时保留与原型属性同名的成员和称谓', async schemaVersion => {
+    const family = {
+      ...createEmptyFamily(),
+      schemaVersion,
+      members: Object.fromEntries(['__proto__', 'constructor', 'toString', 'normal'].map(id => [id, member(id)])),
+      nicknameOverrides: Object.fromEntries([['__proto__', Object.fromEntries([['constructor', '长辈']])]]),
+    }
+    api.loadProject.mockResolvedValue({ ref: project, family, meta: createEmptyMeta('测试') })
+
+    const opened = await openProject(project)
+
+    expect(opened.family.members).toEqual(family.members)
+    expect(JSON.parse(JSON.stringify(opened.family.nicknameOverrides))).toEqual(family.nicknameOverrides)
+  })
+
+  it('保存时完整保留特殊成员 ID，并将非法特殊键值拒绝在写盘之前', async () => {
+    const family = {
+      ...createEmptyFamily(),
+      members: Object.fromEntries(['__proto__', 'constructor', 'normal'].map(id => [id, member(id)])),
+    }
+
+    await saveProject(project, family)
+
+    expect(api.saveProject).toHaveBeenCalledExactlyOnceWith(project, family)
+    expect(Object.keys(api.saveProject.mock.calls[0][1].members).sort()).toEqual(['__proto__', 'constructor', 'normal'])
+    api.saveProject.mockClear()
+    family.members.__proto__.parents.push({ id: 'missing', type: 'blood' })
+    await expect(saveProject(project, family)).rejects.toThrow('不存在的成员 missing')
+    expect(api.saveProject).not.toHaveBeenCalled()
+  })
+
   it('拒绝比应用更新的项目元数据版本', async () => {
     api.loadProject.mockResolvedValue({
       ref: project,

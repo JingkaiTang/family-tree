@@ -114,4 +114,17 @@ describe('validateFamilyIntegrity', () => {
     expect(() => assertFamilyIntegrity(family)).toThrow('rootMemberId')
     expect(() => assertFamilyIntegrity(family)).toThrow('nicknameOverrides.a.missing')
   })
+
+  it.each(['__proto__', 'constructor', 'toString'])('不把继承属性 %s 误当成成员', id => {
+    const family = familyOf(member('a'))
+    family.rootMemberId = id
+    family.defaultViewpointId = id
+    family.members.a.parents.push({ id, type: 'blood' })
+
+    const issues = validateFamilyIntegrity(family)
+
+    expect(issues).toContain(`rootMemberId 引用了不存在的成员 ${id}`)
+    expect(issues).toContain(`defaultViewpointId 引用了不存在的成员 ${id}`)
+    expect(issues).toContain(`members.a.parents 引用了不存在的成员 ${id}`)
+  })
 })

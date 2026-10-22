@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import {
   reconcileLayoutPreferences,
   withBridgeOrderPreference,
@@ -60,7 +60,7 @@ export const useFamilyStore = defineStore('family', () => {
   /** 最近一次成功保存的时间戳，用于 UI 显示 */
   const lastSavedAt = ref<number | null>(null)
 
-  const membersArray = computed(() => Object.values(data.value.members))
+  const membersArray = computed(() => Object.values(data.value.members).map(member => reactive(member)))
   const memberCount = computed(() => membersArray.value.length)
 
   function setProject(project: ProjectRef, meta: ProjectMeta, family: FamilyData, permissions: ProjectAccess = { canEdit: true, canRename: true }) {
@@ -116,6 +116,10 @@ export const useFamilyStore = defineStore('family', () => {
 
   function markDirty() {
     requireEditable()
+    // Vue 不追踪 __proto__ 的属性读取；发布字典变更，让直接读取项目的布局观察者更新。
+    if (Object.hasOwn(data.value.members, '__proto__')) {
+      data.value.members = { ...data.value.members }
+    }
     isDirty.value = true
     // autosave 同步订阅 revision；首个变更也必须先处于 dirty 状态。
     revision.value += 1
@@ -124,21 +128,22 @@ export const useFamilyStore = defineStore('family', () => {
   // ---------------- Member CRUD ----------------
 
   function getMember(id: string): Member | undefined {
-    return data.value.members[id]
+    // Vue 对 __proto__ 还会跳过深层代理，显式代理成员以追踪资料和关系数组。
+    return Object.hasOwn(data.value.members, id) ? reactive(data.value.members[id]) : undefined
   }
 
   function upsertMember(member: Member) {
     requireEditable()
-    data.value.members[member.id] = member
+    data.value.members = { ...data.value.members, [member.id]: member }
     data.value.siblingOrders = reconcileSiblingOrders(data.value)
     markDirty()
   }
 
   function updateMember(id: string, patch: Partial<Member>) {
     requireEditable()
-    const m = data.value.members[id]
+    const m = getMember(id)
     if (!m) return
-    data.value.members[id] = { ...m, ...patch }
+    data.value.members = { ...data.value.members, [id]: { ...m, ...patch } }
     if (patch.parents !== undefined || patch.siblings !== undefined) {
       data.value.siblingOrders = reconcileSiblingOrders(data.value)
     }
@@ -147,10 +152,10 @@ export const useFamilyStore = defineStore('family', () => {
 
   function deleteMember(id: string) {
     requireEditable()
-    const m = data.value.members[id]
+    const m = getMember(id)
     if (!m) return
     // 在其他成员的关系列表中移除对它的引用
-    for (const other of Object.values(data.value.members)) {
+    for (const other of membersArray.value) {
       other.parents = other.parents.filter((r) => r.id !== id)
       other.children = other.children.filter((r) => r.id !== id)
       other.siblings = other.siblings.filter((r) => r.id !== id)
@@ -183,7 +188,9 @@ export const useFamilyStore = defineStore('family', () => {
         delete data.value.childLayoutAssignments[childId]
       }
     }
-    delete data.value.members[id]
+    const remainingMembers = { ...data.value.members }
+    delete remainingMembers[id]
+    data.value.members = remainingMembers
     data.value.siblingOrders = reconcileSiblingOrders(data.value)
     data.value.layoutPreferences = reconcileLayoutPreferences(data.value)
     markDirty()
@@ -199,8 +206,8 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function getCurrentSpouseConflicts(memberId: string, otherId: string): string[] {
-    const me = data.value.members[memberId]
-    const other = data.value.members[otherId]
+    const me = getMember(memberId)
+    const other = getMember(otherId)
     if (!me || !other || memberId === otherId) return []
 
     return [...new Set([currentSpouseId(me), currentSpouseId(other)])]
@@ -209,7 +216,7 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   function removeCurrentSpouse(memberId: string) {
-    const member = data.value.members[memberId]
+    const member = getMember(memberId)
     if (!member) return
 
     const spouseIds = member.spouses
@@ -218,7 +225,7 @@ export const useFamilyStore = defineStore('family', () => {
     member.spouses = member.spouses.filter((spouse) => spouse.type !== 'married')
 
     for (const spouseId of spouseIds) {
-      const spouse = data.value.members[spouseId]
+      const spouse = getMember(spouseId)
       if (!spouse) continue
       spouse.spouses = spouse.spouses.filter((ref) => !(ref.id === memberId && ref.type === 'married'))
     }
@@ -231,8 +238,8 @@ export const useFamilyStore = defineStore('family', () => {
   ): LinkCurrentSpouseResult {
     requireEditable()
     if (memberId === otherId) return { ok: false, conflicts: [] }
-    const me = data.value.members[memberId]
-    const other = data.value.members[otherId]
+    const me = getMember(memberId)
+    const other = getMember(otherId)
     if (!me || !other) return { ok: false, conflicts: [] }
 
     const conflicts = getCurrentSpouseConflicts(memberId, otherId)
@@ -266,8 +273,8 @@ export const useFamilyStore = defineStore('family', () => {
   function linkRelation(memberId: string, otherId: string, kind: RelationKind) {
     requireEditable()
     if (memberId === otherId) return
-    const me = data.value.members[memberId]
-    const other = data.value.members[otherId]
+    const me = getMember(memberId)
+    const other = getMember(otherId)
     if (!me || !other) return
 
     if (kind === 'parent' || kind === 'child') {
@@ -313,8 +320,8 @@ export const useFamilyStore = defineStore('family', () => {
 
   function unlinkRelation(memberId: string, otherId: string, kind: RelationKind) {
     requireEditable()
-    const me = data.value.members[memberId]
-    const other = data.value.members[otherId]
+    const me = getMember(memberId)
+    const other = getMember(otherId)
     if (!me || !other) return
 
     if (kind === 'parent') {
@@ -362,17 +369,16 @@ export const useFamilyStore = defineStore('family', () => {
 
   function setNicknameOverride(fromId: string, toId: string, label: string | null) {
     requireEditable()
-    if (!data.value.nicknameOverrides[fromId]) {
-      data.value.nicknameOverrides[fromId] = {}
-    }
+    const overrides = data.value.nicknameOverrides
+    const previous = Object.hasOwn(overrides, fromId) ? overrides[fromId] : {}
+    // 计算属性创建自有数据键，避免 __proto__ setter；替换字典也会触发 Vue 更新。
+    const row = label === null || label === '' ? { ...previous } : { ...previous, [toId]: label }
     if (label === null || label === '') {
-      delete data.value.nicknameOverrides[fromId][toId]
-      if (Object.keys(data.value.nicknameOverrides[fromId]).length === 0) {
-        delete data.value.nicknameOverrides[fromId]
-      }
-    } else {
-      data.value.nicknameOverrides[fromId][toId] = label
+      delete row[toId]
     }
+    const next = { ...overrides, [fromId]: row }
+    if (Object.keys(row).length === 0) delete next[fromId]
+    data.value.nicknameOverrides = next
     markDirty()
   }
 
@@ -392,13 +398,14 @@ export const useFamilyStore = defineStore('family', () => {
 
   function setChildLayoutAssignment(id: string, assignment: ChildLayoutAssignment | null) {
     requireEditable()
-    if (!data.value.members[id]) return
-    data.value.childLayoutAssignments ??= {}
+    if (!getMember(id)) return
 
     if (!assignment || (!assignment.primaryParentId && !assignment.primarySpouseId)) {
-      delete data.value.childLayoutAssignments[id]
+      const assignments = { ...data.value.childLayoutAssignments }
+      delete assignments[id]
+      data.value.childLayoutAssignments = assignments
     } else {
-      data.value.childLayoutAssignments[id] = assignment
+      data.value.childLayoutAssignments = { ...data.value.childLayoutAssignments, [id]: assignment }
     }
     markDirty()
   }
@@ -453,16 +460,18 @@ export const useFamilyStore = defineStore('family', () => {
    */
   function setManualPosition(id: string, cx: number, top: number) {
     requireEditable()
-    if (!data.value.members[id]) return
-    data.value.manualPositions[id] = { cx, top }
+    if (!getMember(id)) return
+    data.value.manualPositions = { ...data.value.manualPositions, [id]: { cx, top } }
     markDirty()
   }
 
   /** 撤销某成员的手工位置，回到算法布局 */
   function clearManualPosition(id: string) {
     requireEditable()
-    if (data.value.manualPositions[id]) {
-      delete data.value.manualPositions[id]
+    if (Object.hasOwn(data.value.manualPositions, id)) {
+      const positions = { ...data.value.manualPositions }
+      delete positions[id]
+      data.value.manualPositions = positions
       markDirty()
     }
   }
